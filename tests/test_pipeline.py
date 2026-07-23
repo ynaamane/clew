@@ -452,6 +452,182 @@ class TestDoTranscribeAndSummarize:
         assert not out_dir.exists()
 
 
+class TestCorrectionIntegration:
+    def _make_transcript(self) -> TranscriptResult:
+        return TranscriptResult(
+            segments=[Segment(text="Bonjur tout le monde.", start=0.0, end=1.5)],
+            language="fr",
+            duration=1.5,
+        )
+
+    def test_correction_disabled_leaves_transcript_untouched(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = False
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Bonjur tout le monde." in transcript_text
+
+    def test_correction_enabled_applies_fix(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.chat.return_value = "Bonjour tout le monde."
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Bonjour tout le monde." in transcript_text
+        assert "Bonjur" not in transcript_text
+
+    def test_correction_enabled_creates_summarizer_even_without_summarize(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        config.summarization.enabled = False
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.chat.return_value = "Bonjour tout le monde."
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        mock_create.assert_called_once()
+        mock_summarizer.close.assert_called_once()
+        assert not (tmp_path / "summary.md").exists()
+
+    def test_correction_and_summarization_share_one_summarizer_instance(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.chat.return_value = "Bonjour tout le monde."
+        mock_summarizer.summarize.return_value = "A greeting."
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        mock_create.assert_called_once()
+
+    def test_correction_backend_unavailable_skips_gracefully(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = False
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Bonjur tout le monde." in transcript_text
+
+    def test_correction_exception_falls_back_to_uncorrected_transcript(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.chat.side_effect = RuntimeError("boom")
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Bonjur tout le monde." in transcript_text
+
+    def test_hallucinated_correction_rejected_transcript_unchanged(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.correction.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.chat.return_value = (
+            "This is a wildly different unrelated hallucinated response that should be rejected"
+        )
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Bonjur tout le monde." in transcript_text
+
+
 class TestFindDualTracks:
     def test_returns_none_when_neither_track_exists(self, tmp_path):
         from ownscribe.pipeline import _find_dual_tracks

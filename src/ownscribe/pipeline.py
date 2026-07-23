@@ -16,6 +16,7 @@ from pathlib import Path
 import click
 
 from ownscribe.config import Config
+from ownscribe.correction import correct_transcript
 from ownscribe.progress import (
     DownloadProgressEvent,
     PipelineProgress,
@@ -523,14 +524,18 @@ def _do_transcribe_and_summarize(
     """Shared logic for transcribe + optional summarize."""
     diar_enabled = config.diarization.enabled and bool(config.diarization.hf_token)
     sum_enabled = summarize and config.summarization.enabled
+    correction_enabled = config.correction.enabled
 
     summary = None
     summary_str = None
     title_slug = ""
     sum_unavailable = False
     sum_failed = False
+    correction_unavailable = False
+    correction_failed = False
 
     local_sum = sum_enabled and config.summarization.backend == "local"
+    needs_llm = sum_enabled or correction_enabled
 
     with PipelineProgress(
         diarize=diar_enabled,
@@ -554,19 +559,33 @@ def _do_transcribe_and_summarize(
         else:
             result = _transcribe_and_identify(transcriber, audio_path)
 
-        # Save transcript — silent, no echo
-        transcript_str, _ = _format_output(config, result)
-        ext = "json" if config.output.format == "json" else "md"
-        transcript_path = out_dir / f"transcript.{ext}"
-        transcript_path.write_text(transcript_str)
-
-        if sum_enabled:
+        summarizer = None
+        if needs_llm:
             try:
                 summarizer = create_summarizer(config)
             except ImportError as exc:
                 click.echo(f"Error: {exc}", err=True)
                 raise SystemExit(1) from None
-            try:
+
+        try:
+            if correction_enabled:
+                if summarizer is not None and summarizer.is_available():
+                    try:
+                        result = correct_transcript(
+                            summarizer, result, config.correction.max_length_delta_ratio
+                        )
+                    except Exception:
+                        correction_failed = True
+                else:
+                    correction_unavailable = True
+
+            # Save transcript — silent, no echo
+            transcript_str, _ = _format_output(config, result)
+            ext = "json" if config.output.format == "json" else "md"
+            transcript_path = out_dir / f"transcript.{ext}"
+            transcript_path.write_text(transcript_str)
+
+            if sum_enabled and summarizer is not None:
                 if not summarizer.is_available():
                     sum_unavailable = True
                 else:
@@ -589,11 +608,24 @@ def _do_transcribe_and_summarize(
                     except Exception:
                         progress.fail("summarizing")
                         sum_failed = True
-            finally:
+        finally:
+            if summarizer is not None:
                 summarizer.close()
 
     # --- All user-facing output after TUI exits ---
     click.echo(f"Transcript saved to {transcript_path}")
+
+    if correction_unavailable:
+        click.echo(
+            "\nWarning: Correction pass enabled but the summarization backend is not reachable. "
+            "Skipping correction; transcript is uncorrected.",
+            err=True,
+        )
+    elif correction_failed:
+        click.echo(
+            "\nWarning: Correction pass failed. Transcript is saved uncorrected.",
+            err=True,
+        )
 
     if sum_unavailable:
         if config.summarization.backend == "local":

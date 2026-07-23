@@ -166,3 +166,22 @@ SEARCH_ANSWER_PROMPT = """Question: {question}
 {transcripts}
 
 Answer using the format from your instructions (summary, then quoted evidence grouped by meeting)."""
+
+
+# --- Correction prompts ---
+
+CORRECTION_SYSTEM = (
+    "You correct spelling and word-boundary errors in a single transcript segment from a "
+    "bilingual French/English meeting where speakers switch languages mid-sentence. "
+    "Fix only: misspelled words, wrong word boundaries, misheard technical terms "
+    "(e.g. product/domain jargon that a speech recognizer commonly mangles), and "
+    "obviously wrong language-switch artifacts (a French word transcribed as a similar-sounding "
+    "English word, or vice versa). "
+    "Do NOT paraphrase, summarize, add words, remove words, change meaning, translate, "
+    "add punctuation the speaker did not clearly indicate, or fix grammar/disfluencies "
+    "that reflect how people actually speak. "
+    "If the segment is already correct, or you are not confident about a fix, return it unchanged. "
+    "Return ONLY the corrected segment text, nothing else — no quotes, no explanation, no preamble."
+)
+
+CORRECTION_PROMPT = "{segment_text}"

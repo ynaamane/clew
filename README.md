@@ -309,6 +309,18 @@ ownscribe speakers            # list all enrolled names
 ownscribe unenroll "Alice"    # remove an enrolled voiceprint
 ```
 
+## Transcript Correction
+
+Meetings with French/English code-switching (speakers alternating languages mid-sentence) can trip up Whisper's spelling and word-boundary detection. An opt-in correction pass sends each transcript segment's text through your configured LLM backend, asking it to fix spelling and misheard words only — never to paraphrase, translate, add content, or touch timestamps/speakers.
+
+```toml
+[correction]
+enabled = true
+max_length_delta_ratio = 0.4  # reject a fix that changes segment length by more than this fraction
+```
+
+A correction is applied only if it passes the length-delta guard; anything further outside that ratio (a sign of an added or truncated response) is rejected and the original segment text is kept unchanged. Uses your existing `[summarization]` backend — no separate model or config needed. Runs after diarization/speaker naming and before summarization, using the same summarizer instance.
+
 ## Acknowledgments
 
 ownscribe builds on some excellent open-source projects:

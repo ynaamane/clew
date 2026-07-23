@@ -37,6 +37,10 @@ min_speakers = 0          # 0 = auto-detect
 max_speakers = 0
 telemetry = false         # set to true to allow HuggingFace Hub + pyannote metrics telemetry
 
+[correction]
+enabled = false           # opt-in LLM post-correction pass over the transcript text
+max_length_delta_ratio = 0.4  # reject a segment fix that changes length by more than this fraction
+
 [summarization]
 enabled = true
 backend = "local"         # "local" (built-in, no server needed), "ollama", or "openai"
@@ -87,6 +91,12 @@ class DiarizationConfig:
 
 
 @dataclass
+class CorrectionConfig:
+    enabled: bool = False
+    max_length_delta_ratio: float = 0.4
+
+
+@dataclass
 class SummarizationConfig:
     enabled: bool = True
     backend: str = "local"
@@ -127,6 +137,7 @@ class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     transcription: TranscriptionConfig = field(default_factory=TranscriptionConfig)
     diarization: DiarizationConfig = field(default_factory=DiarizationConfig)
+    correction: CorrectionConfig = field(default_factory=CorrectionConfig)
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     templates: dict[str, TemplateConfig] = field(default_factory=dict)
@@ -168,6 +179,11 @@ def _merge_toml(config: Config, data: dict) -> Config:
         for k, v in data["diarization"].items():
             if hasattr(config.diarization, k):
                 setattr(config.diarization, k, v)
+
+    if "correction" in data:
+        for k, v in data["correction"].items():
+            if hasattr(config.correction, k):
+                setattr(config.correction, k, v)
 
     if "summarization" in data:
         for k, v in data["summarization"].items():
