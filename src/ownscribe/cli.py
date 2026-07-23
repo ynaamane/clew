@@ -231,6 +231,32 @@ def resume(
 
 
 @cli.command()
+@click.option("--name", required=True, help="Name to enroll this speaker's voice as.")
+@click.argument("file", type=click.Path(exists=True))
+@click.pass_context
+def enroll(ctx: click.Context, name: str, file: str) -> None:
+    """Enroll a speaker's voiceprint from a short reference audio clip."""
+    config = ctx.obj["config"]
+    from ownscribe.pipeline import run_enroll
+    run_enroll(config, name, file)
+
+
+@cli.command()
+@click.argument("name")
+def unenroll(name: str) -> None:
+    """Remove an enrolled speaker's voiceprint."""
+    from ownscribe.pipeline import run_unenroll
+    run_unenroll(name)
+
+
+@cli.command("speakers")
+def list_speakers() -> None:
+    """List all enrolled speaker names."""
+    from ownscribe.pipeline import run_list_enrolled
+    run_list_enrolled()
+
+
+@cli.command()
 def apps() -> None:
     """List running apps with PIDs for use with --pid."""
     from ownscribe.audio.coreaudio import CoreAudioRecorder

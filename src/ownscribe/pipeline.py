@@ -174,9 +174,36 @@ def _merge_dual_track_results(system_result, mic_result, mic_offset: float):
     return replace(system_result, segments=all_segments, duration=duration)
 
 
+def _relabel_speakers_with_voiceprints(result, cluster_embeddings: dict[str, list[float]]):
+    """Rename diarized cluster labels (e.g. SPEAKER_00) to enrolled names where matched."""
+    from dataclasses import replace
+
+    from ownscribe.speakers.base import VoiceprintDB
+    from ownscribe.speakers.matching import assign_speaker_names
+
+    if not isinstance(cluster_embeddings, dict) or not cluster_embeddings:
+        return result
+
+    db = VoiceprintDB.load()
+    if not db.voiceprints:
+        return result
+
+    assignments = assign_speaker_names(cluster_embeddings, db)
+    relabeled_segments = [
+        replace(seg, speaker=assignments.get(seg.speaker, seg.speaker)) for seg in result.segments
+    ]
+    return replace(result, segments=relabeled_segments)
+
+
+def _transcribe_and_identify(transcriber, audio_path: Path):
+    """Transcribe a track and relabel any diarized clusters with enrolled speaker names."""
+    result = transcriber.transcribe(audio_path)
+    return _relabel_speakers_with_voiceprints(result, transcriber.last_speaker_embeddings)
+
+
 def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_offset: float):
-    """Transcribe system.wav (diarized per config) and mic.wav (owner, never diarized), merged."""
-    system_result = transcriber.transcribe(system_path)
+    """Transcribe system.wav (diarized+identified per config) and mic.wav (owner, never diarized), merged."""
+    system_result = _transcribe_and_identify(transcriber, system_path)
     mic_result = transcriber.transcribe(mic_path, diarize=False)
     return _merge_dual_track_results(system_result, mic_result, mic_offset)
 
@@ -525,7 +552,7 @@ def _do_transcribe_and_summarize(
             mic_offset = _read_mic_start_offset(audio_path)
             result = _transcribe_dual_track(transcriber, system_path, mic_path, mic_offset)
         else:
-            result = transcriber.transcribe(audio_path)
+            result = _transcribe_and_identify(transcriber, audio_path)
 
         # Save transcript — silent, no echo
         transcript_str, _ = _format_output(config, result)
@@ -696,3 +723,57 @@ def run_resume(config: Config, directory: str) -> None:
         click.echo(f"Found audio: {audio}")
         click.echo("Resuming: transcribe + summarize.\n")
         _do_transcribe_and_summarize(config, audio, dir_path)
+
+
+def run_enroll(config: Config, name: str, audio_file: str) -> None:
+    """Enroll a speaker's voiceprint from a short reference clip."""
+    from ownscribe.speakers.base import VoiceprintDB
+    from ownscribe.speakers.embedding import SpeakerEmbedder
+
+    if not config.diarization.hf_token:
+        click.echo(
+            "Error: Enrollment requires a HuggingFace token (same one diarization uses).\n"
+            "Set HF_TOKEN env var or hf_token in config.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    audio_path = Path(audio_file).resolve()
+    embedder = SpeakerEmbedder(config.diarization.hf_token)
+
+    try:
+        embedding = embedder.embed_file(audio_path)
+    except Exception as exc:
+        click.echo(f"Error: Failed to compute voiceprint: {exc}", err=True)
+        raise SystemExit(1) from None
+
+    db = VoiceprintDB.load()
+    db.upsert(name, embedding)
+    db.save()
+
+    click.echo(f"Enrolled '{name}' from {audio_path}")
+
+
+def run_unenroll(name: str) -> None:
+    """Remove an enrolled speaker's voiceprint."""
+    from ownscribe.speakers.base import VoiceprintDB
+
+    db = VoiceprintDB.load()
+    if db.remove(name):
+        db.save()
+        click.echo(f"Removed voiceprint for '{name}'")
+    else:
+        click.echo(f"No enrolled voiceprint found for '{name}'", err=True)
+        raise SystemExit(1)
+
+
+def run_list_enrolled() -> None:
+    """List all enrolled speaker names."""
+    from ownscribe.speakers.base import VoiceprintDB
+
+    db = VoiceprintDB.load()
+    if not db.voiceprints:
+        click.echo("No enrolled speakers.")
+        return
+    for vp in db.voiceprints:
+        click.echo(vp.name)

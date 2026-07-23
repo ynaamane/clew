@@ -309,8 +309,12 @@ class TestDiarizationApiCompat:
         fake_segment = types.SimpleNamespace(start=0.5, end=1.5)
         fake_annotation = mock.MagicMock()
         fake_annotation.itertracks.return_value = [(fake_segment, "track_0", "SPEAKER_00")]
+        fake_annotation.labels.return_value = ["SPEAKER_00"]
         # DiarizeOutput stand-in: deliberately no top-level `itertracks` attribute.
-        fake_diarize_output = types.SimpleNamespace(speaker_diarization=fake_annotation)
+        fake_diarize_output = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2, 0.3]]),
+        )
 
         fake_diarize_model = mock.MagicMock()
         fake_diarize_model.model.return_value = fake_diarize_output
@@ -327,3 +331,62 @@ class TestDiarizationApiCompat:
 
         fake_annotation.itertracks.assert_called_once_with(yield_label=True)
         assert out[0] == "assigned"
+        assert transcriber.last_speaker_embeddings == {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+
+class TestExtractClusterEmbeddings:
+    def test_extracts_embeddings_keyed_by_speaker_label(self):
+        import numpy as np
+
+        from ownscribe.config import TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_annotation = mock.MagicMock()
+        fake_annotation.labels.return_value = ["SPEAKER_00", "SPEAKER_01"]
+        fake_diarization = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2], [0.3, 0.4]]),
+        )
+
+        result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {"SPEAKER_00": [0.1, 0.2], "SPEAKER_01": [0.3, 0.4]}
+
+    def test_returns_empty_dict_when_embeddings_attribute_missing(self):
+        from ownscribe.config import TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_diarization = types.SimpleNamespace(speaker_diarization=mock.MagicMock())
+
+        result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {}
+
+    def test_returns_empty_dict_when_embeddings_is_none(self):
+        from ownscribe.config import TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_diarization = types.SimpleNamespace(
+            speaker_diarization=mock.MagicMock(),
+            speaker_embeddings=None,
+        )
+
+        result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {}
+
+
+class TestLastSpeakerEmbeddings:
+    def test_defaults_to_empty_dict(self):
+        from ownscribe.config import TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        assert transcriber.last_speaker_embeddings == {}

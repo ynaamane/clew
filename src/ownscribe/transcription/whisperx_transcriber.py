@@ -40,6 +40,11 @@ class WhisperXTranscriber(Transcriber):
         self._model = None
         self._align_models: dict[str, tuple[object, object]] = {}
         self._diarize_model = None
+        self._last_speaker_embeddings: dict[str, list[float]] = {}
+
+    @property
+    def last_speaker_embeddings(self) -> dict[str, list[float]]:
+        return self._last_speaker_embeddings
 
     def _load_model(self):
         import whisperx
@@ -327,6 +332,8 @@ class WhisperXTranscriber(Transcriber):
 
         progress.complete("diarizing")
 
+        self._last_speaker_embeddings = self._extract_cluster_embeddings(diarization)
+
         # Convert to DataFrame (replicating whisperx/diarize.py logic)
         diarize_df = pd.DataFrame(
             diarization.speaker_diarization.itertracks(yield_label=True),
@@ -336,3 +343,11 @@ class WhisperXTranscriber(Transcriber):
         diarize_df["end"] = diarize_df["segment"].apply(lambda x: x.end)
 
         return whisperx.assign_word_speakers(diarize_df, result)
+
+    @staticmethod
+    def _extract_cluster_embeddings(diarization) -> dict[str, list[float]]:
+        embeddings = getattr(diarization, "speaker_embeddings", None)
+        if embeddings is None:
+            return {}
+        labels = diarization.speaker_diarization.labels()
+        return {label: embeddings[i].tolist() for i, label in enumerate(labels)}

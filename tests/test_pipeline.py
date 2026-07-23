@@ -6,6 +6,8 @@ import contextlib
 import json
 from unittest import mock
 
+import pytest
+
 from ownscribe.config import Config
 from ownscribe.transcription.models import Segment, TranscriptResult, Word
 
@@ -697,6 +699,146 @@ class TestTranscribeDualTrack:
         assert {seg.speaker for seg in result.segments} == {"SPEAKER_00", "Owner"}
 
 
+class TestRelabelSpeakersWithVoiceprints:
+    def test_relabels_matching_cluster(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        result = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled = _relabel_speakers_with_voiceprints(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
+
+        assert relabeled.segments[0].speaker == "Alice"
+
+    def test_unmatched_cluster_gets_unknown_label(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        result = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled = _relabel_speakers_with_voiceprints(
+                result, {"SPEAKER_00": [0.0, 0.0, 1.0]}
+            )
+
+        assert relabeled.segments[0].speaker == "Unknown-1"
+
+    def test_no_embeddings_returns_result_unchanged(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+
+        result = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        relabeled = _relabel_speakers_with_voiceprints(result, {})
+
+        assert relabeled.segments[0].speaker == "SPEAKER_00"
+
+    def test_no_enrolled_voiceprints_returns_result_unchanged(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+
+        db_path = tmp_path / "voiceprints.json"
+
+        result = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled = _relabel_speakers_with_voiceprints(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
+
+        assert relabeled.segments[0].speaker == "SPEAKER_00"
+
+    def test_non_dict_embeddings_returns_result_unchanged(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+
+        result = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        relabeled = _relabel_speakers_with_voiceprints(result, mock.MagicMock())
+
+        assert relabeled.segments[0].speaker == "SPEAKER_00"
+
+    def test_segments_without_speaker_are_untouched(self, tmp_path):
+        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker=None)])
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled = _relabel_speakers_with_voiceprints(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
+
+        assert relabeled.segments[0].speaker is None
+
+
+class TestTranscribeAndIdentify:
+    def test_relabels_using_transcriber_captured_embeddings(self, tmp_path):
+        from ownscribe.pipeline import _transcribe_and_identify
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        audio_path = tmp_path / "system.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.99, 0.01, 0.0]}
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            result = _transcribe_and_identify(mock_transcriber, audio_path)
+
+        mock_transcriber.transcribe.assert_called_once_with(audio_path)
+        assert result.segments[0].speaker == "Alice"
+
+    def test_no_enrollment_db_leaves_diarized_labels_as_is(self, tmp_path):
+        from ownscribe.pipeline import _transcribe_and_identify
+
+        audio_path = tmp_path / "system.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.99, 0.01, 0.0]}
+
+        db_path = tmp_path / "voiceprints.json"
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            result = _transcribe_and_identify(mock_transcriber, audio_path)
+
+        assert result.segments[0].speaker == "SPEAKER_00"
+
+
 class TestDoTranscribeAndSummarizeDualTrack:
     def test_uses_dual_track_when_both_tracks_present(self, tmp_path):
         from ownscribe.pipeline import _do_transcribe_and_summarize
@@ -1091,3 +1233,143 @@ class TestResume:
         with mock.patch("ownscribe.pipeline.run_summarize") as mock_sum:
             run_resume(config, str(tmp_path))
             mock_sum.assert_called_once_with(config, str(tmp_path / "transcript.json"))
+
+
+class TestRunEnroll:
+    def test_errors_without_hf_token(self, tmp_path):
+        from ownscribe.pipeline import run_enroll
+
+        config = Config()
+        config.diarization.hf_token = ""
+        clip = tmp_path / "clip.wav"
+        clip.touch()
+
+        with pytest.raises(SystemExit):
+            run_enroll(config, "Alice", str(clip))
+
+    def test_saves_embedding_to_db(self, tmp_path):
+        from ownscribe.pipeline import run_enroll
+        from ownscribe.speakers.base import Voiceprint, VoiceprintDB
+
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        clip = tmp_path / "clip.wav"
+        clip.touch()
+        db_path = tmp_path / "voiceprints.json"
+
+        mock_embedder = mock.MagicMock()
+        mock_embedder.embed_file.return_value = [0.1, 0.2, 0.3]
+
+        with (
+            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+        ):
+            run_enroll(config, "Alice", str(clip))
+
+        db = VoiceprintDB.load(db_path)
+        assert db.voiceprints == [Voiceprint(name="Alice", embedding=[0.1, 0.2, 0.3])]
+
+    def test_embedding_failure_exits_with_error(self, tmp_path):
+        from ownscribe.pipeline import run_enroll
+
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        clip = tmp_path / "clip.wav"
+        clip.touch()
+
+        mock_embedder = mock.MagicMock()
+        mock_embedder.embed_file.side_effect = RuntimeError("boom")
+
+        with (
+            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            pytest.raises(SystemExit),
+        ):
+            run_enroll(config, "Alice", str(clip))
+
+    def test_reenrolling_same_name_overwrites(self, tmp_path):
+        from ownscribe.pipeline import run_enroll
+        from ownscribe.speakers.base import VoiceprintDB
+
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        clip = tmp_path / "clip.wav"
+        clip.touch()
+        db_path = tmp_path / "voiceprints.json"
+
+        mock_embedder = mock.MagicMock()
+        mock_embedder.embed_file.return_value = [1.0, 0.0]
+
+        with (
+            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+        ):
+            run_enroll(config, "Alice", str(clip))
+
+        mock_embedder.embed_file.return_value = [0.0, 1.0]
+        with (
+            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+        ):
+            run_enroll(config, "Alice", str(clip))
+
+        db = VoiceprintDB.load(db_path)
+        assert len(db.voiceprints) == 1
+        assert db.voiceprints[0].embedding == [0.0, 1.0]
+
+
+class TestRunUnenroll:
+    def test_removes_existing_speaker(self, tmp_path):
+        from ownscribe.pipeline import run_unenroll
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0])
+        db.save(db_path)
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            run_unenroll("Alice")
+
+        reloaded = VoiceprintDB.load(db_path)
+        assert reloaded.voiceprints == []
+
+    def test_missing_speaker_exits_with_error(self, tmp_path):
+        from ownscribe.pipeline import run_unenroll
+
+        db_path = tmp_path / "voiceprints.json"
+
+        with (
+            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            pytest.raises(SystemExit),
+        ):
+            run_unenroll("Nobody")
+
+
+class TestRunListEnrolled:
+    def test_lists_all_enrolled_names(self, tmp_path, capsys):
+        from ownscribe.pipeline import run_list_enrolled
+        from ownscribe.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0])
+        db.upsert("Bob", [0.0, 1.0])
+        db.save(db_path)
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            run_list_enrolled()
+
+        captured = capsys.readouterr()
+        assert "Alice" in captured.out
+        assert "Bob" in captured.out
+
+    def test_empty_db_reports_none_enrolled(self, tmp_path, capsys):
+        from ownscribe.pipeline import run_list_enrolled
+
+        db_path = tmp_path / "voiceprints.json"
+
+        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            run_list_enrolled()
+
+        captured = capsys.readouterr()
+        assert "No enrolled speakers" in captured.out

@@ -178,6 +178,9 @@ ownscribe transcribe recording.wav # transcribe an audio or video file: wav/mp3/
 ownscribe summarize transcript.md  # summarize a transcript (saves alongside the input)
 ownscribe resume ./2026-02-20_1736 # resume a partial run, or process a folder's audio/video recording
 ownscribe ask "question"           # search your meetings with a natural-language question
+ownscribe enroll --name "Alice" clip.wav # enroll a speaker's voiceprint from a short reference clip
+ownscribe unenroll "Alice"         # remove an enrolled speaker's voiceprint
+ownscribe speakers                 # list all enrolled speaker names
 ownscribe config                   # open config file in $EDITOR
 ownscribe cleanup                  # remove ownscribe data from disk
 ```
@@ -288,6 +291,23 @@ Speaker identification requires a HuggingFace token with access to the pyannote 
 4. Run with `--diarize`
 
 Diarization always runs on CPU. See `NOTES.md` for why the MPS path is disabled here rather than upstream's `device = "auto"` default.
+
+## Speaker Naming
+
+Enroll a speaker's voice from a short reference clip (a few seconds of them speaking, isolated) to have their real name appear in transcripts instead of a generic `SPEAKER_00` label:
+
+```bash
+ownscribe enroll --name "Alice" alice-sample.wav
+```
+
+This computes a voiceprint using the same embedding model diarization already loads (no extra download) and stores it in `~/.config/meeting-scribe/voiceprints/voiceprints.json`. Enrollment requires the same HuggingFace token as diarization (§ Speaker Diarization above).
+
+During a meeting, every diarized speaker cluster is compared against enrolled voiceprints by cosine similarity. A match above the threshold (default `0.65`) gets the enrolled name; anything below gets `Unknown-1`, `Unknown-2`, etc. — never a forced wrong match. If you record with `--mic` (or `capture_mode` retains separate tracks), your own segments are always labeled `Owner` directly from the microphone track and are never sent through diarization or matching, since you're a known speaker by construction.
+
+```bash
+ownscribe speakers            # list all enrolled names
+ownscribe unenroll "Alice"    # remove an enrolled voiceprint
+```
 
 ## Acknowledgments
 
