@@ -42,7 +42,7 @@ All audio, transcripts, and summaries remain local.
 
 ## Features
 
-- **System audio capture** — records all system audio natively via Core Audio Taps (macOS 14.2+), no virtual audio drivers needed
+- **System audio capture** — records all system audio natively via a CoreAudio process tap (macOS 14.2+), no virtual audio drivers needed, no Screen Recording permission required
 - **Microphone capture** — optionally record system + mic audio simultaneously with `--mic`
 - **WhisperX transcription** — fast, accurate speech-to-text with word-level timestamps
 - **Speaker diarization** — optional speaker identification via pyannote (requires HuggingFace token)
@@ -66,17 +66,18 @@ Summarization works out of the box — a local model (Phi-4-mini, ~2.4 GB) downl
 
 Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc.).
 
-> **Tip:** Your terminal app (Terminal, iTerm2, VS Code, etc.) needs **Screen Recording** permission to capture system audio, and **Microphone** permission if you use `--mic`.
-> Open the settings panel directly with:
+> **Tip:** The first time ownscribe records system audio, macOS prompts for **System Audio Recording** permission — a narrower grant than Screen Recording; it only lets ownscribe hear other apps' audio, not see your screen. If you use `--mic`, macOS also prompts for **Microphone** permission. Open either settings panel directly with:
 >
 > ```bash
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
 > ```
 >
-> Enable your terminal app, then restart it.
+> Enable your terminal app under "System Audio Recording Only", then restart it.
 >
-> ownscribe checks both permissions **before** starting a recording and exits with the exact fix if either is missing, rather than silently recording silence for the whole meeting. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
+> ownscribe checks Microphone access **before** starting a recording (when `--mic` is set) and exits with the exact fix if it's missing. System Audio Recording is a private macOS permission with no public preflight API, so it's requested naturally on first capture instead — if denied, ownscribe reports it immediately rather than silently recording silence. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
+>
+> On macOS versions before 14.2, or if you pass `[audio] capture_backend = "screencapturekit"` in config, ownscribe falls back to ScreenCaptureKit, which does require the Screen Recording permission instead.
 
 ## Installation
 
@@ -238,11 +239,12 @@ Config is stored at `~/.config/ownscribe/config.toml`. Run `ownscribe config` to
 
 ```toml
 [audio]
-backend = "coreaudio"     # "coreaudio" or "sounddevice"
+backend = "coreaudio"     # "coreaudio" (native macOS helper) or "sounddevice" (cross-platform)
 device = ""               # empty = system audio
 mic = false               # also capture microphone input
 mic_device = ""           # specific mic device name (empty = default)
 capture_mode = "all"      # "all" = capture all system audio directly (default); "picker" = show source picker
+capture_backend = "coreaudio"  # the native helper's own mechanism: "coreaudio" (tap, macOS 14.2+) or "screencapturekit"
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
 
 [transcription]

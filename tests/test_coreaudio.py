@@ -121,3 +121,60 @@ class TestCoreAudioRecorderMicFailLoud:
 
         with pytest.raises(RuntimeError, match="binary not found"):
             recorder.start(tmp_path / "recording.wav")
+
+
+class TestCoreAudioRecorderCaptureBackend:
+    """CoreAudioRecorder.start() defaults to the CoreAudio tap and only adds
+    ScreenCaptureKit-specific flags when explicitly asked for the SCK fallback."""
+
+    def _make_recorder(self, capture_backend: str = "coreaudio", capture_mode: str = "all", binary_path=None):
+        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path):
+            return CoreAudioRecorder(capture_backend=capture_backend, capture_mode=capture_mode)
+
+    def test_default_backend_omits_capture_backend_and_capture_mode_flags(self, tmp_path):
+        binary = tmp_path / "patched.sh"
+        binary.touch()
+        binary.chmod(0o755)
+        recorder = self._make_recorder(binary_path=binary)
+
+        with mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen:
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--capture-backend" not in cmd
+            assert "--capture-mode-all" not in cmd
+
+    def test_screencapturekit_backend_passes_capture_backend_flag(self, tmp_path):
+        binary = tmp_path / "patched.sh"
+        binary.touch()
+        binary.chmod(0o755)
+        recorder = self._make_recorder(capture_backend="screencapturekit", binary_path=binary)
+
+        with mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen:
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--capture-backend" in cmd
+            assert cmd[cmd.index("--capture-backend") + 1] == "screencapturekit"
+
+    def test_screencapturekit_backend_with_capture_mode_all_passes_both_flags(self, tmp_path):
+        binary = tmp_path / "patched.sh"
+        binary.touch()
+        binary.chmod(0o755)
+        recorder = self._make_recorder(capture_backend="screencapturekit", capture_mode="all", binary_path=binary)
+
+        with mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen:
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--capture-backend" in cmd
+            assert "--capture-mode-all" in cmd
+
+    def test_screencapturekit_backend_with_picker_mode_omits_capture_mode_all(self, tmp_path):
+        binary = tmp_path / "patched.sh"
+        binary.touch()
+        binary.chmod(0o755)
+        recorder = self._make_recorder(capture_backend="screencapturekit", capture_mode="picker", binary_path=binary)
+
+        with mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen:
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--capture-backend" in cmd
+            assert "--capture-mode-all" not in cmd

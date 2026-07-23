@@ -17,6 +17,6 @@ swiftc \
     -framework CoreGraphics \
     -framework CoreAudio \
     -framework AudioToolbox \
-    "$SCRIPT_DIR/Sources/AudioCapture.swift"
+    "$SCRIPT_DIR"/Sources/*.swift
 
 echo "Built: $BIN_DIR/ownscribe-audio"

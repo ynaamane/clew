@@ -40,6 +40,10 @@ class TestDefaults:
         cfg = Config()
         assert cfg.audio.capture_mode == "all"
 
+    def test_default_capture_backend_is_coreaudio_tap(self):
+        cfg = Config()
+        assert cfg.audio.capture_backend == "coreaudio"
+
     def test_default_diarization_telemetry_off(self):
         cfg = Config()
         assert cfg.diarization.telemetry is False
@@ -89,6 +93,12 @@ class TestMergeToml:
         merged = _merge_toml(cfg, data)
         assert merged.audio.mic is True
         assert merged.audio.mic_device == "MacBook Pro Microphone"
+
+    def test_capture_backend_from_toml(self):
+        cfg = Config()
+        data = {"audio": {"capture_backend": "screencapturekit"}}
+        merged = _merge_toml(cfg, data)
+        assert merged.audio.capture_backend == "screencapturekit"
 
     def test_diarization_telemetry_from_toml(self):
         cfg = Config()

@@ -22,6 +22,7 @@ device = ""               # empty = system audio; or device name/index for sound
 mic = false               # also capture microphone input
 mic_device = ""           # specific mic device name (empty = default)
 capture_mode = "all"      # "all" = capture all system audio directly (default); "picker" = show source picker
+capture_backend = "coreaudio"  # ownscribe-audio's mechanism: "coreaudio" (tap, macOS 14.2+) or "screencapturekit"
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
 
 [transcription]
@@ -71,6 +72,7 @@ class AudioConfig:
     mic: bool = False
     mic_device: str = ""
     capture_mode: str = "all"  # "all" = all system audio (default); "picker" = show source picker
+    capture_backend: str = "coreaudio"  # ownscribe-audio mechanism: "coreaudio" (tap, default) or "screencapturekit"
     silence_timeout: int = 300  # seconds of silence before auto-stop; 0 = disabled
 
 

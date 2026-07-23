@@ -105,11 +105,13 @@ class CoreAudioRecorder(AudioRecorder):
     def __init__(
         self, mic: bool = False, mic_device: str = "",
         capture_mode: str = "picker", silence_timeout: int = 0,
+        capture_backend: str = "coreaudio",
     ) -> None:
         self._mic = mic
         self._mic_device = mic_device
         self._capture_mode = capture_mode
         self._silence_timeout = silence_timeout
+        self._capture_backend = capture_backend
         self._process: subprocess.Popen | None = None
         self._binary = _find_binary()
         self._silence_warning: bool = False
@@ -131,8 +133,10 @@ class CoreAudioRecorder(AudioRecorder):
             )
 
         cmd = [str(self._binary), "capture", "--output", str(output_path)]
-        if self._capture_mode == "all":
-            cmd.append("--capture-mode-all")
+        if self._capture_backend == "screencapturekit":
+            cmd.extend(["--capture-backend", "screencapturekit"])
+            if self._capture_mode == "all":
+                cmd.append("--capture-mode-all")
         if wants_mic:
             cmd.append("--mic")
         if self._mic_device:

@@ -12,11 +12,11 @@ import IOKit.pwr_mgt
 // MARK: - Constants
 
 /// Minimum peak amplitude to consider microphone audio "loud" (silence timeout).
-private let kMicLoudThreshold: Float = 1e-2
+let kMicLoudThreshold: Float = 1e-2
 /// Minimum peak amplitude to consider system audio "loud" (silence timeout).
-private let kSystemLoudThreshold: Float = 1e-4
+let kSystemLoudThreshold: Float = 1e-4
 /// System audio capture and merge output sample rate (mono float32).
-private let kSystemAudioSampleRate: Double = 24000
+let kSystemAudioSampleRate: Double = 24000
 
 /// Compute peak amplitude across all channels of float audio data.
 func computePeakLevel(in channelData: UnsafePointer<UnsafeMutablePointer<Float>>,
@@ -362,7 +362,7 @@ func findInputDevice(named name: String) throws -> AudioDeviceID {
 
 // MARK: - System Audio Capture via ScreenCaptureKit
 
-class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, SCContentSharingPickerObserver {
+class SystemAudioCapture: NSObject, SystemAudioCapturing, SCStreamOutput, SCStreamDelegate, SCContentSharingPickerObserver {
     private var stream: SCStream?
     private var audioFile: AVAudioFile?
     private var audioConverter: AVAudioConverter?
@@ -1061,7 +1061,8 @@ func printUsage() {
         --output, -o FILE      Output WAV file path (required for capture)
         --mic                  Also capture microphone input
         --mic-device NAME      Use specific mic input device (implies --mic)
-        --capture-mode-all     Capture all system audio without showing the source picker
+        --capture-backend NAME "coreaudio" (default, macOS 14.2+) or "screencapturekit"
+        --capture-mode-all     ScreenCaptureKit only: capture all system audio without a picker
         --silence-timeout N    Auto-stop after N seconds of silence (0 = disabled)
         --sustained-seconds N  Seconds of continuous audio activity before watch-activity
                                reports a detected meeting (default 3)
@@ -1124,6 +1125,7 @@ func main() {
         var micDeviceName: String?
         var captureModeAll = false
         var silenceTimeout: TimeInterval = 0
+        var captureBackend = "coreaudio"
 
         var i = 2
         while i < args.count {
@@ -1137,6 +1139,13 @@ func main() {
                 outputPath = args[i]
             case "--capture-mode-all":
                 captureModeAll = true
+            case "--capture-backend":
+                i += 1
+                guard i < args.count else {
+                    fputs("Error: --capture-backend requires a value (coreaudio or screencapturekit)\n", stderr)
+                    exit(1)
+                }
+                captureBackend = args[i]
             case "--mic":
                 enableMic = true
             case "--mic-device":
@@ -1172,7 +1181,25 @@ func main() {
             exit(1)
         }
 
-        if !runCapturePermissionPreflight(needsMic: enableMic) {
+        let useCoreAudioTap: Bool
+        if #available(macOS 14.2, *) {
+            useCoreAudioTap = captureBackend != "screencapturekit"
+        } else {
+            useCoreAudioTap = false
+        }
+
+        if !useCoreAudioTap {
+            if !runCapturePermissionPreflight(needsMic: enableMic) {
+                exit(1)
+            }
+        } else if enableMic && !preflightMicrophoneAccess() {
+            fputs("""
+            [PERMISSION_MISSING] Microphone permission is not granted.
+            Mic capture will fail or record silence.
+            Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone
+            Enable your terminal app, then restart it.
+            """, stderr)
+            fputs("\n", stderr)
             exit(1)
         }
 
@@ -1180,8 +1207,15 @@ func main() {
         let systemPath = enableMic ? output + ".sys.tmp.wav" : output
         let micPath = output + ".mic.tmp.wav"
 
-        let capture = SystemAudioCapture(outputPath: systemPath)
-        capture.captureModeAll = captureModeAll
+        let capture: SystemAudioCapturing
+        if useCoreAudioTap, #available(macOS 14.2, *) {
+            CoreAudioTapCapture.cleanupStaleAggregateDevices()
+            capture = CoreAudioTapCapture(outputPath: systemPath)
+        } else {
+            let sckCapture = SystemAudioCapture(outputPath: systemPath)
+            sckCapture.captureModeAll = captureModeAll
+            capture = sckCapture
+        }
         capture.silenceTimeout = silenceTimeout
         var micCapture: MicCapture?
 
