@@ -19,7 +19,7 @@ bash swift/build.sh
 uv run pytest
 
 # Run linter
-uv run ruff check src/ tests/
+uv run ruff check src/ tests/ scripts/
 ```
 
 ## Running tests
@@ -32,35 +32,53 @@ uv run pytest -v -k test_cli        # run a specific test module
 
 Tests that require macOS are auto-skipped on other platforms. Tests marked `@pytest.mark.hardware` are auto-skipped in CI.
 
+## Verifying HF-gated / real-audio behavior
+
+The regular test suite mocks everything gated behind a HuggingFace token (pyannote diarization/embedding models) or real hardware (MPS). `scripts/verify_with_token.py` consolidates every one of those checks into a single script, so they can all be closed in one pass instead of separately:
+
+```bash
+HF_TOKEN=hf_... uv run python scripts/verify_with_token.py
+HF_TOKEN=hf_... uv run python scripts/verify_with_token.py --clip real_meeting.wav
+HF_TOKEN=hf_... uv run python scripts/verify_with_token.py --clip-a alice.wav --clip-b bob.wav
+```
+
+Run `--help` to see every supported clip flag. Each check is independent and prints PASS/FAIL/SKIP with a detail line; the script exits non-zero only if a check that actually ran failed.
+
 ## Code style
 
-This project uses [ruff](https://docs.astral.sh/ruff/) for linting. Run `uv run ruff check src/ tests/` before submitting a PR. The CI will also check this.
+This project uses [ruff](https://docs.astral.sh/ruff/) for linting. Run `uv run ruff check src/ tests/ scripts/` before submitting a PR. The CI will also check this.
 
 ## Open contribution areas
 
 Here are some areas where contributions would be especially welcome:
 
 ### Linux/Windows audio capture backends
+
 Currently, system audio capture only works on macOS via Core Audio Taps. Adding support for PulseAudio/PipeWire (Linux) or WASAPI (Windows) would make the tool cross-platform. See `src/ownscribe/audio/base.py` for the recorder interface. A two-device mode for SoundDeviceRecorder (separate system audio + mic streams) would also bring mic mute toggle support to non-macOS platforms.
 
 ### GUI frontend
+
 Build a desktop GUI (Electron, Tauri, or native) that wraps the CLI. Could show a recording indicator, live transcript preview, and summary output.
 
 ### Integration with meeting tools
+
 A big difference to cloud-based apps is that those usually connect to meetings directly and capture the audio through that. This way, if your microphone is muted, it's not recorded. With the mic mute toggle (press `m` during recording), you can now mute/unmute the mic stream without stopping the recording. Further integration ideas include detecting the meeting app's mute state automatically.
 
 ### Speaker name assignment
+
 Currently, diarization produces anonymous labels (`SPEAKER_00`, `SPEAKER_01`). Allow users to map these to real names, either interactively after transcription or via a pre-configured mapping.
 
 ### Additional LLM backends
+
 Add support for more summarization backends beyond the built-in local model, Ollama, and OpenAI-compatible servers — for example, Anthropic or Google. See `src/ownscribe/summarization/base.py` for the summarizer interface.
 
 ### Improved diarization
+
 The current diarization works well for 2-3 speakers but can struggle with larger meetings. Investigate better models or post-processing to improve accuracy for many-participant calls.
 
 ## Submitting changes
 
 1. Fork the repo and create a feature branch
 2. Make your changes
-3. Ensure tests pass (`uv run pytest`) and linting is clean (`uv run ruff check src/ tests/`)
+3. Ensure tests pass (`uv run pytest`) and linting is clean (`uv run ruff check src/ tests/ scripts/`)
 4. Submit a pull request with a clear description of the change

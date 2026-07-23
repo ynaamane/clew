@@ -299,6 +299,7 @@ class TestDiarizationApiCompat:
         # pyannote.audio 4.0 wraps the annotation in a DiarizeOutput container;
         # _diarize must read it as `.speaker_diarization.itertracks()`.
         import numpy as np
+        import torch  # noqa: F401
 
         from ownscribe.config import DiarizationConfig, TranscriptionConfig
         from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
@@ -332,6 +333,57 @@ class TestDiarizationApiCompat:
         fake_annotation.itertracks.assert_called_once_with(yield_label=True)
         assert out[0] == "assigned"
         assert transcriber.last_speaker_embeddings == {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+
+class TestPyannoteAudioIoRealDecode:
+    """Real (unmocked) proof that the in-memory {waveform, sample_rate} dict this
+    codebase always passes to pyannote never touches torchcodec, regardless of
+    whether the venv's torchcodec build can dlopen against the installed FFmpeg.
+    No HF token or gated model needed: pyannote.audio.core.io.Audio is the same
+    IO helper the real diarization pipeline (SpeakerDiarization) delegates to for
+    every audio access, and this test exercises it directly on a real, decoded
+    (non-mocked) waveform.
+    """
+
+    def test_call_and_crop_succeed_on_real_waveform_dict(self):
+        import numpy as np
+        import torch
+        from pyannote.audio.core.io import Audio
+        from pyannote.core import Segment
+
+        waveform = torch.from_numpy(np.random.randn(1, 16000).astype("float32"))
+        audio_data = {"waveform": waveform, "sample_rate": 16000}
+        io = Audio()
+
+        full_waveform, sample_rate = io(audio_data)
+        assert full_waveform.shape == (1, 16000)
+        assert sample_rate == 16000
+
+        cropped_waveform, crop_sample_rate = io.crop(audio_data, Segment(0.0, 0.5))
+        assert cropped_waveform.shape == (1, 8000)
+        assert crop_sample_rate == 16000
+
+    def test_whisperx_load_audio_never_imports_torchcodec(self, tmp_path):
+        import sys
+
+        import numpy as np
+        import soundfile as sf
+        import whisperx
+
+        assert "torchcodec" not in sys.modules, "torchcodec must not already be imported by an earlier test"
+
+        wav_path = tmp_path / "real_tone.wav"
+        sf.write(str(wav_path), (np.random.randn(16000) * 0.1).astype("float32"), 16000)
+
+        audio = whisperx.load_audio(str(wav_path))
+
+        assert audio.dtype == np.float32
+        assert len(audio) > 0
+        assert "torchcodec" not in sys.modules, (
+            "whisperx.load_audio shells out to the real ffmpeg CLI directly; "
+            "if this starts importing torchcodec, the in-memory-dict workaround "
+            "this codebase relies on may no longer be sufficient upstream."
+        )
 
 
 class TestExtractClusterEmbeddings:
