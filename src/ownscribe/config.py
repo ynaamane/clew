@@ -30,6 +30,12 @@ model = "large-v3"        # whisper model: tiny, base, small, medium, large-v3
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "__BILINGUAL_INITIAL_PROMPT__"
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
+engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, needs the "canary" extra)
+
+[canary]
+repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"  # HF repo of the MLX-native Canary-1B-v2 checkpoint
+max_segment_seconds = 40.0  # VAD-segment audio into chunks no longer than this before each generate() call
+max_tokens_per_segment = 200  # generation cap per segment
 
 [diarization]
 enabled = false           # set to true + provide hf_token to enable
@@ -82,6 +88,14 @@ class TranscriptionConfig:
     language: str = ""
     initial_prompt: str = BILINGUAL_INITIAL_PROMPT
     hotwords: str = ""
+    engine: str = "whisperx"  # "whisperx" (default) or "canary_mlx" (A/B pilot only)
+
+
+@dataclass
+class CanaryConfig:
+    repo: str = "CogniSoftOrg/canary-1b-v2-mlx-bf16"
+    max_segment_seconds: float = 40.0
+    max_tokens_per_segment: int = 200
 
 
 @dataclass
@@ -140,6 +154,7 @@ class OutputConfig:
 class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     transcription: TranscriptionConfig = field(default_factory=TranscriptionConfig)
+    canary: CanaryConfig = field(default_factory=CanaryConfig)
     diarization: DiarizationConfig = field(default_factory=DiarizationConfig)
     correction: CorrectionConfig = field(default_factory=CorrectionConfig)
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
@@ -178,6 +193,11 @@ def _merge_toml(config: Config, data: dict) -> Config:
         for k, v in data["transcription"].items():
             if hasattr(config.transcription, k):
                 setattr(config.transcription, k, v)
+
+    if "canary" in data:
+        for k, v in data["canary"].items():
+            if hasattr(config.canary, k):
+                setattr(config.canary, k, v)
 
     if "diarization" in data:
         for k, v in data["diarization"].items():

@@ -67,6 +67,7 @@ line-length = 120
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pytest.ini_options]
+addopts = "-m 'not slow'"
 markers = [
     "macos: tests that require macOS",
     "hardware: tests that require audio hardware",

@@ -254,6 +254,12 @@ model = "large-v3"        # tiny, base, small, medium, large-v3
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "..."    # defaults to a bilingual FR/EN sentence to prime code-switching; override freely
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
+engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, see below)
+
+[canary]
+repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"  # HF repo of the MLX-native Canary-1B-v2 checkpoint
+max_segment_seconds = 40.0  # VAD-segment audio into chunks no longer than this before each pass
+max_tokens_per_segment = 200
 
 [diarization]
 enabled = false
@@ -376,6 +382,29 @@ max_length_delta_ratio = 0.4  # reject a fix that changes segment length by more
 
 A correction is applied only if it passes the length-delta guard; anything further outside that ratio (a sign of an added or truncated response) is rejected and the original segment text is kept unchanged. Uses your existing `[summarization]` backend — no separate model or config needed. Runs after diarization/speaker naming and before summarization, using the same summarizer instance.
 
+## Canary Transcription Engine (A/B Pilot)
+
+`engine = "canary_mlx"` swaps the default WhisperX/faster-whisper pipeline for [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2) via [mlx-audio](https://github.com/Blaizzy/mlx-audio) (Apple Silicon native, MLX runtime). This is a pilot A/B engine, not the default — pick it explicitly to compare against WhisperX on your own recordings.
+
+```toml
+[transcription]
+engine = "canary_mlx"
+
+[canary]
+repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"
+max_segment_seconds = 40.0
+max_tokens_per_segment = 200
+```
+
+Requires `uv` on PATH (already required to run ownscribe from source). `mlx-audio` is never installed into ownscribe's own environment: the engine spawns `uv run --with mlx-audio ...` per transcription, layering the dependency onto an ephemeral overlay so it never touches `pyproject.toml`, `uv.lock`, or your other transcription runs. The first invocation downloads the ~2GB checkpoint from HuggingFace (cached afterward). The first `uv run --with` invocation also resolves and downloads mlx-audio itself (cached in `~/.cache/uv` afterward, so only the very first Canary transcription pays this cost).
+
+Known scope limits for this engine, compared to the WhisperX default:
+
+- **Segment-level only, no word-level timestamps.** Canary's decoder has no forced-alignment step; every segment's `words` list is empty.
+- **No self-diarization.** Speaker labeling for Canary transcripts is whatever your existing diarization/naming pipeline produces on a segment-overlap basis — Canary itself never diarizes.
+- **One language per run.** No per-segment auto-detection; `[transcription] language` (or the CLI `--language` flag) sets both source and target language for the whole file, defaulting to French if unset.
+- **VAD-segmented in ≤`max_segment_seconds` chunks** (via faster-whisper's bundled Silero VAD, already installed for WhisperX — no extra dependency) rather than one continuous pass, since Canary's positional encoding has no long-form chunking of its own.
+
 ## Acknowledgments
 
 ownscribe builds on some excellent open-source projects:
@@ -383,6 +412,7 @@ ownscribe builds on some excellent open-source projects:
 - [WhisperX](https://github.com/m-bain/whisperX) — fast speech recognition with word-level timestamps and speaker diarization
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — CTranslate2-based Whisper inference
 - [pyannote.audio](https://github.com/pyannote/pyannote-audio) — speaker diarization
+- [mlx-audio](https://github.com/Blaizzy/mlx-audio) / [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2) — Apple Silicon native ASR (Canary pilot engine)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) / [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) — local LLM inference
 - [Ollama](https://ollama.ai) — local LLM serving
 - [Click](https://click.palletsprojects.com) — CLI framework

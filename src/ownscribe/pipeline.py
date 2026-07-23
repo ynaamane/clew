@@ -161,7 +161,20 @@ def _create_recorder(config: Config):
 
 
 def _create_transcriber(config: Config, progress=None):
-    """Create the WhisperX transcriber."""
+    """Create the configured transcriber (whisperx default, or canary_mlx for the A/B pilot)."""
+    if config.transcription.engine == "canary_mlx":
+        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber, is_available
+
+        if not is_available():
+            click.echo(
+                "Error: [transcription] engine = 'canary_mlx' requires `uv` on PATH "
+                "(used to run the mlx-audio overlay subprocess). Install uv or switch "
+                "back to engine = 'whisperx'.",
+                err=True,
+            )
+            raise SystemExit(1)
+        return CanaryMlxTranscriber(config.transcription, config.canary, progress=progress)
+
     from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
 
     diar_config = config.diarization if config.diarization.enabled else None
