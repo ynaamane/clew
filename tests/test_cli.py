@@ -111,6 +111,18 @@ class TestSubcommandHelp:
         assert result.exit_code == 0
         assert "Resume a partially-completed pipeline" in result.output
 
+    def test_reprocess_help(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["reprocess", "--help"])
+        assert result.exit_code == 0
+        assert "Force a full re-transcribe+summarize" in result.output
+
+    def test_purge_help(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["purge", "--help"])
+        assert result.exit_code == 0
+        assert "Delete retained audio according to the retention policy" in result.output
+
     def test_warmup_help(self):
         runner = CliRunner()
         result = runner.invoke(cli, ["warmup", "--help"])
@@ -153,6 +165,63 @@ class TestWarmupCommand:
         assert config.transcription.model == "large-v3"
         assert config.transcription.language == "de"
         assert config.diarization.enabled is True
+
+
+class TestReprocessCommand:
+    def test_reprocess_invokes_pipeline_with_overrides(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+            result = runner.invoke(
+                cli,
+                ["reprocess", str(tmp_path), "--model", "large-v3", "--language", "fr", "--template", "brief"],
+            )
+
+        assert result.exit_code == 0
+        config = mock_reprocess.call_args[0][0]
+        assert config.transcription.model == "large-v3"
+        assert config.transcription.language == "fr"
+        assert config.summarization.template == "brief"
+        assert mock_reprocess.call_args[0][1] == str(tmp_path)
+
+    def test_reprocess_requires_existing_directory(self):
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(cli, ["reprocess", "/no/such/directory"])
+        assert result.exit_code != 0
+
+
+class TestPurgeCommand:
+    def test_purge_default_forwards_none_and_false(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+            result = runner.invoke(cli, ["purge"])
+
+        assert result.exit_code == 0
+        mock_purge.assert_called_once()
+        _config, older_than_days, purge_all, dry_run = mock_purge.call_args[0]
+        assert older_than_days is None
+        assert purge_all is False
+        assert dry_run is False
+
+    def test_purge_older_than_and_dry_run_flags(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+            result = runner.invoke(cli, ["purge", "--older-than", "14", "--dry-run"])
+
+        assert result.exit_code == 0
+        _, older_than_days, purge_all, dry_run = mock_purge.call_args[0]
+        assert older_than_days == 14
+        assert purge_all is False
+        assert dry_run is True
+
+    def test_purge_all_flag(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+            result = runner.invoke(cli, ["purge", "--all"])
+
+        assert result.exit_code == 0
+        _, _, purge_all, _ = mock_purge.call_args[0]
+        assert purge_all is True
 
 
 class TestCleanup:

@@ -56,6 +56,10 @@ class TestDefaults:
         cfg = Config()
         assert cfg.audio.silence_timeout == 300
 
+    def test_default_retention_days_is_keep_forever(self):
+        cfg = Config()
+        assert cfg.output.retention_days == 0
+
 
 class TestMergeToml:
     def test_full_override(self):
@@ -97,6 +101,12 @@ class TestMergeToml:
         data = {"summarization": {"template": "lecture"}}
         merged = _merge_toml(cfg, data)
         assert merged.summarization.template == "lecture"
+
+    def test_retention_days_from_toml(self):
+        cfg = Config()
+        data = {"output": {"retention_days": 30}}
+        merged = _merge_toml(cfg, data)
+        assert merged.output.retention_days == 30
 
     def test_user_templates_from_toml(self):
         cfg = Config()

@@ -244,6 +244,44 @@ def resume(
 
 
 @cli.command()
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--model", default=None, help="Whisper model size (tiny, base, small, medium, large-v3).")
+@click.option("--language", default=None, help="Language code for transcription (e.g. en, de, fr).")
+@click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
+@click.pass_context
+def reprocess(
+    ctx: click.Context, directory: str,
+    model: str | None, language: str | None, template: str | None,
+) -> None:
+    """Force a full re-transcribe+summarize from retained audio, even if output already exists."""
+    config = ctx.obj["config"]
+    if model:
+        config.transcription.model = model
+    if language:
+        config.transcription.language = language
+    if template:
+        config.summarization.template = template
+
+    from ownscribe.pipeline import run_reprocess
+    run_reprocess(config, directory)
+
+
+@cli.command()
+@click.option(
+    "--older-than", "older_than_days", default=None, type=click.IntRange(min=0),
+    help="Purge retained audio older than this many days (overrides retention_days from config).",
+)
+@click.option("--all", "purge_all", is_flag=True, help="Purge all retained audio regardless of age.")
+@click.option("--dry-run", is_flag=True, help="List what would be purged without deleting anything.")
+@click.pass_context
+def purge(ctx: click.Context, older_than_days: int | None, purge_all: bool, dry_run: bool) -> None:
+    """Delete retained audio according to the retention policy (keep-N-days, forever, or --all)."""
+    config = ctx.obj["config"]
+    from ownscribe.pipeline import run_purge
+    run_purge(config, older_than_days, purge_all, dry_run)
+
+
+@cli.command()
 @click.option("--name", required=True, help="Name to enroll this speaker's voice as.")
 @click.argument("file", type=click.Path(exists=True))
 @click.pass_context

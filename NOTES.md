@@ -282,3 +282,50 @@ Stopped before writing any implementation code. Verification against the real `B
 - Also found: `mlx-audio` pulls 108 new packages (gradio, spacy, aiortc, librosa, mlx-vlm...) even pinned to the compatible 0.2.10 line — no version conflicts with the existing stack, but a genuinely heavy optional extra, reinforcing why "behind a flag" needs to mean a real `pyproject.toml` optional-dependency group, not just a runtime default.
 
 Sent full findings to team-lead and paused rather than silently building against a self-corrected premise on a task this consequential (new heavy dependency, feeds directly into the Task#9/pilot-harness A/B comparison). Awaiting direction before resuming.
+
+## Task#12 (planner P11) — audio retention flag + policy + `reprocess` command
+
+Directly closes the gap flagged at the end of Task#4 (see "Gap surfaced, not silently absorbed" above): the original brief's retention config flag, a stated policy (keep N days / forever / manual purge), and a `reprocess` command.
+
+### `keep_recording` already defaulted correctly — verified via git history, not assumed
+
+The brief described inverting upstream's delete-after-transcribe default. Checked `git log -p` on `config.py` back to the fork point (`dfa1e3a`): `keep_recording: bool = True` was already the default from the very first commit — upstream's own default is keep, not delete. No inversion was needed; the brief's premise on this specific point was stale by the time this task started. Verified rather than trusted.
+
+### Real bug found and fixed before building anything new: orphaned dual-track files on delete
+
+Before adding any retention _policy_, checked whether the existing deletion path (`keep_recording=false`) was even correct after Task#4's dual-track retention landed. It wasn't: the delete block in `_do_transcribe_and_summarize` only ever unlinked `audio_path` itself (`recording.wav`), never `system.wav`/`mic.wav`/`track_alignment.json` — those three files were silently left behind forever on every dual-track recording with `keep_recording=false`, the exact opposite of what that flag promises. Confirmed empirically with a standalone repro (wrote all four files, ran the deletion code, checked what survived) before writing the fix, per the standing rule of verifying a bug exists before patching it.
+
+Fix: `_dual_track_paths(audio_path)` returns every retained-track/sidecar path next to `audio_path` that actually exists (`system.wav`, `mic.wav`, `track_alignment.json`, filtered by `.exists()` so a single-track recording never errors on missing files); the deletion loop now iterates `(audio_path, *_dual_track_paths(audio_path))` with `unlink(missing_ok=True)`. Two new tests pin this: one confirms all four files are gone when `keep_recording=false`, one confirms all three retained-audio files (recording+system+mic) survive when `keep_recording=true`.
+
+### Retention policy: `retention_days` config + `ownscribe purge`, not a background job
+
+Chose the simplest design that satisfies all three named policy options (keep-N-days / forever / manual-purge) without inventing a scheduler this project has no infrastructure for:
+
+- `[output].retention_days` (new `OutputConfig` field, default `0` = keep forever) — a single integer covers both "forever" (0) and "N days" (positive) without a separate enum/mode field.
+- `ownscribe purge` (`run_purge` in `pipeline.py`) is the manual-purge mechanism for both the "N days" and "forever-until-I-say-so" cases — it is never invoked automatically by the recording/transcribe pipeline, only by explicit user action (or an external scheduler like `launchd`/`cron`, which is the user's choice to wire up, not this tool's job to assume).
+- `--older-than N` overrides `retention_days` for a one-off purge without touching config; `--all` ignores age entirely; `--dry-run` lists what would be removed without deleting anything. Running plain `purge` with `retention_days=0` and no `--all` is a deliberate no-op with an explanatory message, rather than silently doing nothing or (worse) deleting everything — an empty/ambiguous invocation should never be destructive by default.
+- `purge` walks `config.output.resolved_dir`'s immediate subdirectories (each a meeting), resolves retained audio the same way `resume`/`reprocess` do (including the separate-`audio_dir` case), and age-gates on the audio file's own mtime — not the directory name — so a `reprocess`'d recording's age resets correctly rather than being purge-eligible forever based on its original recording date.
+- Deliberately narrow blast radius: `purge` only ever removes audio + its dual-track/sidecar files, never `transcript.md`/`summary.md` — past notes stay readable after their source audio is gone, matching the brief's implicit goal (control disk usage from raw audio, not destroy meeting history).
+
+Refactored the audio-resolution logic (target directory, falling back to a separate configured `audio_dir` if set) that `run_resume` and `run_reprocess` had each partially duplicated into one shared `_resolve_retained_audio(config, directory)` helper, now used by all three (`resume`, `reprocess`, `purge`) — verified `run_resume`'s existing 7-test class still passes unchanged after the refactor before adding anything new.
+
+### `reprocess`: the "force redo" case `resume` deliberately doesn't cover
+
+Re-read `run_resume` first to confirm the actual gap: it explicitly returns early ("Nothing to resume") when both transcript AND summary already exist — by design, since its job is finishing incomplete work, not redoing complete work. `reprocess` fills that gap deliberately: same audio-resolution logic, but unconditionally deletes any existing `transcript.md`/`summary.md`/`.json` before calling `_do_transcribe_and_summarize` again, and errors out clearly if no retained audio exists for that meeting (the one prerequisite `reprocess` cannot work around) rather than a confusing downstream failure.
+
+CLI wiring for both `reprocess` and `purge` follows the exact option/pass-through pattern already established by `resume`/`warmup` (`--model`/`--language`/`--template` overrides for `reprocess`; `--older-than`/`--all`/`--dry-run` for `purge`).
+
+### Verified beyond pytest: real filesystem behavior, not just mocks
+
+Every pytest test for `_do_transcribe_and_summarize` mocks the transcriber, and every `purge`/`reprocess` pipeline test mocks `_do_transcribe_and_summarize` itself — correct for testing dispatch logic, but neither proves the real file-deletion/file-rewrite behavior end-to-end. Ran two additional real, unmocked smoke tests directly against the filesystem (temp `HOME`, real config file, real `ownscribe` CLI invocation, only the heavy ASR call mocked):
+
+1. `purge --dry-run` then `purge --older-than 30` against a directory with one aged recording (mtime forced 60 days back, dual-track + transcript) and one recent one: dry-run left every file untouched and printed the correct candidate; the real run deleted `recording.wav`/`system.wav`/`mic.wav` from the aged meeting, left its `transcript.md` intact, and left the recent meeting's `recording.wav` completely untouched.
+2. `reprocess` against a directory with a stale `transcript.md`/`summary.md` (summarization disabled in config, transcriber mocked to return known text): confirmed the old transcript content was fully overwritten with the new mocked output, and `summary.md` was correctly absent per the disabled config, rather than trusting the pytest mocks alone.
+
+Caught and fixed one script-level mistake during this verification (not a code bug): my first smoke-test script constructed a `Word(word=..., ...)` — the real dataclass field is `text`, per `transcription/models.py`. Confirmed the actual field names against the source before re-running, rather than guessing from the variable name.
+
+pytest after this task: **365 -> 390 passed** (25 new, verified against the prior commit via a `git stash`/pytest/`git stash pop` round-trip rather than an in-session running count: 2 dual-track-deletion tests + 6 `TestReprocess` + 8 `TestRunPurge` pipeline tests, 2 `TestReprocessCommand` + 3 `TestPurgeCommand` CLI tests + 2 help-text tests, 2 `test_config.py` retention-default/TOML-merge tests). ruff: clean (two findings caught and fixed: a >120-char TOML comment line, an unused unpacked `config` variable in a CLI test — prefixed `_config`).
+
+### README updated
+
+Added `reprocess`/`purge` to the Subcommands list, a new `[output].retention_days` line in the Configuration TOML block, and a new "Audio Retention" section (with a "Reprocessing a Meeting" subsection) explaining the three retention modes and both commands, plus a Table of Contents entry.

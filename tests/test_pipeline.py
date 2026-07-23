@@ -412,6 +412,55 @@ class TestDoTranscribeAndSummarize:
         assert (tmp_path / "transcript.md").exists()
         assert not audio_path.exists()
 
+    def test_keep_recording_false_also_deletes_dual_tracks_and_sidecar(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.output.keep_recording = False
+        audio_path = tmp_path / "recording.wav"
+        audio_path.write_bytes(b"fake audio data")
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        sidecar_path = tmp_path / "track_alignment.json"
+        system_path.write_bytes(b"fake system audio")
+        mic_path.write_bytes(b"fake mic audio")
+        sidecar_path.write_text('{"mic_start_offset_seconds": 0.0}')
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        assert not audio_path.exists()
+        assert not system_path.exists()
+        assert not mic_path.exists()
+        assert not sidecar_path.exists()
+
+    def test_keep_recording_true_keeps_dual_tracks_too(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.output.keep_recording = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.write_bytes(b"fake audio data")
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        system_path.write_bytes(b"fake system audio")
+        mic_path.write_bytes(b"fake mic audio")
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        assert audio_path.exists()
+        assert system_path.exists()
+        assert mic_path.exists()
+
     def test_keep_recording_true_keeps_wav(self, tmp_path):
         from ownscribe.pipeline import _do_transcribe_and_summarize
 
@@ -1663,6 +1712,231 @@ class TestResume:
         with mock.patch("ownscribe.pipeline.run_summarize") as mock_sum:
             run_resume(config, str(tmp_path))
             mock_sum.assert_called_once_with(config, str(tmp_path / "transcript.json"))
+
+
+class TestReprocess:
+    """Test run_reprocess forced re-transcription from retained audio."""
+
+    def test_errors_when_directory_does_not_exist(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        config = Config()
+        missing = tmp_path / "does-not-exist"
+
+        with pytest.raises(SystemExit):
+            run_reprocess(config, str(missing))
+
+    def test_errors_when_no_audio_retained(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        (tmp_path / "transcript.md").write_text("# Transcript\nHello.")
+        (tmp_path / "summary.md").write_text("# Summary")
+
+        config = Config()
+
+        with pytest.raises(SystemExit):
+            run_reprocess(config, str(tmp_path))
+
+    def test_forces_reprocess_even_when_transcript_and_summary_exist(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        (tmp_path / "transcript.md").write_text("# Transcript\nOld.")
+        (tmp_path / "summary.md").write_text("# Summary\nOld.")
+
+        config = Config()
+
+        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+            run_reprocess(config, str(tmp_path))
+            mock_ts.assert_called_once_with(config, audio_path, tmp_path)
+
+    def test_deletes_stale_transcript_and_summary_before_reprocessing(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        transcript_path = tmp_path / "transcript.md"
+        summary_path = tmp_path / "summary.md"
+        transcript_path.write_text("# Transcript\nOld.")
+        summary_path.write_text("# Summary\nOld.")
+
+        config = Config()
+
+        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"):
+            run_reprocess(config, str(tmp_path))
+
+        assert not transcript_path.exists()
+        assert not summary_path.exists()
+
+    def test_finds_dual_track_audio_in_separate_audio_dir(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        text_dir = tmp_path / "notes" / "2026-01-01_1200"
+        text_dir.mkdir(parents=True)
+        audio_dir = tmp_path / "audio-cache" / "2026-01-01_1200"
+        audio_dir.mkdir(parents=True)
+        audio_path = audio_dir / "recording.wav"
+        audio_path.touch()
+        (audio_dir / "system.wav").touch()
+        (audio_dir / "mic.wav").touch()
+
+        config = Config()
+        config.output.dir = str(tmp_path / "notes")
+        config.output.audio_dir = str(tmp_path / "audio-cache")
+
+        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+            run_reprocess(config, str(text_dir))
+            mock_ts.assert_called_once_with(config, audio_path, text_dir)
+
+    def test_finds_non_wav_audio(self, tmp_path):
+        from ownscribe.pipeline import run_reprocess
+
+        audio_path = tmp_path / "meeting.mp3"
+        audio_path.touch()
+
+        config = Config()
+
+        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+            run_reprocess(config, str(tmp_path))
+            mock_ts.assert_called_once_with(config, audio_path, tmp_path)
+
+
+class TestRunPurge:
+    """Test run_purge's retention policy: keep-forever, keep-N-days, and --all."""
+
+    def _age_file(self, path, days):
+        import os
+        import time
+
+        past = time.time() - (days * 86400)
+        os.utime(path, (past, past))
+
+    def test_keep_forever_default_without_all_is_a_noop(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+        self._age_file(audio_path, days=9999)
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=False, dry_run=False)
+
+        assert audio_path.exists()
+
+    def test_all_purges_regardless_of_age(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
+
+        assert not audio_path.exists()
+
+    def test_all_also_deletes_dual_tracks(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        system_path = meeting_dir / "system.wav"
+        mic_path = meeting_dir / "mic.wav"
+        audio_path.write_bytes(b"fake audio")
+        system_path.write_bytes(b"fake system")
+        mic_path.write_bytes(b"fake mic")
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
+
+        assert not audio_path.exists()
+        assert not system_path.exists()
+        assert not mic_path.exists()
+
+    def test_older_than_days_only_purges_aged_recordings(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        old_dir = tmp_path / "2020-01-01_1200"
+        old_dir.mkdir()
+        old_audio = old_dir / "recording.wav"
+        old_audio.write_bytes(b"old")
+        self._age_file(old_audio, days=60)
+
+        recent_dir = tmp_path / "2026-07-01_1200"
+        recent_dir.mkdir()
+        recent_audio = recent_dir / "recording.wav"
+        recent_audio.write_bytes(b"recent")
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=30, purge_all=False, dry_run=False)
+
+        assert not old_audio.exists()
+        assert recent_audio.exists()
+
+    def test_older_than_flag_overrides_config_retention_days(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+        self._age_file(audio_path, days=10)
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+        config.output.retention_days = 0
+
+        run_purge(config, older_than_days=5, purge_all=False, dry_run=False)
+
+        assert not audio_path.exists()
+
+    def test_dry_run_does_not_delete(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=True)
+
+        assert audio_path.exists()
+
+    def test_directories_without_audio_are_skipped_not_errored(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        empty_dir = tmp_path / "2026-01-01_1200"
+        empty_dir.mkdir()
+        (empty_dir / "transcript.md").write_text("hello")
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
+
+    def test_missing_output_base_dir_is_a_noop(self, tmp_path):
+        from ownscribe.pipeline import run_purge
+
+        config = Config()
+        config.output.dir = str(tmp_path / "does-not-exist")
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
 
 
 class TestRunEnroll:

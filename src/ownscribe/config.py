@@ -60,6 +60,7 @@ dir = "~/ownscribe"       # base output directory
 audio_dir = ""            # directory for audio recordings; empty = same as dir
 format = "markdown"       # "markdown" or "json"
 keep_recording = true     # keep WAV files after transcription; false = auto-delete
+retention_days = 0        # days before `ownscribe purge` may remove audio; 0 = keep forever (manual purge only)
 """.replace("__BILINGUAL_INITIAL_PROMPT__", BILINGUAL_INITIAL_PROMPT)
 
 
@@ -119,6 +120,7 @@ class OutputConfig:
     audio_dir: str = ""
     format: str = "markdown"
     keep_recording: bool = True
+    retention_days: int = 0
 
     @property
     def resolved_dir(self) -> Path:

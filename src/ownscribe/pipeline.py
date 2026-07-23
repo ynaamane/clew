@@ -179,6 +179,16 @@ def _find_dual_tracks(audio_path: Path) -> tuple[Path, Path] | None:
     return None
 
 
+def _dual_track_paths(audio_path: Path) -> tuple[Path, ...]:
+    """Return every retained-track/sidecar path next to audio_path that actually exists."""
+    candidates = (
+        audio_path.parent / "system.wav",
+        audio_path.parent / "mic.wav",
+        audio_path.parent / "track_alignment.json",
+    )
+    return tuple(p for p in candidates if p.exists())
+
+
 def _read_mic_start_offset(audio_path: Path) -> float:
     """Read mic_start_offset_seconds from track_alignment.json next to audio_path, or 0.0."""
     import json
@@ -726,7 +736,8 @@ def _do_transcribe_and_summarize(
 
     # Delete recording if configured — use the (possibly renamed) audio_path
     if not config.output.keep_recording and audio_path.exists():
-        audio_path.unlink()
+        for retained_path in (audio_path, *_dual_track_paths(audio_path)):
+            retained_path.unlink(missing_ok=True)
         # Also remove the parent directory if it is now empty, which is expected
         # when a separate audio_dir is configured.
         if not any(audio_path.parent.iterdir()):
@@ -776,14 +787,7 @@ def run_resume(config: Config, directory: str) -> None:
         click.echo(f"Error: {dir_path} is not a directory.", err=True)
         raise SystemExit(1)
 
-    # First look for an audio file in the target directory, since the user is
-    # explicitly resuming there. If none is found and a separate directory is
-    # configured for audio, search that directory as well.
-    audio = _find_audio(dir_path)
-    if audio is None and config.output.uses_separate_audio_dir:
-        candidate = config.output.resolved_audio_dir / dir_path.name
-        if candidate != dir_path and candidate.is_dir():
-            audio = _find_audio(candidate)
+    audio = _resolve_retained_audio(config, dir_path)
     transcript = _find_transcript(dir_path)
     summary = _find_summary(dir_path)
 
@@ -905,3 +909,86 @@ def run_watch(config: Config, sustained_seconds: float) -> None:
 
     click.echo("Meeting detected — starting recording.\n")
     run_pipeline(config)
+
+
+def _resolve_retained_audio(config: Config, directory: Path) -> Path | None:
+    """Find retained audio for a meeting directory, checking a separate audio_dir if configured."""
+    audio = _find_audio(directory)
+    if audio is None and config.output.uses_separate_audio_dir:
+        candidate = config.output.resolved_audio_dir / directory.name
+        if candidate != directory and candidate.is_dir():
+            audio = _find_audio(candidate)
+    return audio
+
+
+def run_reprocess(config: Config, directory: str) -> None:
+    """Force a full re-transcribe+summarize from retained audio, even if output already exists."""
+    dir_path = Path(directory).resolve()
+    if not dir_path.is_dir():
+        click.echo(f"Error: {dir_path} is not a directory.", err=True)
+        raise SystemExit(1)
+
+    audio = _resolve_retained_audio(config, dir_path)
+
+    if audio is None:
+        click.echo(
+            f"Error: No retained audio found in {dir_path}.\n"
+            "Reprocessing requires the original recording -- check `keep_recording` "
+            "was true when this meeting was recorded.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    for existing in (_find_transcript(dir_path), _find_summary(dir_path)):
+        if existing is not None:
+            existing.unlink()
+
+    click.echo(f"Reprocessing from: {audio}\n")
+    _do_transcribe_and_summarize(config, audio, dir_path)
+
+
+def run_purge(config: Config, older_than_days: int | None, purge_all: bool, dry_run: bool) -> None:
+    """Delete retained audio according to the retention policy (keep-N-days, forever, or --all)."""
+    effective_days = config.output.retention_days if older_than_days is None else older_than_days
+
+    if not purge_all and effective_days <= 0:
+        click.echo(
+            "Retention policy is 'keep forever' (retention_days=0) and --all was not given.\n"
+            "Nothing to purge. Pass --all to remove all retained audio regardless of age, "
+            "or set retention_days / --older-than to a positive number of days.",
+        )
+        return
+
+    base = config.output.resolved_dir
+    if not base.is_dir():
+        click.echo("No retained audio is eligible for purging.")
+        return
+
+    eligible: list[tuple[Path, Path]] = []
+    for directory in sorted(d for d in base.iterdir() if d.is_dir()):
+        audio = _resolve_retained_audio(config, directory)
+        if audio is None:
+            continue
+        if purge_all:
+            eligible.append((directory, audio))
+            continue
+        age_days = (time.time() - audio.stat().st_mtime) / 86400
+        if age_days >= effective_days:
+            eligible.append((directory, audio))
+
+    if not eligible:
+        click.echo("No retained audio is eligible for purging.")
+        return
+
+    for directory, audio in eligible:
+        if dry_run:
+            click.echo(f"Would remove: {directory}")
+            continue
+        for retained_path in (audio, *_dual_track_paths(audio)):
+            retained_path.unlink(missing_ok=True)
+        click.echo(f"Removed retained audio: {directory}")
+
+    if dry_run:
+        click.echo(f"\n{len(eligible)} meeting(s) would be purged (dry run — nothing deleted).")
+    else:
+        click.echo(f"\nPurged retained audio from {len(eligible)} meeting(s).")

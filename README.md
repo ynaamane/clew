@@ -18,6 +18,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Audio Retention](#audio-retention)
 - [Summarization Templates](#summarization-templates)
 - [Speaker Diarization](#speaker-diarization)
 - [Acknowledgments](#acknowledgments)
@@ -181,6 +182,10 @@ ownscribe warmup                   # prefetch WhisperX/pyannote models before a 
 ownscribe transcribe recording.wav # transcribe an audio or video file: wav/mp3/mp4/mov/mkv (saved alongside)
 ownscribe summarize transcript.md  # summarize a transcript (saves alongside the input)
 ownscribe resume ./2026-02-20_1736 # resume a partial run, or process a folder's audio/video recording
+ownscribe reprocess ./2026-02-20_1736 # force a full re-transcribe+summarize, even if output already exists
+ownscribe purge --older-than 30    # delete retained audio older than N days
+ownscribe purge --all              # delete all retained audio regardless of age
+ownscribe purge --dry-run          # preview what a purge would remove, without deleting
 ownscribe ask "question"           # search your meetings with a natural-language question
 ownscribe enroll --name "Alice" clip.wav # enroll a speaker's voiceprint from a short reference clip
 ownscribe unenroll "Alice"         # remove an enrolled speaker's voiceprint
@@ -270,9 +275,40 @@ dir = "~/ownscribe"
 audio_dir = ""            # directory for audio recordings; empty = same as dir
 format = "markdown"       # "markdown" or "json"
 keep_recording = true     # false = auto-delete WAV after transcription
+retention_days = 0        # days before `ownscribe purge` may remove audio; 0 = keep forever (manual purge only)
 ```
 
 **Precedence:** CLI flags > environment variables (`HF_TOKEN`, `OLLAMA_HOST`, `OPENAI_API_KEY`) > config file > defaults.
+
+## Audio Retention
+
+By default (`keep_recording = true`), every recording's WAV files (system, mic, and any sidecar files) stay on disk next to the transcript and summary. This is what makes `resume` and `reprocess` possible — both need the original audio.
+
+There are three ways to control how long retained audio sticks around:
+
+- **Keep forever (default)** — `retention_days = 0` and never run `purge`. Nothing is ever deleted automatically.
+- **Auto-delete after each meeting** — `keep_recording = false` deletes the WAV files immediately after transcription (no retention at all, so `reprocess` won't work on that meeting later).
+- **Keep for N days, then purge manually** — set `retention_days` in config, and periodically run `ownscribe purge` to remove anything older than that. This is _not_ a background job; retention only happens when you invoke `purge`.
+
+```bash
+ownscribe purge                    # purge using retention_days from config (no-op if retention_days = 0)
+ownscribe purge --older-than 14    # override config: purge anything older than 14 days
+ownscribe purge --all              # purge every retained recording, regardless of age
+ownscribe purge --dry-run          # preview what would be purged, without deleting anything
+```
+
+`purge` only ever removes retained audio (WAV files and sidecars) — transcripts and summaries are never touched, so past notes remain readable even after their source audio is gone.
+
+### Reprocessing a Meeting
+
+If a transcript or summary came out wrong — a bad model choice, a config change, a summarization backend swap — `reprocess` redoes the whole pipeline from the retained audio, overwriting the existing transcript and summary:
+
+```bash
+ownscribe reprocess ./2026-02-20_1736
+ownscribe reprocess ./2026-02-20_1736 --model large-v3 --template lecture
+```
+
+Unlike `resume` (which skips work that's already done), `reprocess` always starts over from the audio — it errors out if no retained audio is found for that meeting (i.e. `keep_recording` was `false` when it was recorded, or it's already been purged).
 
 ## Summarization Templates
 
