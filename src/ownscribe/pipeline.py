@@ -870,7 +870,7 @@ def run_list_enrolled() -> None:
 
 
 def run_watch(config: Config, sustained_seconds: float) -> None:
-    """Watch for sustained system audio activity, then record+transcribe+summarize."""
+    """Watch for sustained mic+output activity together, then record+transcribe+summarize."""
     import subprocess
 
     from ownscribe.audio.coreaudio import _find_binary
@@ -883,7 +883,7 @@ def run_watch(config: Config, sustained_seconds: float) -> None:
         )
         raise SystemExit(1)
 
-    click.echo(f"Watching for a meeting to start (audio active for {sustained_seconds:.0f}s)...")
+    click.echo(f"Watching for a meeting to start (mic+output active for {sustained_seconds:.0f}s)...")
 
     process = subprocess.Popen(
         [str(binary), "watch-activity", "--sustained-seconds", str(sustained_seconds)],

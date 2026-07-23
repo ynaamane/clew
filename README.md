@@ -197,14 +197,16 @@ ownscribe cleanup                  # remove ownscribe data from disk
 
 ### Auto-Detecting a Meeting
 
-Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether the Mac's default output device is actively playing audio (a permission-free, OS-level signal — no Screen Recording or Microphone access needed just to watch), and once that holds continuously for a few seconds it starts recording automatically.
+Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether BOTH the default input device (mic) and the default output device (speakers/headphones) are active at the same time — a permission-free, OS-level signal on both sides, since it only reads a hardware property and never opens an actual audio stream — and once that combined state holds continuously for a few seconds it starts recording automatically. Mic activity alone (dictation, a voice memo) does not trigger it, and output activity alone (music, a video) does not either — only mic AND output together, the pattern a live call produces.
 
 ```bash
-ownscribe watch                          # default: 3s of sustained audio before recording starts
+ownscribe watch                          # default: 3s of sustained mic+output activity before recording starts
 ownscribe watch --sustained-seconds 5    # require a longer sustained window (fewer false starts)
 ```
 
-This works identically regardless of which app produces the audio — Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS output-device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only audio that stays active for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline — everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
+This works identically regardless of which app produces the audio — Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only activity that stays sustained on both devices for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline — everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
+
+> **Known limitation**: `ownscribe`'s own `--mic` capture (via `AVAudioEngine`) makes the OS report the output device as "running" even while producing silence — an artifact of `AVAudioEngine`'s internal render graph, not of anything actually playing. This does not affect `watch` today, since `watch-activity` always exits before a recording starts (they never run concurrently), but it means the mic+output signal is not safe to reuse while `ownscribe`'s own mic capture is active.
 
 > **Video files work too.** Anywhere ownscribe accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v) — it extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `ownscribe resume ./that-folder/` (transcript + summary); use `ownscribe transcribe meeting.mp4` for a transcript only.
 

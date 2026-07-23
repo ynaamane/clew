@@ -984,6 +984,18 @@ func defaultOutputDeviceID() -> AudioDeviceID? {
     return status == noErr ? deviceID : nil
 }
 
+func defaultInputDeviceID() -> AudioDeviceID? {
+    var deviceID = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultInputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+    return status == noErr ? deviceID : nil
+}
+
 func isAudioDeviceRunningSomewhere(_ deviceID: AudioDeviceID) -> Bool? {
     var isRunning: UInt32 = 0
     var size = UInt32(MemoryLayout<UInt32>.size)
@@ -1015,15 +1027,24 @@ class SustainedActivityDetector {
     }
 }
 
+func combinedCallSignal(mic: Bool?, output: Bool?) -> Bool? {
+    guard let mic, let output else { return nil }
+    return mic && output
+}
+
 func watchAudioActivity(sustainedSeconds: Double, pollInterval: Double = 1.0) {
-    guard let deviceID = defaultOutputDeviceID() else {
+    guard let outputID = defaultOutputDeviceID() else {
         fputs("Error: could not resolve default output device\n", stderr)
+        exit(1)
+    }
+    guard let inputID = defaultInputDeviceID() else {
+        fputs("Error: could not resolve default input device\n", stderr)
         exit(1)
     }
 
     let detector = SustainedActivityDetector(sustainedSeconds: sustainedSeconds)
 
-    fputs("Watching for sustained audio activity on the default output device (>\(sustainedSeconds)s)...\n", stderr)
+    fputs("Watching for sustained mic+output activity (a call, not just playback or dictation) (>\(sustainedSeconds)s)...\n", stderr)
 
     let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
     signal(SIGINT, SIG_IGN)
@@ -1033,8 +1054,10 @@ func watchAudioActivity(sustainedSeconds: Double, pollInterval: Double = 1.0) {
     let timer = DispatchSource.makeTimerSource(queue: .main)
     timer.schedule(deadline: .now(), repeating: pollInterval)
     timer.setEventHandler {
-        guard let running = isAudioDeviceRunningSomewhere(deviceID) else { return }
-        if detector.observe(running: running, now: Date()) {
+        let micRunning = isAudioDeviceRunningSomewhere(inputID)
+        let outputRunning = isAudioDeviceRunningSomewhere(outputID)
+        guard let combined = combinedCallSignal(mic: micRunning, output: outputRunning) else { return }
+        if detector.observe(running: combined, now: Date()) {
             print("[MEETING_DETECTED]")
             fflush(stdout)
             exit(0)
@@ -1064,7 +1087,7 @@ func printUsage() {
         --capture-backend NAME "coreaudio" (default, macOS 14.2+) or "screencapturekit"
         --capture-mode-all     ScreenCaptureKit only: capture all system audio without a picker
         --silence-timeout N    Auto-stop after N seconds of silence (0 = disabled)
-        --sustained-seconds N  Seconds of continuous audio activity before watch-activity
+        --sustained-seconds N  Seconds of continuous mic+output activity before watch-activity
                                reports a detected meeting (default 3)
         --help, -h             Show this help
 
@@ -1072,8 +1095,9 @@ func printUsage() {
         capture          Record audio to a WAV file
         list-apps         Show running applications
         list-devices      Show available audio input devices
-        watch-activity    Poll for sustained system audio output activity and print
-                          [MEETING_DETECTED] once it holds for --sustained-seconds
+        watch-activity    Poll for sustained mic AND output activity together (mic alone is
+                          dictation, output alone is media playback; both together is a call)
+                          and print [MEETING_DETECTED] once it holds for --sustained-seconds
 
     """, stderr)
 }
