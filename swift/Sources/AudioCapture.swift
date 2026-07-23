@@ -1,6 +1,7 @@
 import ScreenCaptureKit
 import CoreMedia
 import AVFAudio
+import AVFoundation
 import CoreGraphics
 import Foundation
 import AppKit
@@ -927,6 +928,48 @@ func mergeAudioFiles(systemPath: String, micPath: String,
     fputs("Merged audio saved to \(outputPath)\(detail)\n", stderr)
 }
 
+// MARK: - Capture permission preflight
+
+func preflightScreenCaptureAccess() -> Bool {
+    CGPreflightScreenCaptureAccess()
+}
+
+func preflightMicrophoneAccess() -> Bool {
+    AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+}
+
+func runCapturePermissionPreflight(
+    needsMic: Bool,
+    hasScreenCaptureAccess: Bool = preflightScreenCaptureAccess(),
+    hasMicrophoneAccess: Bool = preflightMicrophoneAccess()
+) -> Bool {
+    var ok = true
+
+    if !hasScreenCaptureAccess {
+        ok = false
+        fputs("""
+        [PERMISSION_MISSING] Screen Recording permission is not granted.
+        System audio capture will fail or record silence.
+        Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+        Enable your terminal app, then restart it.
+        """, stderr)
+        fputs("\n", stderr)
+    }
+
+    if needsMic && !hasMicrophoneAccess {
+        ok = false
+        fputs("""
+        [PERMISSION_MISSING] Microphone permission is not granted.
+        Mic capture will fail or record silence.
+        Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone
+        Enable your terminal app, then restart it.
+        """, stderr)
+        fputs("\n", stderr)
+    }
+
+    return ok
+}
+
 // MARK: - Main
 
 func printUsage() {
@@ -1025,6 +1068,10 @@ func main() {
         guard let output = outputPath else {
             fputs("Error: --output is required\n", stderr)
             printUsage()
+            exit(1)
+        }
+
+        if !runCapturePermissionPreflight(needsMic: enableMic) {
             exit(1)
         }
 

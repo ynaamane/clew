@@ -58,6 +58,56 @@ def _check_audio_silence(audio_path: Path) -> None:
         raise SystemExit(1)
 
 
+_RMS_SILENCE_THRESHOLD = 1e-5
+
+
+def _track_rms(audio_path: Path) -> float | None:
+    """Compute RMS amplitude over the first 5s of audio_path, or None if unreadable."""
+    try:
+        import numpy as np
+        import soundfile as sf
+    except ImportError:
+        return None
+
+    try:
+        info = sf.info(audio_path)
+        frames_to_read = min(int(info.samplerate * 5), info.frames)
+        data, _ = sf.read(audio_path, frames=frames_to_read, dtype="float32")
+        return float(np.sqrt(np.mean(np.square(data))))
+    except Exception:
+        return None
+
+
+def _check_dual_track_silence(system_path: Path, mic_path: Path) -> None:
+    """Warn (without blocking) if either retained track is silent, naming which one."""
+    system_rms = _track_rms(system_path)
+    mic_rms = _track_rms(mic_path)
+
+    system_silent = system_rms is not None and system_rms < _RMS_SILENCE_THRESHOLD
+    mic_silent = mic_rms is not None and mic_rms < _RMS_SILENCE_THRESHOLD
+
+    if system_silent and mic_silent:
+        click.echo(
+            "\nWarning: Both system audio and microphone tracks are silent "
+            "(RMS ~0). Check Screen Recording AND Microphone permissions.",
+            err=True,
+        )
+    elif system_silent:
+        click.echo(
+            "\nWarning: System audio track is silent (RMS ~0), microphone is not. "
+            "Check Screen Recording permission — remote speakers may be missing "
+            "from the transcript.",
+            err=True,
+        )
+    elif mic_silent:
+        click.echo(
+            "\nWarning: Microphone track is silent (RMS ~0), system audio is not. "
+            "Check Microphone permission — your own segments may be missing "
+            "from the transcript.",
+            err=True,
+        )
+
+
 def _get_output_dir(config: Config) -> Path:
     """Create and return a timestamped output directory."""
     base = config.output.resolved_dir
@@ -361,7 +411,10 @@ def run_pipeline(config: Config) -> None:
 
     # Check for silent audio before spending time on transcription
     # Skip if the recorder already reported a silence warning (CoreAudio helper)
-    if not getattr(recorder, "silence_warning", False):
+    dual_tracks = _find_dual_tracks(audio_path)
+    if dual_tracks:
+        _check_dual_track_silence(*dual_tracks)
+    elif not getattr(recorder, "silence_warning", False):
         _check_audio_silence(audio_path)
 
     # 2. Transcribe

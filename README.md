@@ -65,14 +65,17 @@ Summarization works out of the box — a local model (Phi-4-mini, ~2.4 GB) downl
 
 Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc.).
 
-> **Tip:** Your terminal app (Terminal, iTerm2, VS Code, etc.) needs **Screen Recording** permission to capture system audio.
+> **Tip:** Your terminal app (Terminal, iTerm2, VS Code, etc.) needs **Screen Recording** permission to capture system audio, and **Microphone** permission if you use `--mic`.
 > Open the settings panel directly with:
 >
 > ```bash
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+> open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
 > ```
 >
 > Enable your terminal app, then restart it.
+>
+> ownscribe checks both permissions **before** starting a recording and exits with the exact fix if either is missing, rather than silently recording silence for the whole meeting. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
 
 ## Installation
 

@@ -12,6 +12,116 @@ from ownscribe.config import Config
 from ownscribe.transcription.models import Segment, TranscriptResult, Word
 
 
+def _write_wav(path, samples, sample_rate=16000):
+    import numpy as np
+    import soundfile as sf
+
+    sf.write(str(path), np.asarray(samples, dtype="float32"), sample_rate)
+
+
+def _silent_samples(n=16000):
+    import numpy as np
+
+    return np.zeros(n, dtype="float32")
+
+
+def _loud_samples(n=16000):
+    import numpy as np
+
+    return (np.sin(np.linspace(0, 100 * np.pi, n)) * 0.1).astype("float32")
+
+
+class TestTrackRms:
+    def test_silent_track_has_near_zero_rms(self, tmp_path):
+        from ownscribe.pipeline import _track_rms
+
+        path = tmp_path / "silent.wav"
+        _write_wav(path, _silent_samples())
+
+        assert _track_rms(path) == 0.0
+
+    def test_loud_track_has_nonzero_rms(self, tmp_path):
+        from ownscribe.pipeline import _track_rms
+
+        path = tmp_path / "loud.wav"
+        _write_wav(path, _loud_samples())
+
+        rms = _track_rms(path)
+        assert rms is not None
+        assert rms > 1e-3
+
+    def test_missing_file_returns_none(self, tmp_path):
+        from ownscribe.pipeline import _track_rms
+
+        assert _track_rms(tmp_path / "does-not-exist.wav") is None
+
+
+class TestCheckDualTrackSilence:
+    def test_both_loud_no_warning(self, tmp_path, capsys):
+        from ownscribe.pipeline import _check_dual_track_silence
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(system_path, _loud_samples())
+        _write_wav(mic_path, _loud_samples())
+
+        _check_dual_track_silence(system_path, mic_path)
+
+        captured = capsys.readouterr()
+        assert "Warning" not in captured.err
+
+    def test_system_silent_mic_loud_warns_system_specifically(self, tmp_path, capsys):
+        from ownscribe.pipeline import _check_dual_track_silence
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(system_path, _silent_samples())
+        _write_wav(mic_path, _loud_samples())
+
+        _check_dual_track_silence(system_path, mic_path)
+
+        captured = capsys.readouterr()
+        assert "System audio track is silent" in captured.err
+        assert "Microphone track is silent" not in captured.err
+
+    def test_mic_silent_system_loud_warns_mic_specifically(self, tmp_path, capsys):
+        from ownscribe.pipeline import _check_dual_track_silence
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(system_path, _loud_samples())
+        _write_wav(mic_path, _silent_samples())
+
+        _check_dual_track_silence(system_path, mic_path)
+
+        captured = capsys.readouterr()
+        assert "Microphone track is silent" in captured.err
+        assert "System audio track is silent" not in captured.err
+
+    def test_both_silent_warns_both(self, tmp_path, capsys):
+        from ownscribe.pipeline import _check_dual_track_silence
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(system_path, _silent_samples())
+        _write_wav(mic_path, _silent_samples())
+
+        _check_dual_track_silence(system_path, mic_path)
+
+        captured = capsys.readouterr()
+        assert "Both system audio and microphone" in captured.err
+
+    def test_never_raises_systemexit(self, tmp_path):
+        from ownscribe.pipeline import _check_dual_track_silence
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(system_path, _silent_samples())
+        _write_wav(mic_path, _silent_samples())
+
+        _check_dual_track_silence(system_path, mic_path)
+
+
 class TestCreateRecorder:
     def test_coreaudio_when_available(self):
         from ownscribe.pipeline import _create_recorder
@@ -1198,6 +1308,51 @@ class TestRunPipelineAudioLocation:
         audio_path = mock_recorder.start.call_args[0][0]
         assert audio_path.is_relative_to(tmp_path / "notes")
         assert audio_path.parent.parent == tmp_path / "notes"
+
+    def test_dual_track_silence_check_runs_when_tracks_present(self, tmp_path, capsys):
+        from ownscribe.pipeline import run_pipeline
+
+        config = Config()
+        config.output.dir = str(tmp_path / "notes")
+
+        recorder = mock.MagicMock()
+        recorder.is_recording = False
+        recorder.is_muted = False
+        recorder.silence_timed_out = False
+        recorder.silence_warning = False
+
+        def _start(path):
+            path.write_bytes(b"fake audio data, definitely more than 44 bytes")
+            _write_wav(path.parent / "system.wav", _silent_samples())
+            _write_wav(path.parent / "mic.wav", _loud_samples())
+
+        recorder.start.side_effect = _start
+
+        with (
+            mock.patch("ownscribe.pipeline._create_recorder", return_value=recorder),
+            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"),
+        ):
+            run_pipeline(config)
+
+        captured = capsys.readouterr()
+        assert "System audio track is silent" in captured.err
+
+    def test_single_track_silence_check_runs_when_no_dual_tracks(self, tmp_path):
+        from ownscribe.pipeline import run_pipeline
+
+        config = Config()
+        config.output.dir = str(tmp_path / "notes")
+
+        mock_recorder = self._make_recorder_mock()
+
+        with (
+            mock.patch("ownscribe.pipeline._create_recorder", return_value=mock_recorder),
+            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"),
+            mock.patch("ownscribe.pipeline._check_audio_silence") as mock_check,
+        ):
+            run_pipeline(config)
+
+        mock_check.assert_called_once()
 
 
 class TestRunTranscribeColocation:
