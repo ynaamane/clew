@@ -970,6 +970,81 @@ func runCapturePermissionPreflight(
     return ok
 }
 
+// MARK: - Audio activity detection
+
+func defaultOutputDeviceID() -> AudioDeviceID? {
+    var deviceID = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+    return status == noErr ? deviceID : nil
+}
+
+func isAudioDeviceRunningSomewhere(_ deviceID: AudioDeviceID) -> Bool? {
+    var isRunning: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &isRunning)
+    return status == noErr ? (isRunning != 0) : nil
+}
+
+class SustainedActivityDetector {
+    private let sustainedSeconds: Double
+    private var activeSince: Date?
+
+    init(sustainedSeconds: Double) {
+        self.sustainedSeconds = sustainedSeconds
+    }
+
+    func observe(running: Bool, now: Date) -> Bool {
+        if running {
+            if activeSince == nil {
+                activeSince = now
+            }
+            return now.timeIntervalSince(activeSince!) >= sustainedSeconds
+        }
+        activeSince = nil
+        return false
+    }
+}
+
+func watchAudioActivity(sustainedSeconds: Double, pollInterval: Double = 1.0) {
+    guard let deviceID = defaultOutputDeviceID() else {
+        fputs("Error: could not resolve default output device\n", stderr)
+        exit(1)
+    }
+
+    let detector = SustainedActivityDetector(sustainedSeconds: sustainedSeconds)
+
+    fputs("Watching for sustained audio activity on the default output device (>\(sustainedSeconds)s)...\n", stderr)
+
+    let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+    signal(SIGINT, SIG_IGN)
+    sigintSource.setEventHandler { exit(0) }
+    sigintSource.resume()
+
+    let timer = DispatchSource.makeTimerSource(queue: .main)
+    timer.schedule(deadline: .now(), repeating: pollInterval)
+    timer.setEventHandler {
+        guard let running = isAudioDeviceRunningSomewhere(deviceID) else { return }
+        if detector.observe(running: running, now: Date()) {
+            print("[MEETING_DETECTED]")
+            fflush(stdout)
+            exit(0)
+        }
+    }
+    timer.resume()
+
+    RunLoop.main.run()
+}
+
 // MARK: - Main
 
 func printUsage() {
@@ -980,19 +1055,24 @@ func printUsage() {
         ownscribe-audio capture --output FILE [--mic] [--mic-device NAME] [--silence-timeout N]
         ownscribe-audio list-apps
         ownscribe-audio list-devices
+        ownscribe-audio watch-activity [--sustained-seconds N]
 
     OPTIONS:
-        --output, -o FILE    Output WAV file path (required for capture)
-        --mic                Also capture microphone input
-        --mic-device NAME    Use specific mic input device (implies --mic)
-        --capture-mode-all   Capture all system audio without showing the source picker
-        --silence-timeout N  Auto-stop after N seconds of silence (0 = disabled)
-        --help, -h           Show this help
+        --output, -o FILE      Output WAV file path (required for capture)
+        --mic                  Also capture microphone input
+        --mic-device NAME      Use specific mic input device (implies --mic)
+        --capture-mode-all     Capture all system audio without showing the source picker
+        --silence-timeout N    Auto-stop after N seconds of silence (0 = disabled)
+        --sustained-seconds N  Seconds of continuous audio activity before watch-activity
+                               reports a detected meeting (default 3)
+        --help, -h             Show this help
 
     SUBCOMMANDS:
-        capture              Record audio to a WAV file
-        list-apps            Show running applications
-        list-devices         Show available audio input devices
+        capture          Record audio to a WAV file
+        list-apps         Show running applications
+        list-devices      Show available audio input devices
+        watch-activity    Poll for sustained system audio output activity and print
+                          [MEETING_DETECTED] once it holds for --sustained-seconds
 
     """, stderr)
 }
@@ -1012,6 +1092,27 @@ func main() {
 
     case "list-devices":
         listInputDevices()
+
+    case "watch-activity":
+        var sustainedSeconds = 3.0
+        var i = 2
+        while i < args.count {
+            switch args[i] {
+            case "--sustained-seconds":
+                i += 1
+                guard i < args.count, let val = Double(args[i]) else {
+                    fputs("Error: --sustained-seconds requires a number of seconds\n", stderr)
+                    exit(1)
+                }
+                sustainedSeconds = val
+            default:
+                fputs("Unknown option: \(args[i])\n", stderr)
+                printUsage()
+                exit(1)
+            }
+            i += 1
+        }
+        watchAudioActivity(sustainedSeconds: sustainedSeconds)
 
     case "capture":
         // Initialize NSApplication so the picker GUI can render

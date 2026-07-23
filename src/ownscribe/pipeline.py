@@ -862,3 +862,46 @@ def run_list_enrolled() -> None:
         return
     for vp in db.voiceprints:
         click.echo(vp.name)
+
+
+def run_watch(config: Config, sustained_seconds: float) -> None:
+    """Watch for sustained system audio activity, then record+transcribe+summarize."""
+    import subprocess
+
+    from ownscribe.audio.coreaudio import _find_binary
+
+    binary = _find_binary()
+    if binary is None:
+        click.echo(
+            "Error: ownscribe-audio binary not found. Run: bash swift/build.sh",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    click.echo(f"Watching for a meeting to start (audio active for {sustained_seconds:.0f}s)...")
+
+    process = subprocess.Popen(
+        [str(binary), "watch-activity", "--sustained-seconds", str(sustained_seconds)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    detected = False
+    try:
+        for line in process.stdout:
+            if line.strip() == "[MEETING_DETECTED]":
+                detected = True
+                break
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+
+    if not detected:
+        click.echo(
+            "Error: watch-activity exited without detecting a meeting.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    click.echo("Meeting detected — starting recording.\n")
+    run_pipeline(config)

@@ -139,6 +139,19 @@ def devices() -> None:
 
 
 @cli.command()
+@click.option(
+    "--sustained-seconds", default=3.0, type=float,
+    help="Seconds of continuous audio activity before starting a recording (default 3).",
+)
+@click.pass_context
+def watch(ctx: click.Context, sustained_seconds: float) -> None:
+    """Wait for a meeting to start (sustained system audio activity), then record it."""
+    config = ctx.obj["config"]
+    from ownscribe.pipeline import run_watch
+    run_watch(config, sustained_seconds)
+
+
+@cli.command()
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--diarize", is_flag=True, help="Enable speaker diarization.")
 @click.option("--model", default=None, help="Whisper model size.")

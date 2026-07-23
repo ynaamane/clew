@@ -176,6 +176,7 @@ ownscribe --silence-timeout 0                 # disable silence auto-stop
 ```bash
 ownscribe devices                  # list audio devices (uses native CoreAudio when available)
 ownscribe apps                     # list running apps with PIDs for use with --pid
+ownscribe watch                    # wait for a meeting to start, then record it automatically
 ownscribe warmup                   # prefetch WhisperX/pyannote models before a meeting
 ownscribe transcribe recording.wav # transcribe an audio or video file: wav/mp3/mp4/mov/mkv (saved alongside)
 ownscribe summarize transcript.md  # summarize a transcript (saves alongside the input)
@@ -187,6 +188,17 @@ ownscribe speakers                 # list all enrolled speaker names
 ownscribe config                   # open config file in $EDITOR
 ownscribe cleanup                  # remove ownscribe data from disk
 ```
+
+### Auto-Detecting a Meeting
+
+Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether the Mac's default output device is actively playing audio (a permission-free, OS-level signal — no Screen Recording or Microphone access needed just to watch), and once that holds continuously for a few seconds it starts recording automatically.
+
+```bash
+ownscribe watch                          # default: 3s of sustained audio before recording starts
+ownscribe watch --sustained-seconds 5    # require a longer sustained window (fewer false starts)
+```
+
+This works identically regardless of which app produces the audio — Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS output-device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only audio that stays active for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline — everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
 
 > **Video files work too.** Anywhere ownscribe accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v) — it extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `ownscribe resume ./that-folder/` (transcript + summary); use `ownscribe transcribe meeting.mp4` for a transcript only.
 

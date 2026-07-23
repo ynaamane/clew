@@ -1171,6 +1171,105 @@ class TestDoTranscribeAndSummarizeDualTrack:
         mock_transcriber.transcribe.assert_called_once_with(audio_path)
 
 
+class TestRunWatch:
+    def _make_fake_process(self, lines, returncode=0):
+        process = mock.MagicMock()
+        process.stdout = iter(lines)
+        process.poll.return_value = returncode
+        process.wait.return_value = returncode
+        return process
+
+    def test_errors_when_binary_not_found(self):
+        from ownscribe.pipeline import run_watch
+
+        config = Config()
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=None),
+            pytest.raises(SystemExit),
+        ):
+            run_watch(config, sustained_seconds=3.0)
+
+    def test_starts_recording_on_detection(self, tmp_path):
+        from ownscribe.pipeline import run_watch
+
+        config = Config()
+        binary_path = tmp_path / "ownscribe-audio"
+        binary_path.touch()
+
+        fake_process = self._make_fake_process(["[MEETING_DETECTED]\n"])
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("subprocess.Popen", return_value=fake_process),
+            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+        ):
+            run_watch(config, sustained_seconds=3.0)
+
+        mock_run_pipeline.assert_called_once_with(config)
+
+    def test_passes_sustained_seconds_to_subprocess(self, tmp_path):
+        from ownscribe.pipeline import run_watch
+
+        config = Config()
+        binary_path = tmp_path / "ownscribe-audio"
+        binary_path.touch()
+
+        fake_process = self._make_fake_process(["[MEETING_DETECTED]\n"])
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("subprocess.Popen", return_value=fake_process) as mock_popen,
+            mock.patch("ownscribe.pipeline.run_pipeline"),
+        ):
+            run_watch(config, sustained_seconds=5.0)
+
+        called_args = mock_popen.call_args[0][0]
+        assert str(binary_path) in called_args
+        assert "watch-activity" in called_args
+        assert "--sustained-seconds" in called_args
+        assert "5.0" in called_args
+
+    def test_process_exit_without_detection_does_not_start_recording(self, tmp_path):
+        from ownscribe.pipeline import run_watch
+
+        config = Config()
+        binary_path = tmp_path / "ownscribe-audio"
+        binary_path.touch()
+
+        fake_process = self._make_fake_process([])
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("subprocess.Popen", return_value=fake_process),
+            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+            pytest.raises(SystemExit),
+        ):
+            run_watch(config, sustained_seconds=3.0)
+
+        mock_run_pipeline.assert_not_called()
+
+    def test_ignores_unrelated_stdout_lines_before_detection(self, tmp_path):
+        from ownscribe.pipeline import run_watch
+
+        config = Config()
+        binary_path = tmp_path / "ownscribe-audio"
+        binary_path.touch()
+
+        fake_process = self._make_fake_process(
+            ["some noise\n", "\n", "[MEETING_DETECTED]\n"]
+        )
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("subprocess.Popen", return_value=fake_process),
+            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+        ):
+            run_watch(config, sustained_seconds=3.0)
+
+        mock_run_pipeline.assert_called_once_with(config)
+
+
 class TestRunWarmup:
     def test_run_warmup_calls_prepare_models(self):
         from ownscribe.pipeline import run_warmup
