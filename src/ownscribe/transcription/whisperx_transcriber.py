@@ -178,7 +178,7 @@ class WhisperXTranscriber(Transcriber):
             progress.fail("preparing_models")
             raise
 
-    def transcribe(self, audio_path: Path) -> TranscriptResult:
+    def transcribe(self, audio_path: Path, diarize: bool | None = None) -> TranscriptResult:
         import shutil
 
         if not shutil.which("ffmpeg"):
@@ -192,12 +192,10 @@ class WhisperXTranscriber(Transcriber):
         # --- Telemetry toggle (must happen before importing whisperx) ---
         self._configure_runtime_env()
 
+        want_diarize = diarize if diarize is not None else bool(self._diar_config and self._diar_config.enabled)
+
         hf_token_warning: str | None = None
-        if (
-            self._diar_config
-            and self._diar_config.enabled
-            and not self._diar_config.hf_token
-        ):
+        if want_diarize and self._diar_config and not self._diar_config.hf_token:
             hf_token_warning = (
                 "Diarization requested but no HF token configured. "
                 "Set HF_TOKEN env var or hf_token in config. Skipping."
@@ -209,14 +207,14 @@ class WhisperXTranscriber(Transcriber):
             # Suppress named loggers that bypass root (whisperx has propagate=False)
             for name in ("whisperx", "lightning", "pytorch_lightning"):
                 logging.getLogger(name).setLevel(logging.WARNING)
-            result = self._transcribe_inner(audio_path)
+            result = self._transcribe_inner(audio_path, want_diarize=want_diarize)
 
         if hf_token_warning:
             click.echo(hf_token_warning, err=True)
 
         return result
 
-    def _transcribe_inner(self, audio_path: Path) -> TranscriptResult:
+    def _transcribe_inner(self, audio_path: Path, want_diarize: bool) -> TranscriptResult:
         import whisperx
 
         progress = self._progress
@@ -269,11 +267,7 @@ class WhisperXTranscriber(Transcriber):
                 progress.complete("transcribing")
 
                 # --- Optional diarization ---
-                if (
-                    self._diar_config
-                    and self._diar_config.enabled
-                    and self._diar_config.hf_token
-                ):
+                if want_diarize and self._diar_config and self._diar_config.hf_token:
                     result = self._diarize(audio, result)
         finally:
             devnull.close()

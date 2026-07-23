@@ -726,6 +726,12 @@ func listInputDevices() {
 
 // MARK: - Merge audio files with timestamp alignment
 
+func writeTrackAlignmentSidecar(outputDir: URL, micStartOffsetSeconds: Double) {
+    let sidecarPath = outputDir.appendingPathComponent("track_alignment.json").path
+    let json = "{\"mic_start_offset_seconds\": \(micStartOffsetSeconds)}\n"
+    try? json.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
+}
+
 func mergeAudioFiles(systemPath: String, micPath: String,
                      systemStartHostTime: UInt64, micStartHostTime: UInt64,
                      outputPath: String) throws {
@@ -735,6 +741,18 @@ func mergeAudioFiles(systemPath: String, micPath: String,
     let fm = FileManager.default
     let systemFileSize = (try? fm.attributesOfItem(atPath: systemPath)[.size] as? Int) ?? 0
     let micFileSize = (try? fm.attributesOfItem(atPath: micPath)[.size] as? Int) ?? 0
+
+    let outputDir = URL(fileURLWithPath: outputPath).deletingLastPathComponent()
+    let systemKeepPath = outputDir.appendingPathComponent("system.wav").path
+    let micKeepPath = outputDir.appendingPathComponent("mic.wav").path
+    if systemFileSize > wavHeaderSize {
+        try? fm.removeItem(atPath: systemKeepPath)
+        try? fm.copyItem(atPath: systemPath, toPath: systemKeepPath)
+    }
+    if micFileSize > wavHeaderSize {
+        try? fm.removeItem(atPath: micKeepPath)
+        try? fm.copyItem(atPath: micPath, toPath: micKeepPath)
+    }
 
     // Both empty — clean up temp files and let the caller handle it
     if systemFileSize <= wavHeaderSize && micFileSize <= wavHeaderSize {
@@ -761,6 +779,7 @@ func mergeAudioFiles(systemPath: String, micPath: String,
 
     // Compute offset in seconds between the two start times using mach_timebase_info
     let offsetFrames: Int64
+    let micStartOffsetSeconds: Double
     if systemFile != nil {
         var timebase = mach_timebase_info_data_t()
         mach_timebase_info(&timebase)
@@ -769,9 +788,12 @@ func mergeAudioFiles(systemPath: String, micPath: String,
         let micStartNanos = Double(micStartHostTime) * ticksToNanos
         let offsetSeconds = (micStartNanos - systemStartNanos) / 1_000_000_000.0
         offsetFrames = Int64(offsetSeconds * outputSampleRate)
+        micStartOffsetSeconds = offsetSeconds
     } else {
         offsetFrames = 0
+        micStartOffsetSeconds = 0
     }
+    writeTrackAlignmentSidecar(outputDir: outputDir, micStartOffsetSeconds: micStartOffsetSeconds)
     let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                       sampleRate: outputSampleRate,
                                       channels: outputChannels,

@@ -116,6 +116,71 @@ def _create_transcriber(config: Config, progress=None):
     return WhisperXTranscriber(config.transcription, diar_config, progress=progress)
 
 
+_OWNER_SPEAKER_LABEL = "Owner"
+
+
+def _find_dual_tracks(audio_path: Path) -> tuple[Path, Path] | None:
+    """Return (system_path, mic_path) next to audio_path if both were retained, else None."""
+    system_path = audio_path.parent / "system.wav"
+    mic_path = audio_path.parent / "mic.wav"
+    if system_path.exists() and mic_path.exists():
+        return system_path, mic_path
+    return None
+
+
+def _read_mic_start_offset(audio_path: Path) -> float:
+    """Read mic_start_offset_seconds from track_alignment.json next to audio_path, or 0.0."""
+    import json
+
+    sidecar_path = audio_path.parent / "track_alignment.json"
+    try:
+        data = json.loads(sidecar_path.read_text())
+        return float(data.get("mic_start_offset_seconds", 0.0))
+    except (OSError, ValueError, TypeError):
+        return 0.0
+
+
+def _shift_result(result, offset: float):
+    """Return a copy of result with every segment/word start/end shifted by offset seconds."""
+    from dataclasses import replace
+
+    shifted_segments = []
+    for seg in result.segments:
+        shifted_words = [replace(w, start=w.start + offset, end=w.end + offset) for w in seg.words]
+        shifted_segments.append(
+            replace(seg, start=seg.start + offset, end=seg.end + offset, words=shifted_words)
+        )
+    return replace(result, segments=shifted_segments)
+
+
+def _tag_speaker(result, speaker_label: str):
+    """Return a copy of result with every segment's speaker set to speaker_label."""
+    from dataclasses import replace
+
+    tagged_segments = [replace(seg, speaker=speaker_label) for seg in result.segments]
+    return replace(result, segments=tagged_segments)
+
+
+def _merge_dual_track_results(system_result, mic_result, mic_offset: float):
+    """Merge a diarized system-track result with an owner-tagged mic-track result into one timeline."""
+    from dataclasses import replace
+
+    tagged_mic = _tag_speaker(_shift_result(mic_result, mic_offset), _OWNER_SPEAKER_LABEL)
+    all_segments = sorted(
+        [*system_result.segments, *tagged_mic.segments],
+        key=lambda seg: seg.start,
+    )
+    duration = max(system_result.duration, mic_result.duration + mic_offset)
+    return replace(system_result, segments=all_segments, duration=duration)
+
+
+def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_offset: float):
+    """Transcribe system.wav (diarized per config) and mic.wav (owner, never diarized), merged."""
+    system_result = transcriber.transcribe(system_path)
+    mic_result = transcriber.transcribe(mic_path, diarize=False)
+    return _merge_dual_track_results(system_result, mic_result, mic_offset)
+
+
 def _download_summarization_model(
     model_name: str,
     progress: PipelineProgress,
@@ -454,7 +519,13 @@ def _do_transcribe_and_summarize(
             )
             raise SystemExit(1) from None
 
-        result = transcriber.transcribe(audio_path)
+        dual_tracks = _find_dual_tracks(audio_path)
+        if dual_tracks:
+            system_path, mic_path = dual_tracks
+            mic_offset = _read_mic_start_offset(audio_path)
+            result = _transcribe_dual_track(transcriber, system_path, mic_path, mic_offset)
+        else:
+            result = transcriber.transcribe(audio_path)
 
         # Save transcript — silent, no echo
         transcript_str, _ = _format_output(config, result)

@@ -177,7 +177,7 @@ class TestDownloadProgressHooks:
             mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
             mock.patch.object(transcriber, "prepare_models") as mock_prepare_models,
         ):
-            result = transcriber._transcribe_inner(mock.MagicMock())
+            result = transcriber._transcribe_inner(mock.MagicMock(), want_diarize=False)
 
         mock_prepare_models.assert_not_called()
         mock_prepare_runtime.assert_called_once_with(
@@ -188,6 +188,62 @@ class TestDownloadProgressHooks:
         assert ("begin", "transcribing") in progress.calls
         assert ("begin", "preparing_models") not in progress.calls
         assert result.language == "en"
+
+
+class TestDiarizeOverride:
+    def test_diarize_false_override_skips_diarization_even_when_configured(self):
+        from ownscribe.config import DiarizationConfig, TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        class _Audio:
+            shape = (16000,)
+
+        fake_whisperx = types.SimpleNamespace(
+            load_audio=lambda _path: _Audio(),
+            align=lambda *args, **kwargs: {"segments": []},
+        )
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+        transcriber._model = mock.MagicMock()
+        transcriber._model.transcribe.return_value = {"segments": [], "language": "en"}
+
+        with (
+            mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"),
+            mock.patch.dict("sys.modules", {"whisperx": fake_whisperx}),
+            mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
+            mock.patch.object(transcriber, "_diarize") as mock_diarize,
+        ):
+            transcriber.transcribe(mock.MagicMock(), diarize=False)
+
+        mock_diarize.assert_not_called()
+
+    def test_diarize_none_falls_back_to_config_enabled(self):
+        from ownscribe.config import DiarizationConfig, TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        class _Audio:
+            shape = (16000,)
+
+        fake_whisperx = types.SimpleNamespace(
+            load_audio=lambda _path: _Audio(),
+            align=lambda *args, **kwargs: {"segments": []},
+        )
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+        transcriber._model = mock.MagicMock()
+        transcriber._model.transcribe.return_value = {"segments": [], "language": "en"}
+
+        with (
+            mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"),
+            mock.patch.dict("sys.modules", {"whisperx": fake_whisperx}),
+            mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
+            mock.patch.object(transcriber, "_diarize", return_value={"segments": []}) as mock_diarize,
+        ):
+            transcriber.transcribe(mock.MagicMock())
+
+        mock_diarize.assert_called_once()
 
 
 class TestDiarizationApiCompat:

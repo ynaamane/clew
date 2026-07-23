@@ -7,7 +7,7 @@ import json
 from unittest import mock
 
 from ownscribe.config import Config
-from ownscribe.transcription.models import Segment, TranscriptResult
+from ownscribe.transcription.models import Segment, TranscriptResult, Word
 
 
 class TestCreateRecorder:
@@ -60,20 +60,32 @@ class TestCreateRecorder:
         with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
-            mock_cls.assert_called_once_with(mic=False, mic_device="", capture_mode="picker", silence_timeout=120)
+            mock_cls.assert_called_once_with(mic=False, mic_device="", capture_mode="all", silence_timeout=120)
 
-    def test_capture_mode_passed_to_coreaudio(self):
+    def test_capture_mode_defaults_to_all(self):
         from ownscribe.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
-        config.audio.capture_mode = "all"
 
         with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(mic=False, mic_device="", capture_mode="all", silence_timeout=300)
+
+    def test_capture_mode_picker_override_passed_to_coreaudio(self):
+        from ownscribe.pipeline import _create_recorder
+
+        config = Config()
+        config.audio.backend = "coreaudio"
+        config.audio.device = ""
+        config.audio.capture_mode = "picker"
+
+        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+            mock_cls.return_value.is_available.return_value = True
+            _create_recorder(config)
+            mock_cls.assert_called_once_with(mic=False, mic_device="", capture_mode="picker", silence_timeout=300)
 
     def test_silence_timeout_passed_to_sounddevice(self):
         from ownscribe.pipeline import _create_recorder
@@ -436,6 +448,299 @@ class TestDoTranscribeAndSummarize:
         assert (renamed_out_dir / "summary.md").exists()
         assert not (renamed_out_dir / "recording.wav").exists()
         assert not out_dir.exists()
+
+
+class TestFindDualTracks:
+    def test_returns_none_when_neither_track_exists(self, tmp_path):
+        from ownscribe.pipeline import _find_dual_tracks
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        assert _find_dual_tracks(audio_path) is None
+
+    def test_returns_none_when_only_system_exists(self, tmp_path):
+        from ownscribe.pipeline import _find_dual_tracks
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        (tmp_path / "system.wav").touch()
+
+        assert _find_dual_tracks(audio_path) is None
+
+    def test_returns_none_when_only_mic_exists(self, tmp_path):
+        from ownscribe.pipeline import _find_dual_tracks
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        (tmp_path / "mic.wav").touch()
+
+        assert _find_dual_tracks(audio_path) is None
+
+    def test_returns_both_paths_when_both_exist(self, tmp_path):
+        from ownscribe.pipeline import _find_dual_tracks
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        system_path.touch()
+        mic_path.touch()
+
+        result = _find_dual_tracks(audio_path)
+
+        assert result == (system_path, mic_path)
+
+
+class TestReadMicStartOffset:
+    def test_reads_positive_offset_from_sidecar(self, tmp_path):
+        from ownscribe.pipeline import _read_mic_start_offset
+
+        audio_path = tmp_path / "recording.wav"
+        (tmp_path / "track_alignment.json").write_text('{"mic_start_offset_seconds": 0.3}')
+
+        assert _read_mic_start_offset(audio_path) == 0.3
+
+    def test_reads_negative_offset_from_sidecar(self, tmp_path):
+        from ownscribe.pipeline import _read_mic_start_offset
+
+        audio_path = tmp_path / "recording.wav"
+        (tmp_path / "track_alignment.json").write_text('{"mic_start_offset_seconds": -0.3}')
+
+        assert _read_mic_start_offset(audio_path) == -0.3
+
+    def test_returns_zero_when_sidecar_missing(self, tmp_path):
+        from ownscribe.pipeline import _read_mic_start_offset
+
+        audio_path = tmp_path / "recording.wav"
+
+        assert _read_mic_start_offset(audio_path) == 0.0
+
+    def test_returns_zero_when_sidecar_malformed(self, tmp_path):
+        from ownscribe.pipeline import _read_mic_start_offset
+
+        audio_path = tmp_path / "recording.wav"
+        (tmp_path / "track_alignment.json").write_text("not json at all")
+
+        assert _read_mic_start_offset(audio_path) == 0.0
+
+    def test_returns_zero_when_key_missing(self, tmp_path):
+        from ownscribe.pipeline import _read_mic_start_offset
+
+        audio_path = tmp_path / "recording.wav"
+        (tmp_path / "track_alignment.json").write_text("{}")
+
+        assert _read_mic_start_offset(audio_path) == 0.0
+
+
+class TestShiftResult:
+    def test_shifts_segment_and_word_timestamps(self):
+        from ownscribe.pipeline import _shift_result
+
+        result = TranscriptResult(
+            segments=[
+                Segment(
+                    text="hello",
+                    start=1.0,
+                    end=2.0,
+                    words=[Word(text="hello", start=1.0, end=2.0)],
+                )
+            ],
+            language="en",
+            duration=2.0,
+        )
+
+        shifted = _shift_result(result, 0.5)
+
+        assert shifted.segments[0].start == 1.5
+        assert shifted.segments[0].end == 2.5
+        assert shifted.segments[0].words[0].start == 1.5
+        assert shifted.segments[0].words[0].end == 2.5
+
+    def test_negative_offset_shifts_backward(self):
+        from ownscribe.pipeline import _shift_result
+
+        result = TranscriptResult(segments=[Segment(text="hi", start=2.0, end=3.0)])
+
+        shifted = _shift_result(result, -0.5)
+
+        assert shifted.segments[0].start == 1.5
+        assert shifted.segments[0].end == 2.5
+
+    def test_does_not_mutate_original(self):
+        from ownscribe.pipeline import _shift_result
+
+        original = TranscriptResult(segments=[Segment(text="hi", start=1.0, end=2.0)])
+
+        _shift_result(original, 0.5)
+
+        assert original.segments[0].start == 1.0
+
+
+class TestTagSpeaker:
+    def test_sets_speaker_on_every_segment(self):
+        from ownscribe.pipeline import _tag_speaker
+
+        result = TranscriptResult(
+            segments=[
+                Segment(text="a", start=0.0, end=1.0, speaker=None),
+                Segment(text="b", start=1.0, end=2.0, speaker="SPEAKER_00"),
+            ]
+        )
+
+        tagged = _tag_speaker(result, "Owner")
+
+        assert all(seg.speaker == "Owner" for seg in tagged.segments)
+
+
+class TestMergeDualTrackResults:
+    def test_interleaves_segments_by_start_time(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(
+            segments=[
+                Segment(text="remote says hi", start=0.0, end=1.0, speaker="SPEAKER_00"),
+                Segment(text="remote continues", start=2.0, end=3.0, speaker="SPEAKER_00"),
+            ],
+            language="en",
+            duration=3.0,
+        )
+        mic_result = TranscriptResult(
+            segments=[Segment(text="owner replies", start=0.5, end=1.5)],
+            language="en",
+            duration=1.0,
+        )
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=0.0)
+
+        texts_in_order = [seg.text for seg in merged.segments]
+        assert texts_in_order == ["remote says hi", "owner replies", "remote continues"]
+
+    def test_mic_segments_tagged_owner_and_shifted(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(segments=[], language="en", duration=5.0)
+        mic_result = TranscriptResult(
+            segments=[Segment(text="owner speaks", start=0.0, end=1.0)],
+            language="en",
+            duration=1.0,
+        )
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=0.3)
+
+        assert len(merged.segments) == 1
+        assert merged.segments[0].speaker == "Owner"
+        assert merged.segments[0].start == 0.3
+        assert merged.segments[0].end == 1.3
+
+    def test_system_segments_speaker_labels_untouched(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(
+            segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")],
+            language="en",
+            duration=1.0,
+        )
+        mic_result = TranscriptResult(segments=[], language="en", duration=0.0)
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=0.0)
+
+        assert merged.segments[0].speaker == "SPEAKER_00"
+
+    def test_duration_is_max_of_both_tracks_accounting_for_offset(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(segments=[], language="en", duration=5.0)
+        mic_result = TranscriptResult(segments=[], language="en", duration=10.0)
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=2.0)
+
+        assert merged.duration == 12.0
+
+
+class TestTranscribeDualTrack:
+    def test_diarizes_system_never_diarizes_mic(self, tmp_path):
+        from ownscribe.pipeline import _transcribe_dual_track
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.side_effect = [
+            TranscriptResult(segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")]),
+            TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
+        ]
+
+        _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0)
+
+        calls = mock_transcriber.transcribe.call_args_list
+        assert calls[0].args[0] == system_path
+        assert calls[0].kwargs == {}
+        assert calls[1].args[0] == mic_path
+        assert calls[1].kwargs == {"diarize": False}
+
+    def test_merges_both_transcripts_into_one_result(self, tmp_path):
+        from ownscribe.pipeline import _transcribe_dual_track
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.side_effect = [
+            TranscriptResult(segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")]),
+            TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
+        ]
+
+        result = _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0)
+
+        assert len(result.segments) == 2
+        assert {seg.speaker for seg in result.segments} == {"SPEAKER_00", "Owner"}
+
+
+class TestDoTranscribeAndSummarizeDualTrack:
+    def test_uses_dual_track_when_both_tracks_present(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        (tmp_path / "system.wav").touch()
+        (tmp_path / "mic.wav").touch()
+        (tmp_path / "track_alignment.json").write_text('{"mic_start_offset_seconds": 0.2}')
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.side_effect = [
+            TranscriptResult(segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")]),
+            TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
+        ]
+
+        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        assert mock_transcriber.transcribe.call_count == 2
+        transcript_text = (tmp_path / "transcript.md").read_text()
+        assert "Owner" in transcript_text
+
+    def test_falls_back_to_single_track_when_tracks_absent(self, tmp_path):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="Hello world.", start=0.0, end=1.5)],
+            language="en",
+            duration=1.5,
+        )
+
+        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        mock_transcriber.transcribe.assert_called_once_with(audio_path)
 
 
 class TestRunWarmup:
