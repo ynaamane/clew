@@ -56,6 +56,28 @@ def _download_binary() -> Path | None:
         return None
 
 
+def binary_supports_separate_tracks(binary: Path) -> bool:
+    """Probe whether binary is this fork's patched build rather than upstream's
+    unpatched release, which lacks separate mic/system track retention. Checks for
+    the watch-activity subcommand (added after separate-track retention landed in
+    this fork's history, so its presence implies separate-track support too).
+    Side-effect-free: an invalid --sustained-seconds value fails inside
+    watch-activity's own arg parsing on the patched build (never starts the poll
+    loop), while upstream hits its top-level unknown-command branch for the same
+    invocation.
+    """
+    try:
+        result = subprocess.run(
+            [str(binary), "watch-activity", "--sustained-seconds", "not-a-number"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return "requires a number of seconds" in result.stdout or "requires a number of seconds" in result.stderr
+
+
 def _find_binary() -> Path | None:
     for candidate in _BINARY_CANDIDATES:
         if candidate.exists() and candidate.is_file():
@@ -71,7 +93,9 @@ def _find_binary() -> Path | None:
     if found:
         return Path(found)
 
-    # Try downloading
+    # Try downloading -- this pulls upstream's unpatched release. Callers that need
+    # separate mic/system tracks must check binary_supports_separate_tracks() before
+    # relying on this binary; _find_binary() itself stays a plain locate/fetch.
     return _download_binary()
 
 
@@ -99,10 +123,17 @@ class CoreAudioRecorder(AudioRecorder):
         if not self._binary:
             raise RuntimeError("ownscribe-audio binary not found. Run: bash swift/build.sh")
 
+        wants_mic = self._mic or self._mic_device
+        if wants_mic and not binary_supports_separate_tracks(self._binary):
+            raise RuntimeError(
+                f"{self._binary} is an outdated/unpatched ownscribe-audio binary -- it "
+                "cannot retain separate mic/system tracks. Run: bash swift/build.sh"
+            )
+
         cmd = [str(self._binary), "capture", "--output", str(output_path)]
         if self._capture_mode == "all":
             cmd.append("--capture-mode-all")
-        if self._mic or self._mic_device:
+        if wants_mic:
             cmd.append("--mic")
         if self._mic_device:
             cmd.extend(["--mic-device", self._mic_device])
