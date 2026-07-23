@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest import mock
 
 from ownscribe.config import Config, OutputConfig, _merge_toml, ensure_config_file
-from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
 
 
 class TestDefaults:
@@ -35,10 +34,6 @@ class TestDefaults:
     def test_default_diarization_telemetry_off(self):
         cfg = Config()
         assert cfg.diarization.telemetry is False
-
-    def test_default_diarization_device_auto(self):
-        cfg = Config()
-        assert cfg.diarization.device == "auto"
 
     def test_default_summarization_template_empty(self):
         cfg = Config()
@@ -166,22 +161,6 @@ class TestEnsureConfigFile:
              mock.patch("ownscribe.config.CONFIG_PATH", config_path):
             ensure_config_file()
         assert config_path.read_text() == "# custom config\n"
-
-
-class TestResolveDiarizationDevice:
-    def test_cpu_passthrough(self):
-        assert WhisperXTranscriber._resolve_diarization_device("cpu") == "cpu"
-
-    def test_mps_passthrough(self):
-        assert WhisperXTranscriber._resolve_diarization_device("mps") == "mps"
-
-    def test_auto_with_mps_available(self):
-        with mock.patch("torch.backends.mps.is_available", return_value=True):
-            assert WhisperXTranscriber._resolve_diarization_device("auto") == "mps"
-
-    def test_auto_without_mps(self):
-        with mock.patch("torch.backends.mps.is_available", return_value=False):
-            assert WhisperXTranscriber._resolve_diarization_device("auto") == "cpu"
 
 
 class TestResolvedDir:

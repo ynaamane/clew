@@ -142,13 +142,12 @@ class WhisperXTranscriber(Transcriber):
         if self._diarize_model is not None:
             return self._diarize_model
 
-        device = self._resolve_diarization_device(self._diar_config.device)
         self._diarize_model = self._capture_download_output(
             step_key,
             "Loading diarization pipeline",
             DiarizationPipeline,
             token=self._diar_config.hf_token,
-            device=device,
+            device="cpu",
         )
         return self._diarize_model
 
@@ -305,14 +304,6 @@ class WhisperXTranscriber(Transcriber):
 
         duration = audio.shape[0] / float(_SAMPLE_RATE)
         return TranscriptResult(segments=segments, language=language, duration=duration)
-
-    @staticmethod
-    def _resolve_diarization_device(device_cfg: str) -> str:
-        if device_cfg == "auto":
-            import torch
-
-            return "mps" if torch.backends.mps.is_available() else "cpu"
-        return device_cfg
 
     def _diarize(self, audio, result):
         import pandas as pd

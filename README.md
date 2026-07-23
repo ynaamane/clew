@@ -67,9 +67,11 @@ Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc
 
 > **Tip:** Your terminal app (Terminal, iTerm2, VS Code, etc.) needs **Screen Recording** permission to capture system audio.
 > Open the settings panel directly with:
+>
 > ```bash
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 > ```
+>
 > Enable your terminal app, then restart it.
 
 ## Installation
@@ -139,6 +141,7 @@ ownscribe                    # records system audio, Ctrl+C to stop
 ```
 
 This will:
+
 1. Capture system audio until you press Ctrl+C (or auto-stop after 5 minutes of silence)
 2. Transcribe with WhisperX
 3. Summarize with your local LLM
@@ -200,6 +203,7 @@ ownscribe ask "action items from last week" --limit 5
 ```
 
 This runs a two-stage pipeline:
+
 1. **Find** — sends meeting summaries to the LLM to identify which meetings are relevant
 2. **Answer** — sends the full transcripts of relevant meetings to the LLM to produce an answer with quotes
 
@@ -228,7 +232,6 @@ language = ""             # empty = auto-detect
 enabled = false
 hf_token = ""             # HuggingFace token for pyannote
 telemetry = false         # allow HuggingFace Hub + pyannote metrics telemetry
-device = "auto"           # "auto" (mps if available), "mps", or "cpu"
 
 [summarization]
 enabled = true
@@ -257,11 +260,11 @@ keep_recording = true     # false = auto-delete WAV after transcription
 
 Built-in templates control how transcripts are summarized:
 
-| Template | Best for | Output style |
-|----------|----------|-------------|
-| `meeting` | Meetings, standups, 1:1s | Summary, Key Points, Action Items, Decisions |
-| `lecture` | Lectures, seminars, talks | Summary, Key Concepts, Key Takeaways |
-| `brief` | Quick overviews | 3-5 bullet points |
+| Template  | Best for                  | Output style                                 |
+| --------- | ------------------------- | -------------------------------------------- |
+| `meeting` | Meetings, standups, 1:1s  | Summary, Key Points, Action Items, Decisions |
+| `lecture` | Lectures, seminars, talks | Summary, Key Concepts, Key Takeaways         |
+| `brief`   | Quick overviews           | 3-5 bullet points                            |
 
 Use `--template` on the CLI or set `template` in `[summarization]` config. Default is `meeting`.
 
@@ -284,7 +287,7 @@ Speaker identification requires a HuggingFace token with access to the pyannote 
 3. Set `HF_TOKEN` env var or add `hf_token` to config
 4. Run with `--diarize`
 
-On Apple Silicon Macs, diarization automatically uses the Metal Performance Shaders (MPS) GPU backend for ~10x faster processing. Set `device = "cpu"` in the `[diarization]` config section to disable this.
+Diarization always runs on CPU. See `NOTES.md` for why the MPS path is disabled here rather than upstream's `device = "auto"` default.
 
 ## Acknowledgments
 

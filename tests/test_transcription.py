@@ -196,7 +196,7 @@ class TestDiarizationApiCompat:
         from ownscribe.config import DiarizationConfig, TranscriptionConfig
         from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
 
-        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token", device="cpu")
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
 
         fake_pipeline = mock.MagicMock(return_value=mock.sentinel.diarize_model)
@@ -217,6 +217,28 @@ class TestDiarizationApiCompat:
         assert kwargs.get("token") == "hf_test_token"
         assert "use_auth_token" not in kwargs
 
+    def test_load_diarization_pipeline_always_forces_cpu(self):
+        from ownscribe.config import DiarizationConfig, TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+
+        fake_pipeline = mock.MagicMock(return_value=mock.sentinel.diarize_model)
+        fake_diarize_module = types.SimpleNamespace(DiarizationPipeline=fake_pipeline)
+
+        def passthrough(_step_key, _label, fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+
+        with (
+            mock.patch.dict("sys.modules", {"whisperx.diarize": fake_diarize_module}),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough),
+        ):
+            transcriber._load_diarization_pipeline()
+
+        kwargs = fake_pipeline.call_args.kwargs
+        assert kwargs.get("device") == "cpu"
+
     def test_diarize_unwraps_speaker_diarization_from_diarize_output(self):
         # pyannote.audio 4.0 wraps the annotation in a DiarizeOutput container;
         # _diarize must read it as `.speaker_diarization.itertracks()`.
@@ -225,7 +247,7 @@ class TestDiarizationApiCompat:
         from ownscribe.config import DiarizationConfig, TranscriptionConfig
         from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
 
-        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token", device="cpu")
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
 
         fake_segment = types.SimpleNamespace(start=0.5, end=1.5)
