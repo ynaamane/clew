@@ -10,6 +10,11 @@ from pathlib import Path
 CONFIG_DIR = Path("~/.config/ownscribe").expanduser()
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 
+BILINGUAL_INITIAL_PROMPT = (
+    "On continue le sprint review, on regarde le backend et le pipeline de deployment. "
+    "Let's also check the roadmap and merge the feedback from last time."
+)
+
 DEFAULT_CONFIG_TOML = """\
 [audio]
 backend = "coreaudio"     # "coreaudio" (default) or "sounddevice"
@@ -20,9 +25,9 @@ capture_mode = "picker"   # "picker" = show source picker; "all" = capture all s
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
 
 [transcription]
-model = "base"            # whisper model: tiny, base, small, medium, large-v3
-language = ""             # empty = auto-detect
-# initial_prompt = ""     # prime Whisper with context: domain vocab, speaker names, expected phrases
+model = "large-v3"        # whisper model: tiny, base, small, medium, large-v3
+language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
+initial_prompt = "__BILINGUAL_INITIAL_PROMPT__"
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
 
 [diarization]
@@ -51,7 +56,7 @@ dir = "~/ownscribe"       # base output directory
 audio_dir = ""            # directory for audio recordings; empty = same as dir
 format = "markdown"       # "markdown" or "json"
 keep_recording = true     # keep WAV files after transcription; false = auto-delete
-"""
+""".replace("__BILINGUAL_INITIAL_PROMPT__", BILINGUAL_INITIAL_PROMPT)
 
 
 @dataclass
@@ -66,9 +71,9 @@ class AudioConfig:
 
 @dataclass
 class TranscriptionConfig:
-    model: str = "base"
+    model: str = "large-v3"
     language: str = ""
-    initial_prompt: str = ""
+    initial_prompt: str = BILINGUAL_INITIAL_PROMPT
     hotwords: str = ""
 
 

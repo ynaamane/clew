@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from unittest import mock
 
-from ownscribe.config import Config, OutputConfig, _merge_toml, ensure_config_file
+from ownscribe.config import BILINGUAL_INITIAL_PROMPT, Config, OutputConfig, _merge_toml, ensure_config_file
 
 
 class TestDefaults:
@@ -16,7 +16,12 @@ class TestDefaults:
 
     def test_default_transcription_model(self):
         cfg = Config()
-        assert cfg.transcription.model == "base"
+        assert cfg.transcription.model == "large-v3"
+
+    def test_default_transcription_initial_prompt_is_bilingual(self):
+        cfg = Config()
+        assert cfg.transcription.initial_prompt == BILINGUAL_INITIAL_PROMPT
+        assert cfg.transcription.initial_prompt != ""
 
     def test_default_summarization_enabled(self):
         cfg = Config()
@@ -150,7 +155,10 @@ class TestEnsureConfigFile:
              mock.patch("ownscribe.config.CONFIG_PATH", config_path):
             result = ensure_config_file()
         assert result.exists()
-        assert "[audio]" in result.read_text()
+        written = result.read_text()
+        assert "[audio]" in written
+        assert BILINGUAL_INITIAL_PROMPT in written
+        assert "__BILINGUAL_INITIAL_PROMPT__" not in written
 
     def test_does_not_overwrite_existing(self, tmp_path):
         config_dir = tmp_path / "ownscribe"

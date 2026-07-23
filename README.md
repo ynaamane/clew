@@ -223,9 +223,9 @@ capture_mode = "picker"   # "picker" = show source picker; "all" = capture all s
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
 
 [transcription]
-model = "base"            # tiny, base, small, medium, large-v3
-language = ""             # empty = auto-detect
-# initial_prompt = ""     # prime Whisper with context: domain vocab, speaker names, expected phrases
+model = "large-v3"        # tiny, base, small, medium, large-v3
+language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
+initial_prompt = "..."    # defaults to a bilingual FR/EN sentence to prime code-switching; override freely
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
 
 [diarization]
