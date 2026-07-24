@@ -16,7 +16,9 @@ def clean_response(text: str) -> str:
     return text
 
 MEETING_SUMMARY_SYSTEM = (
-    "You are a meeting notes assistant. You produce clear, structured summaries of meeting transcripts."
+    "You are a meeting notes assistant. You produce clear, structured summaries of meeting transcripts. "
+    "Only include names, tasks, dates, and decisions that are explicitly stated in the transcript. "
+    "Never invent or infer a name, action item, or decision that is not actually present in the text."
 )
 
 MEETING_SUMMARY_PROMPT = """Summarize the following meeting transcript into structured meeting notes.
@@ -29,10 +31,12 @@ A brief 2-3 sentence overview of what the meeting was about.
 Bullet points of the main topics discussed and decisions made.
 
 ## Action Items
-Bullet points of any tasks, assignments, or follow-ups mentioned. Include who is responsible if mentioned.
+Bullet points of any tasks, assignments, or follow-ups explicitly mentioned. Include who is responsible only
+if a name is actually stated in the transcript. If no action items were mentioned, write "None mentioned."
+under this heading — do not invent any.
 
 ## Decisions
-Bullet points of any explicit decisions that were made.
+Bullet points of any explicit decisions that were made. If none were made, write "None mentioned."
 
 ---
 
@@ -41,7 +45,9 @@ Transcript:
 
 LECTURE_SUMMARY_SYSTEM = (
     "You are an academic note-taking assistant. "
-    "You produce clear, structured notes from lecture and seminar transcripts."
+    "You produce clear, structured notes from lecture and seminar transcripts. "
+    "Only include concepts, terms, and takeaways that are explicitly present in the transcript. "
+    "Never invent an example, term, or takeaway that is not actually present in the text."
 )
 
 LECTURE_SUMMARY_PROMPT = """Summarize the following lecture transcript into structured notes.
@@ -62,7 +68,8 @@ Transcript:
 {transcript}"""
 
 BRIEF_SUMMARY_SYSTEM = (
-    "You are a concise summarization assistant. You produce short, scannable summaries."
+    "You are a concise summarization assistant. You produce short, scannable summaries. "
+    "Only include facts that are explicitly stated in the transcript; never invent details."
 )
 
 BRIEF_SUMMARY_PROMPT = """Summarize the following transcript into 3-5 concise bullet points.

@@ -24,6 +24,7 @@ from ownscribe.progress import (
     format_download_progress,
 )
 from ownscribe.summarization import create_summarizer
+from ownscribe.summarization.grounding import find_ungrounded_names
 
 # A standard WAV file header (RIFF + fmt + data chunk header) is 44 bytes.
 # Files at or below this size contain no audio frames.
@@ -562,10 +563,18 @@ def run_summarize(config: Config, transcript_file: str) -> None:
                     )
                     raise SystemExit(1) from None
             summary = summarizer.summarize(transcript_text)
+            ungrounded_names = find_ungrounded_names(summary, transcript_text)
             title_slug = _generate_title_slug(summary, summarizer)
             progress.complete("summarizing")
     finally:
         summarizer.close()
+
+    if ungrounded_names:
+        click.echo(
+            "\nWarning: the summary mentions names not found in the transcript: "
+            f"{', '.join(ungrounded_names)}. Review before trusting action items/decisions.",
+            err=True,
+        )
 
     summary_md = format_summary(summary)
     summary_path = out_dir / "summary.md"
@@ -611,6 +620,7 @@ def _do_transcribe_and_summarize(
     sum_failed = False
     correction_unavailable = False
     correction_failed = False
+    ungrounded_names: list[str] = []
 
     local_sum = sum_enabled and config.summarization.backend == "local"
     needs_llm = sum_enabled or correction_enabled
@@ -678,6 +688,7 @@ def _do_transcribe_and_summarize(
                             )
                             progress.complete("downloading_model")
                         summary = summarizer.summarize(result.full_text)
+                        ungrounded_names = find_ungrounded_names(summary, result.full_text)
                         _, summary_str = _format_output(config, result, summary)
                         summary_path = out_dir / f"summary.{ext}"
                         summary_path.write_text(summary_str or summary)
@@ -724,6 +735,13 @@ def _do_transcribe_and_summarize(
             f"\nWarning: Summarization failed. "
             f"Transcript is saved at {transcript_path}\n"
             f"Resume with: ownscribe resume {out_dir}",
+            err=True,
+        )
+
+    if ungrounded_names:
+        click.echo(
+            "\nWarning: the summary mentions names not found in the transcript: "
+            f"{', '.join(ungrounded_names)}. Review before trusting action items/decisions.",
             err=True,
         )
 

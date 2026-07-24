@@ -412,6 +412,59 @@ class TestDoTranscribeAndSummarize:
         assert (tmp_path / "summary.md").exists()
         assert "Summary" in (tmp_path / "summary.md").read_text()
 
+    def test_summary_with_invented_name_triggers_grounding_warning(self, tmp_path, capsys):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Action Items\n- Zephyr to follow up.\n"
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        captured = capsys.readouterr()
+        assert "Zephyr" in captured.err
+        assert "not found in the transcript" in captured.err
+
+    def test_summary_fully_grounded_in_transcript_has_no_warning(self, tmp_path, capsys):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nHello world was discussed."
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        captured = capsys.readouterr()
+        assert "not found in the transcript" not in captured.err
+
     def test_summarizer_unavailable_skips_gracefully(self, tmp_path):
         from ownscribe.pipeline import _do_transcribe_and_summarize
 
@@ -1619,6 +1672,32 @@ class TestRunSummarizeColocation:
 
         renamed_dir = tx_dir.parent / f"{tx_dir.name}_test-title"
         assert (renamed_dir / "summary.md").exists()
+
+    def test_summary_with_invented_name_triggers_grounding_warning(self, tmp_path, capsys):
+        from ownscribe.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Action Items\n- Zephyr to follow up.\n"
+        mock_summarizer.generate_title.return_value = "test-title"
+
+        with (
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            run_summarize(config, str(tx_path))
+
+        captured = capsys.readouterr()
+        assert "Zephyr" in captured.err
+        assert "not found in the transcript" in captured.err
 
     def test_renames_matching_audio_dir_inside_output_tree(self, tmp_path):
         from ownscribe.pipeline import run_summarize
