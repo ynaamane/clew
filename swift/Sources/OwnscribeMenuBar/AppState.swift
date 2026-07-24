@@ -82,6 +82,7 @@ public final class AppState {
 
     public func restoreUnmutedOnQuit() {
         guard isMuted else { return }
+        isMuted = false
         _ = applyMasterMute(false, device: muteDevice) { [weak self] muted in
             self?.recordingController.setLocalMicMute(muted)
         }

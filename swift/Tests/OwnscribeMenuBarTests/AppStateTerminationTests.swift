@@ -42,4 +42,17 @@ final class AppStateTerminationTests: XCTestCase {
 
         XCTAssertTrue(device.setInputMuteCalls.isEmpty)
     }
+
+    func testCallingRestoreUnmutedOnQuitTwiceOnlyTouchesHardwareOnce() {
+        let device = SpyAudioMuteDevice()
+        let appState = AppState(homeDir: FileManager.default.temporaryDirectory, muteDevice: device)
+        appState.toggleMasterMute()
+        XCTAssertTrue(appState.isMuted)
+        device.setInputMuteCalls = []
+
+        appState.restoreUnmutedOnQuit()
+        appState.restoreUnmutedOnQuit()
+
+        XCTAssertEqual(device.setInputMuteCalls, [false])
+    }
 }

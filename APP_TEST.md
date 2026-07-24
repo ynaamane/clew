@@ -44,7 +44,7 @@ dist/MeetingScribe.app` with no errors.
       Microphone — the earlier grant should still apply. If you ARE
       re-prompted, something is wrong (most likely: the app was signed with
       a different or ad-hoc identity). Check `codesign -dvvv
-  dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
+dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
       `Signature=adhoc`.
 
 ## End-to-end recording
@@ -94,6 +94,18 @@ dist/MeetingScribe.app` with no errors.
 - [ ] Quit the app while muted (via AirPods or built-in). Reopen it and
       check System Settings → Sound → Input is NOT still muted — the app
       should have restored the unmuted state on quit.
+- [ ] Mute via the hotkey or menu button, then quit with **⌘Q** (NOT the
+      "Quit ownscribe" menu button). Check System Settings → Sound → Input
+      — the mic should be unmuted, same as the button-quit case above. This
+      is the path that was silently broken before the quit-path fix: ⌘Q
+      bypasses the button's click handler entirely, so this only proves
+      anything if you genuinely use ⌘Q, not the menu.
+- [ ] Repeat with `killall OwnscribeMenuBar` (the app's actual process
+      name, not the `MeetingScribe.app` bundle name) from a terminal instead
+      of ⌘Q. This sends a raw SIGTERM directly to the process, bypassing
+      the normal Quit Apple-Event entirely — it exercises the secondary
+      signal-handler path, not just the notification path above. Same
+      expectation: mic unmuted afterward.
 
 ## Global hotkey while unfocused
 
