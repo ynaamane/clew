@@ -64,6 +64,22 @@ class TestDefaults:
         cfg = Config()
         assert cfg.output.retention_days == 0
 
+    def test_default_transcription_engine_is_whisperx(self):
+        cfg = Config()
+        assert cfg.transcription.engine == "whisperx"
+
+    def test_default_canary_repo(self):
+        cfg = Config()
+        assert cfg.canary.repo == "CogniSoftOrg/canary-1b-v2-mlx-bf16"
+
+    def test_default_canary_max_segment_seconds(self):
+        cfg = Config()
+        assert cfg.canary.max_segment_seconds == 10.0
+
+    def test_default_canary_max_tokens_per_segment(self):
+        cfg = Config()
+        assert cfg.canary.max_tokens_per_segment == 200
+
 
 class TestMergeToml:
     def test_full_override(self):
@@ -99,6 +115,20 @@ class TestMergeToml:
         data = {"audio": {"capture_backend": "screencapturekit"}}
         merged = _merge_toml(cfg, data)
         assert merged.audio.capture_backend == "screencapturekit"
+
+    def test_transcription_engine_from_toml(self):
+        cfg = Config()
+        data = {"transcription": {"engine": "canary_mlx"}}
+        merged = _merge_toml(cfg, data)
+        assert merged.transcription.engine == "canary_mlx"
+
+    def test_canary_section_from_toml(self):
+        cfg = Config()
+        data = {"canary": {"repo": "some/other-repo", "max_segment_seconds": 20.0, "max_tokens_per_segment": 50}}
+        merged = _merge_toml(cfg, data)
+        assert merged.canary.repo == "some/other-repo"
+        assert merged.canary.max_segment_seconds == 20.0
+        assert merged.canary.max_tokens_per_segment == 50
 
     def test_diarization_telemetry_from_toml(self):
         cfg = Config()

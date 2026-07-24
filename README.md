@@ -258,7 +258,7 @@ engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, see
 
 [canary]
 repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"  # HF repo of the MLX-native Canary-1B-v2 checkpoint
-max_segment_seconds = 40.0  # VAD-segment audio into chunks no longer than this before each pass
+max_segment_seconds = 10.0  # VAD-segment audio into chunks no longer than this before each pass
 max_tokens_per_segment = 200
 
 [diarization]
@@ -392,7 +392,7 @@ engine = "canary_mlx"
 
 [canary]
 repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"
-max_segment_seconds = 40.0
+max_segment_seconds = 10.0
 max_tokens_per_segment = 200
 ```
 
@@ -404,6 +404,7 @@ Known scope limits for this engine, compared to the WhisperX default:
 - **No self-diarization.** Speaker labeling for Canary transcripts is whatever your existing diarization/naming pipeline produces on a segment-overlap basis — Canary itself never diarizes.
 - **One language per run.** No per-segment auto-detection; `[transcription] language` (or the CLI `--language` flag) sets both source and target language for the whole file, defaulting to French if unset.
 - **VAD-segmented in ≤`max_segment_seconds` chunks** (via faster-whisper's bundled Silero VAD, already installed for WhisperX — no extra dependency) rather than one continuous pass, since Canary's positional encoding has no long-form chunking of its own.
+- **Pilot result: WhisperX stays the default.** On a real code-switched FR/EN clip (see `pilot/`), Canary's WER on code-switch spans was consistently worse than WhisperX's across every `max_segment_seconds` tested (5s/10s/40s) — the pre-committed pass bar (Canary must win switch-span WER by ≥3 points) was not met. `max_segment_seconds` defaults to 10.0 based on this pilot, not the 40.0 first assumed: 40s let VAD hand Canary an entire 30s conversational clip in one call, which measurably hurt accuracy versus finer segmentation.
 
 ## Acknowledgments
 

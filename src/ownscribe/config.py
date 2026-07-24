@@ -34,7 +34,7 @@ engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, nee
 
 [canary]
 repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"  # HF repo of the MLX-native Canary-1B-v2 checkpoint
-max_segment_seconds = 40.0  # VAD-segment audio into chunks no longer than this before each generate() call
+max_segment_seconds = 10.0  # VAD-segment audio into chunks no longer than this before each generate() call
 max_tokens_per_segment = 200  # generation cap per segment
 
 [diarization]
@@ -94,7 +94,7 @@ class TranscriptionConfig:
 @dataclass
 class CanaryConfig:
     repo: str = "CogniSoftOrg/canary-1b-v2-mlx-bf16"
-    max_segment_seconds: float = 40.0
+    max_segment_seconds: float = 10.0
     max_tokens_per_segment: int = 200
 
 
