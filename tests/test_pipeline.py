@@ -1224,6 +1224,82 @@ class TestMergeDualTrackResults:
 
         assert merged.duration == 12.0
 
+    def test_negative_offset_shifts_system_forward_not_mic_backward(self):
+        """mic_offset < 0 means mic started BEFORE system (BUG3: shifting mic backward by
+        a negative amount pushed its early segments to negative timestamps, which
+        _format_time then rendered as a bogus HH:MM like [59:51])."""
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(
+            segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")],
+            language="en",
+            duration=1.0,
+        )
+        mic_result = TranscriptResult(
+            segments=[Segment(text="owner speaks first", start=0.0, end=1.0)],
+            language="en",
+            duration=1.0,
+        )
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=-0.3)
+
+        assert all(seg.start >= 0.0 for seg in merged.segments)
+        mic_seg = next(seg for seg in merged.segments if seg.speaker == "Owner")
+        system_seg = next(seg for seg in merged.segments if seg.speaker == "SPEAKER_00")
+        assert mic_seg.start == 0.0
+        assert system_seg.start == 0.3
+
+    def test_negative_offset_preserves_chronological_order(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(
+            segments=[Segment(text="remote later", start=0.0, end=1.0, speaker="SPEAKER_00")],
+            language="en",
+            duration=1.0,
+        )
+        mic_result = TranscriptResult(
+            segments=[Segment(text="owner earlier", start=0.0, end=1.0)],
+            language="en",
+            duration=1.0,
+        )
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=-0.3)
+
+        assert [seg.text for seg in merged.segments] == ["owner earlier", "remote later"]
+
+    def test_negative_offset_duration_accounts_for_shifted_system(self):
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(segments=[], language="en", duration=5.0)
+        mic_result = TranscriptResult(segments=[], language="en", duration=10.0)
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=-2.0)
+
+        assert merged.duration == 10.0
+
+    def test_real_world_repro_offset_produces_chronological_non_negative_timeline(self):
+        """Pins the exact BUG3 repro values (mic started ~28.28s before system;
+        ~/ownscribe/2026-07-24_1756_emerging-internet-force-impact/track_alignment.json)."""
+        from ownscribe.pipeline import _merge_dual_track_results
+
+        system_result = TranscriptResult(
+            segments=[
+                Segment(text="video content", start=1.659, end=9.956, speaker="SPEAKER_00"),
+            ],
+            language="fr",
+            duration=10.979,
+        )
+        mic_result = TranscriptResult(
+            segments=[Segment(text="Oui, ca a rate.", start=18.980, end=29.926)],
+            language="fr",
+            duration=39.271,
+        )
+
+        merged = _merge_dual_track_results(system_result, mic_result, mic_offset=-28.277794125)
+
+        assert all(seg.start >= 0.0 for seg in merged.segments)
+        assert [seg.text for seg in merged.segments] == ["Oui, ca a rate.", "video content"]
+
 
 class TestTranscribeDualTrack:
     def test_diarizes_system_never_diarizes_mic(self, tmp_path):

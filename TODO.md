@@ -1,18 +1,19 @@
 # TODO — meeting-scribe
 
-## Status: CLI working end-to-end (real solo test passed). Menu-bar app in final packaging. One open bug (BUG3).
+## Status: CLI working end-to-end (real solo test passed, BUG3 fixed). Menu-bar app in final packaging. No open bugs.
 
-CLI proven on a real solo test 2026-07-24: system audio (YouTube) captured, mic captured, diarization split Owner vs SPEAKER_00, summary grounded (no hallucination), no Zoom-style freeze. 523 tests green, all on `main` (private repo ynaamane/meeting-scribe).
+CLI proven on a real solo test 2026-07-24: system audio (YouTube) captured, mic captured, diarization split Owner vs SPEAKER_00, summary grounded (no hallucination), no Zoom-style freeze. 620 tests green (554 Python + 66 Swift), all on `main` (private repo ynaamane/meeting-scribe).
 
 ## Open bugs
 
-- **BUG3 (open, being fixed)** — mic↔system track offset wrong (`mic_start_offset_seconds: -28.3`) → the Owner line renders at a bogus timestamp ([59:51]) and the transcript is out of chronological order. Fix in progress. Repro: `~/ownscribe/2026-07-24_1756_emerging-internet-force-impact/`.
+None.
 
 ## Closed bugs (verified)
 
 - **BUG0 (CRITICAL, closed)** — CoreAudio tap froze Zoom + no permission prompt. Root cause: no NSAudioCaptureUsageDescription Info.plist embedded → no prompt possible → unauthorized tap stalled CoreAudio for ~60s (froze the call). Fix: embedded Info.plist (verified in the binary via otool/strings) + a CGPreflightScreenCaptureAccess fail-loud guard before creating the tap. On macOS 26.1+/27 the tap rides the existing Screen Recording grant (so no prompt fired on this machine — expected).
 - **BUG1 (closed)** — diarization produced no speaker labels on `resume`. Root cause: `resume`/`reprocess` had no `--diarize` flag → diarization stayed off by default. Fix: added `--diarize` to both. (Confirmed in the real test: Owner vs SPEAKER_00 split correctly.)
 - **BUG2 (closed)** — summary invented names/action-items (John/Sarah/Mark) absent from the audio. Fix: prompt now forbids inventing names + writes "None mentioned." for empty sections, PLUS a deterministic grounding.py that flags ungrounded capitalized words (warn-only). Verified with real phi-4-mini inference (twice) + confirmed grounded in the real solo test.
+- **BUG3 (closed)** — mic↔system offset (-28.3s) rendered the Owner line at a bogus timestamp ([59:51]) and scrambled transcript order. Root cause: `_merge_dual_track_results` only handled the case where mic started at/after system; when mic started first (confirmed via 3 independent measurements — acoustic cross-correlation, host-time delta, same-utterance timeline comparison, all converging on ~28.3s), shifting mic backward produced negative timestamps. Fix: the merge now anchors to whichever track started first (mirrors what the Swift audio merge already did correctly). Verified end-to-end against the real repro dir via `resume` — Owner now renders at [00:18] in correct chronological order. See LESSONS_LEARNED.md for the full mechanism.
 
 ## The final verification pass (needs YOU — HF token + real audio)
 
@@ -36,7 +37,7 @@ export HF_TOKEN=hf_xxxxx
 ```
 
 - **Headphones** = cleanest separation. On speakers, call audio bleeds into your mic track; `echo_cancellation` in config mitigates.
-- Audio is RETAINED → `./rec.sh redo <dir>` re-runs after a fix (e.g. once BUG3 lands, redo this test dir to see correct ordering).
+- Audio is RETAINED → `./rec.sh redo <dir>` re-runs after a fix (used to verify the BUG3 fix against the original real repro dir).
 
 ## Menu-bar app (in progress)
 

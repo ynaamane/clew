@@ -249,15 +249,28 @@ def _tag_speaker(result, speaker_label: str):
 
 
 def _merge_dual_track_results(system_result, mic_result, mic_offset: float):
-    """Merge a diarized system-track result with an owner-tagged mic-track result into one timeline."""
+    """Merge a diarized system-track result with an owner-tagged mic-track result into one timeline.
+
+    mic_offset is mic's start time minus system's start time. Whichever track started
+    first anchors the merged timeline at 0; the other is shifted forward by the absolute
+    offset, so segment starts are never negative regardless of which engine came up first.
+    """
     from dataclasses import replace
 
-    tagged_mic = _tag_speaker(_shift_result(mic_result, mic_offset), _OWNER_SPEAKER_LABEL)
+    if mic_offset >= 0:
+        shifted_system = system_result
+        shifted_mic = _shift_result(mic_result, mic_offset)
+        duration = max(system_result.duration, mic_result.duration + mic_offset)
+    else:
+        shifted_system = _shift_result(system_result, -mic_offset)
+        shifted_mic = mic_result
+        duration = max(system_result.duration - mic_offset, mic_result.duration)
+
+    tagged_mic = _tag_speaker(shifted_mic, _OWNER_SPEAKER_LABEL)
     all_segments = sorted(
-        [*system_result.segments, *tagged_mic.segments],
+        [*shifted_system.segments, *tagged_mic.segments],
         key=lambda seg: seg.start,
     )
-    duration = max(system_result.duration, mic_result.duration + mic_offset)
     return replace(system_result, segments=all_segments, duration=duration)
 
 
