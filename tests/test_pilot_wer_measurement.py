@@ -71,7 +71,6 @@ class TestComputeWer:
 
 class TestNoDoubleCounting:
     def test_no_double_counting_when_one_hypothesis_segment_spans_multiple_short_reference_utterances(self):
-        # Three short reference utterances, all inside ONE long hypothesis segment's window.
         reference_utterances = [
             _utterance(["une"], ["fra"], 0, 500),
             _utterance(["cannette"], ["fra"], 500, 1000),
@@ -84,10 +83,7 @@ class TestNoDoubleCounting:
         assert results["fra"] == 0.0
         assert results["overall"] == 0.0
 
-    def test_wer_never_exceeds_reasonable_bound_under_segment_granularity_mismatch(self):
-        # Same scenario, but the hypothesis segment omits one reference word --
-        # a real error should still produce a bounded WER, never > 1.0 from
-        # the pure act of overlapping multiple reference utterances.
+    def test_a_genuine_error_under_segment_overlap_still_produces_bounded_wer(self):
         reference_utterances = [
             _utterance(["une"], ["fra"], 0, 500),
             _utterance(["cannette"], ["fra"], 500, 1000),
@@ -112,8 +108,6 @@ class TestWerBySpan:
         assert results["fra"] == 0.0
 
     def test_window_start_offset_shifts_reference_timestamps_correctly(self):
-        # Reference timestamps are absolute; window_start_s must convert them
-        # to the clip-relative timeline the hypothesis segments live on.
         reference_utterances = [_utterance(["bonjour"], ["fra"], 100_000, 100_500)]
         hypothesis_segments = [HypothesisSegment(text="bonjour", start_s=0.0, end_s=0.5)]
 

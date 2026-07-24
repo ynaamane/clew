@@ -30,12 +30,12 @@ model = "large-v3"        # whisper model: tiny, base, small, medium, large-v3
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "__BILINGUAL_INITIAL_PROMPT__"
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
-engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, needs the "canary" extra)
+engine = "whisperx"
 
 [canary]
-repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"  # HF repo of the MLX-native Canary-1B-v2 checkpoint
-max_segment_seconds = 10.0  # VAD-segment audio into chunks no longer than this before each generate() call
-max_tokens_per_segment = 200  # generation cap per segment
+repo = "CogniSoftOrg/canary-1b-v2-mlx-bf16"
+max_segment_seconds = 10.0
+max_tokens_per_segment = 200
 
 [diarization]
 enabled = false           # set to true + provide hf_token to enable
@@ -88,7 +88,7 @@ class TranscriptionConfig:
     language: str = ""
     initial_prompt: str = BILINGUAL_INITIAL_PROMPT
     hotwords: str = ""
-    engine: str = "whisperx"  # "whisperx" (default) or "canary_mlx" (A/B pilot only)
+    engine: str = "whisperx"
 
 
 @dataclass

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from dataclasses import asdict
@@ -119,7 +120,7 @@ def decide_verdict(
     whisper_switch = wer_results.get("whisperx", {}).get("switch", float("nan"))
     canary_switch = wer_results.get("canary_mlx", {}).get("switch", float("nan"))
 
-    if whisper_switch != whisper_switch or canary_switch != canary_switch:  # NaN check
+    if math.isnan(whisper_switch) or math.isnan(canary_switch):
         return {
             "default_engine": "whisperx",
             "reason": (

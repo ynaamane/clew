@@ -42,7 +42,6 @@ class TestDecideVerdict:
         assert "< required" in verdict["reason"]
 
     def test_whisper_stays_default_when_canary_regresses_switch_wer(self):
-        # Exactly the real pilot result: Canary's switch WER is WORSE, not better.
         wer_results = {
             "whisperx": {"overall": 0.39, "fra": 0.39, "eng": 3.5, "switch": 0.667},
             "canary_mlx": {"overall": 0.39, "fra": 0.49, "eng": 9.25, "switch": 1.333},
@@ -75,8 +74,7 @@ class TestDecideVerdict:
         assert verdict["default_engine"] == "whisperx"
         assert verdict["switch_wer_delta_points"] is None
 
-    def test_exact_threshold_boundary_wins(self):
-        # delta_points == switch_win_threshold exactly should pass (>=, not >).
+    def test_delta_exactly_at_threshold_wins_since_comparison_is_inclusive(self):
         wer_results = {
             "whisperx": {"overall": 0.4, "fra": 0.4, "eng": 0.4, "switch": 0.53},
             "canary_mlx": {"overall": 0.4, "fra": 0.4, "eng": 0.4, "switch": 0.50},
@@ -92,8 +90,6 @@ class TestDecideVerdict:
             "whisperx": {"overall": 0.4, "fra": 0.4, "eng": 0.4, "switch": 0.5},
             "canary_mlx": {"overall": 0.4, "fra": 0.4, "eng": 0.4, "switch": 0.1},
         }
-        # No thermal test run at all (WER-only invocation) -- Canary should NOT
-        # get default status without a passed thermal run.
         thermal_results = {}
 
         verdict = decide_verdict(wer_results, thermal_results)
@@ -184,8 +180,8 @@ class TestRunEndToEnd:
     def _fake_reference(self, out_dir: Path) -> tuple[Path, Path]:
         fallback_dir = out_dir / "fallback_data"
         fallback_dir.mkdir(parents=True)
-        clip_path = fallback_dir / "clip.wav"
-        clip_path.write_bytes(b"RIFF....WAVEfmt ")  # never actually decoded, ffprobe is mocked too
+        unread_clip_path = fallback_dir / "clip.wav"
+        unread_clip_path.write_bytes(b"RIFF....WAVEfmt ")
         reference_path = fallback_dir / "reference.json"
         reference_path.write_text(
             json.dumps(
@@ -210,7 +206,7 @@ class TestRunEndToEnd:
                 }
             )
         )
-        return clip_path, reference_path
+        return unread_clip_path, reference_path
 
     def test_run_writes_results_json_and_verdict_md(self, tmp_path):
         clip_path, reference_path = self._fake_reference(tmp_path)

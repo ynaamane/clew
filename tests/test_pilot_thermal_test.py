@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import sys
 import time
 from pathlib import Path
@@ -97,5 +98,5 @@ class TestRunThermalTest:
         from thermal_test import ThermalRunResult
 
         empty = ThermalRunResult(target_duration_s=0.0, actual_wall_time_s=0.0, audio_duration_s=1.0)
-        assert empty.mean_rtf != empty.mean_rtf  # NaN != NaN
-        assert empty.max_rtf != empty.max_rtf
+        assert math.isnan(empty.mean_rtf)
+        assert math.isnan(empty.max_rtf)
