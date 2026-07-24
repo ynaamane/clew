@@ -28,7 +28,9 @@ public struct HotKeyCombo: Equatable, Sendable {
         self.modifiers = modifiers
     }
 
-    public static let defaultMuteToggle = HotKeyCombo(keyCode: 0x2E, modifiers: [.command, .shift]) // kVK_ANSI_M
+    static let kVK_ANSI_M: UInt32 = 0x2E
+
+    public static let defaultMuteToggle = HotKeyCombo(keyCode: kVK_ANSI_M, modifiers: [.command, .shift])
 
     public var carbonModifierMask: UInt32 {
         var mask: UInt32 = 0
@@ -40,8 +42,13 @@ public struct HotKeyCombo: Equatable, Sendable {
     }
 }
 
+private func fourCharCode(_ code: String) -> OSType {
+    code.utf8.reduce(0) { $0 << 8 + OSType($1) }
+}
+
 @MainActor
 public final class GlobalHotKeyRegistration {
+    private let hotKeySignature = fourCharCode("owmu")
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var onPress: (() -> Void)?
@@ -79,7 +86,7 @@ public final class GlobalHotKeyRegistration {
 
         guard installStatus == noErr else { return false }
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x6F776D75), id: 1) // 'owmu'
+        let hotKeyID = EventHotKeyID(signature: hotKeySignature, id: 1)
         let registerStatus = RegisterEventHotKey(
             combo.keyCode, combo.carbonModifierMask, hotKeyID,
             GetApplicationEventTarget(), 0, &hotKeyRef)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import OwnscribeCapture
 
@@ -32,6 +33,8 @@ public final class AppState {
         self.pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
         refreshRecentMeetings()
         registerMuteHotKey()
+        registerTerminationObserver()
+        registerTerminationSignalHandlers()
     }
 
     private func registerMuteHotKey() {
@@ -39,6 +42,33 @@ public final class AppState {
             Task { @MainActor [weak self] in
                 self?.toggleMasterMute()
             }
+        }
+    }
+
+    private func registerTerminationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.restoreUnmutedOnQuit()
+            }
+        }
+    }
+
+    private var terminationSignalSources: [DispatchSourceSignal] = []
+
+    private func registerTerminationSignalHandlers() {
+        for sig in [SIGTERM, SIGINT] {
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler { [weak self] in
+                self?.restoreUnmutedOnQuit()
+                NSApplication.shared.terminate(nil)
+            }
+            source.resume()
+            terminationSignalSources.append(source)
         }
     }
 

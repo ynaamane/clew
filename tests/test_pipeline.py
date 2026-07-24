@@ -44,6 +44,16 @@ def _write_segmented_wav(path, loud_spans, total_seconds, sample_rate=16000):
     _write_wav(path, samples, sample_rate)
 
 
+def _write_wav_at_exact_rms(path, target_rms, total_seconds, sample_rate=16000, freq=440.0):
+    import numpy as np
+
+    n = int(total_seconds * sample_rate)
+    t = np.arange(n) / sample_rate
+    amplitude = target_rms * (2**0.5)
+    samples = (amplitude * np.sin(2 * np.pi * freq * t)).astype("float32")
+    _write_wav(path, samples, sample_rate)
+
+
 class TestGateSilentMicSegments:
     def test_loud_segment_is_kept(self, tmp_path):
         from ownscribe.pipeline import gate_silent_mic_segments
@@ -113,6 +123,36 @@ class TestGateSilentMicSegments:
         gated = gate_silent_mic_segments(result, mic_path, threshold=1.0)
 
         assert gated.segments == []
+
+    def test_segment_ten_percent_above_threshold_is_kept(self, tmp_path):
+        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        just_above = _MIC_SEGMENT_SILENCE_THRESHOLD * 1.1
+        _write_wav_at_exact_rms(mic_path, just_above, total_seconds=1.0)
+
+        result = TranscriptResult(segments=[Segment(text="quiet real speech", start=0.0, end=1.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["quiet real speech"]
+
+    def test_segment_ten_percent_below_threshold_is_dropped(self, tmp_path):
+        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        just_below = _MIC_SEGMENT_SILENCE_THRESHOLD * 0.9
+        _write_wav_at_exact_rms(mic_path, just_below, total_seconds=1.0)
+
+        result = TranscriptResult(segments=[Segment(text="phantom near cutoff", start=0.0, end=1.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_default_threshold_stays_two_orders_of_magnitude_below_real_world_repro_owner_segment_rms(self):
+        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD
+
+        real_world_repro_owner_segment_rms = 0.016304502
+        assert real_world_repro_owner_segment_rms / _MIC_SEGMENT_SILENCE_THRESHOLD > 100
 
 
 class TestTrackRms:
