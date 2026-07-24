@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.ownscribe.audio</string>
+	<key>CFBundleExecutable</key>
+	<string>ownscribe-audio</string>
+	<key>CFBundleName</key>
+	<string>ownscribe-audio</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.2</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>ownscribe captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ownscribe records your microphone so it can transcribe your side of the meeting.</string>
+</dict>
+</plist>

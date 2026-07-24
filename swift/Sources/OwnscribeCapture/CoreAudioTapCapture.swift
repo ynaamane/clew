@@ -26,6 +26,10 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
     private var lastLoudTimeLock = os_unfair_lock_s()
     private var silenceTimer: DispatchSourceTimer?
 
+    private static let noAudioYetWarningDelay: TimeInterval = 6.0
+    private var anyAudioReceived = false
+    private var noAudioYetWarningTimer: DispatchWorkItem?
+
     public init(outputPath: String) {
         self.outputPath = outputPath
     }
@@ -51,6 +55,7 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
         }
 
         try startIOProc(format: avFormat)
+        armNoAudioYetWarning()
 
         fputs("Recording system audio to \(outputPath) via CoreAudio process tap... Press Ctrl+C to stop.\n", stderr)
 
@@ -138,6 +143,23 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
         }
     }
 
+    private func armNoAudioYetWarning() {
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, !self.anyAudioReceived else { return }
+            fputs("""
+            [SILENCE_WARNING] No system audio has been received at all in the first \(Int(Self.noAudioYetWarningDelay))s.
+            This can mean nothing has played through the speakers yet (normal), or that System
+            Audio Recording permission was never granted (macOS may not have been able to show
+            the permission prompt for this binary). If a call is active and you expect audio,
+            check: open x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+            """, stderr)
+            fputs("\n", stderr)
+            self.noAudioYetWarningTimer = nil
+        }
+        noAudioYetWarningTimer = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.noAudioYetWarningDelay, execute: workItem)
+    }
+
     private func handleAudio(inputData: UnsafePointer<AudioBufferList>, inputTime: UnsafePointer<AudioTimeStamp>, format: AVAudioFormat) {
         if startHostTime == 0 {
             startHostTime = inputTime.pointee.mHostTime
@@ -147,6 +169,12 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
             return
         }
         guard buffer.frameLength > 0 else { return }
+
+        if !anyAudioReceived {
+            anyAudioReceived = true
+            noAudioYetWarningTimer?.cancel()
+            noAudioYetWarningTimer = nil
+        }
 
         do {
             try audioFile?.write(from: buffer)
@@ -184,6 +212,8 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
     public func stop() {
         silenceTimer?.cancel()
         silenceTimer = nil
+        noAudioYetWarningTimer?.cancel()
+        noAudioYetWarningTimer = nil
 
         if let procID = deviceProcID {
             AudioDeviceStop(aggregateDeviceID, procID)
