@@ -1,50 +1,50 @@
 # TODO — meeting-scribe
 
-## Status: code-complete, awaiting the final token/real-audio verification pass
+## Status: CLI working end-to-end (real solo test passed). Menu-bar app in final packaging. One open bug (BUG3).
 
-17/18 build tasks done, 504 tests green, working tree clean at `de4d7df`. Everything below is what CANNOT be closed without Yanis's HuggingFace token + his real machine/apps/audio — it was deferred by design to a single end-of-build pass, not skipped.
+CLI proven on a real solo test 2026-07-24: system audio (YouTube) captured, mic captured, diarization split Owner vs SPEAKER_00, summary grounded (no hallucination), no Zoom-style freeze. 523 tests green, all on `main` (private repo ynaamane/meeting-scribe).
 
-## The final verification pass (needs YOU — ~10 min)
+## Open bugs
 
-Run `scripts/verify_with_token.py` after:
+- **BUG3 (open, being fixed)** — mic↔system track offset wrong (`mic_start_offset_seconds: -28.3`) → the Owner line renders at a bogus timestamp ([59:51]) and the transcript is out of chronological order. Fix in progress. Repro: `~/ownscribe/2026-07-24_1756_emerging-internet-force-impact/`.
 
-1. **Create a HuggingFace token + accept model licenses**
-   - Sign up at huggingface.co (free)
-   - Accept conditions on https://huggingface.co/pyannote/speaker-diarization-community-1
-   - (optional, only to re-test the pilot) accept https://huggingface.co/nvidia/canary-1b-v2
-   - Generate a token at https://huggingface.co/settings/tokens
-   - `export HF_TOKEN=hf_xxxxx`
+## Closed bugs (verified)
 
-2. **What the script closes in one pass** (7 checks, PASS/FAIL/SKIP):
-   - [ ] community-1 loads + diarizes a real WAV end-to-end (proves the whole gated path)
-   - [ ] enrollment separation: does the 0.65 cosine threshold actually separate YOUR colleagues' voices? (measure intra vs inter-speaker distance, tune if needed)
-   - [ ] standalone-enroll embedding space == in-meeting embedding space (same vectors, same audio)
-   - [ ] owner mic-track labeling on a real dual-track capture
-   - [ ] MPS vs CPU end-to-end diff — does community-1 on MPS produce the #1886 wrong-output/all-speaker-0 mode, or is MPS safe on torch 2.8? (op-level already passes; only the full pipeline is unverified). If MPS is clean → big speedup unlock.
-   - [ ] Canary A/B re-run on YOUR real code-switched audio (the FEBLOC fallback said Canary loses by 66pts on switch spans; confirm on your own audio)
+- **BUG0 (CRITICAL, closed)** — CoreAudio tap froze Zoom + no permission prompt. Root cause: no NSAudioCaptureUsageDescription Info.plist embedded → no prompt possible → unauthorized tap stalled CoreAudio for ~60s (froze the call). Fix: embedded Info.plist (verified in the binary via otool/strings) + a CGPreflightScreenCaptureAccess fail-loud guard before creating the tap. On macOS 26.1+/27 the tap rides the existing Screen Recording grant (so no prompt fired on this machine — expected).
+- **BUG1 (closed)** — diarization produced no speaker labels on `resume`. Root cause: `resume`/`reprocess` had no `--diarize` flag → diarization stayed off by default. Fix: added `--diarize` to both. (Confirmed in the real test: Owner vs SPEAKER_00 split correctly.)
+- **BUG2 (closed)** — summary invented names/action-items (John/Sarah/Mark) absent from the audio. Fix: prompt now forbids inventing names + writes "None mentioned." for empty sections, PLUS a deterministic grounding.py that flags ungrounded capitalized words (warn-only). Verified with real phi-4-mini inference (twice) + confirmed grounded in the real solo test.
 
-3. **The 5-source capture matrix (Task#11, needs your live apps)** — play audio in each, confirm non-silent system.wav:
-   - [ ] Zoom (native app)
-   - [ ] WhatsApp (native app)
-   - [ ] Google Meet (web tab in Dia)
-   - [ ] Microsoft Teams (web tab in Dia)
-   - [ ] Discord (web tab in Dia)
-   - Note: the CoreAudio global tap SHOULD get all 5 at once (proven headless with a synthetic tone + FFT), but the archcheck flagged that some apps don't always land in a stereo-mix tap — this is the one thing to prove empirically before trusting it.
+## The final verification pass (needs YOU — HF token + real audio)
 
-4. **AEC on real human speech** — the `--echo-cancellation` path is verified against a synthetic tone (~800x suppression, but that was Apple's audio-ducking on a tone, not validated on a real voice). Test on speakers with a real call: does it clean the bleed WITHOUT degrading your own-voice transcript? Default stays `off`; `auto` enables it only on built-in speakers.
+Run `scripts/verify_with_token.py` (token from env: `export HF_TOKEN=hf_xxxxx`, after accepting https://huggingface.co/pyannote/speaker-diarization-community-1). Closes in one pass:
 
-## Known minor issue (non-blocking)
+- [ ] enrollment separation: does 0.65 cosine actually separate YOUR colleagues' voices? (tune if needed)
+- [ ] MPS vs CPU end-to-end (is MPS safe on torch 2.8 → speedup unlock, or the #1886 wrong-output mode)
+- [ ] the 5-source capture matrix — play audio in each, confirm non-silent system.wav:
+  - [x] system-audio capture proven (real YouTube test, -21dB captured)
+  - [ ] Zoom (native) / WhatsApp (native) / Meet / Teams / Discord (web in Dia) — each specifically
 
-- `verdict.md` prints `mean_rtf=nan` (run_pilot.py:246 reads `mean_rtf` as a dict key, but it's a computed @property on ThermalTestResult — never serialized). The real per-iteration RTF values ARE in `results.json`'s `iterations[]`. Cosmetic report-writer gap; fix whenever pilot/ is next touched.
+## Everyday usage
 
-## Recommended usage (documented, no code needed)
+```
+cd ~/meeting-scribe
+export HF_TOKEN=hf_xxxxx
+./rec.sh          # English call (Ctrl+C to stop) — output in ~/ownscribe/
+./rec.sh fr       # French call  ← use this for FR audio (the real test showed --language en on FR audio still works but mislabels the header)
+./rec.sh redo DIR # re-transcribe a past meeting from kept audio
+./rec.sh enroll "Sam" clip.wav   # teach a colleague's voice → auto-named next time
+```
 
-- **Wear headphones** for cleanest own-voice/call separation (physically perfect by construction). Speaker mode works but see `--echo-cancellation`.
-- Enroll recurring colleagues once (`ownscribe enroll --name "X" clip.wav`) → auto-named in every future meeting.
-- Buggy transcript? `ownscribe reprocess <recording-dir>` re-runs from retained audio, no re-recording.
+- **Headphones** = cleanest separation. On speakers, call audio bleeds into your mic track; `echo_cancellation` in config mitigates.
+- Audio is RETAINED → `./rec.sh redo <dir>` re-runs after a fix (e.g. once BUG3 lands, redo this test dir to see correct ordering).
+
+## Menu-bar app (in progress)
+
+SwiftUI MenuBarExtra app scaffolded + runs in dev (`swift run OwnscribeMenuBar`), drives the existing CLI venv, coexists with the CLI. FINAL phase in progress: package a real `.app` signed with a STABLE self-signed cert (so macOS permissions granted once survive rebuilds). Build/recreate steps → BUILD.md; first-launch checklist → APP_TEST.md (both coming with the packaging commit).
 
 ## Deferred / out of scope (by design)
 
-- Target-speaker extraction for the conference-room simultaneous-overlap case — rejected (wrong direction, no Mac/FR artifact, degrades ASR). The N-people-one-channel overlap is an accepted physical ceiling; enroll room participants for solo-turn naming + manual cleanup on true overlaps.
-- MPS as default — stays CPU until the token pass confirms MPS is clean end-to-end (the whole pipeline is CPU-bound anyway: CTranslate2 has no Metal backend).
-- Retention consent/legal note — recording other call participants; add a "call is transcribed" notice per your context.
+- Notarization (self-signed is fine for personal use; only needed to distribute to other Macs).
+- Target-speaker extraction for the conference-room simultaneous-overlap case (physical ceiling; enroll + manual cleanup instead).
+- Bundling Python+models into the .app (v1 drives the existing repo venv).
+- MPS as default (stays CPU until the token pass clears it; ASR is CPU-bound anyway).
