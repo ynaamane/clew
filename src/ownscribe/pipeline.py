@@ -240,6 +240,43 @@ def _shift_result(result, offset: float):
     return replace(result, segments=shifted_segments)
 
 
+_MIC_SEGMENT_SILENCE_THRESHOLD = 1e-4
+
+
+def gate_silent_mic_segments(result, mic_path: Path, threshold: float = _MIC_SEGMENT_SILENCE_THRESHOLD):
+    """Drop segments whose corresponding span in mic_path is acoustically silent.
+
+    Complements the manual mute: even if the mic isn't muted (forgotten, or a mute
+    that only reached the call app and not the recording), a genuinely silent mic
+    span should never produce an Owner line. Gates emission only -- never fabricates
+    a segment that wasn't there. Returns result unchanged if mic_path is unreadable.
+    """
+    from dataclasses import replace
+
+    try:
+        import numpy as np
+        import soundfile as sf
+
+        data, sample_rate = sf.read(mic_path, dtype="float32")
+    except Exception:
+        return result
+
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+
+    kept_segments = []
+    for seg in result.segments:
+        start_frame = max(0, int(seg.start * sample_rate))
+        end_frame = min(len(data), int(seg.end * sample_rate))
+        if start_frame >= end_frame:
+            continue
+        span_rms = float(np.sqrt(np.mean(np.square(data[start_frame:end_frame]))))
+        if span_rms >= threshold:
+            kept_segments.append(seg)
+
+    return replace(result, segments=kept_segments)
+
+
 def _tag_speaker(result, speaker_label: str):
     """Return a copy of result with every segment's speaker set to speaker_label."""
     from dataclasses import replace
@@ -305,6 +342,7 @@ def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_o
     """Transcribe system.wav (diarized+identified per config) and mic.wav (owner, never diarized), merged."""
     system_result = _transcribe_and_identify(transcriber, system_path)
     mic_result = transcriber.transcribe(mic_path, diarize=False)
+    mic_result = gate_silent_mic_segments(mic_result, mic_path)
     return _merge_dual_track_results(system_result, mic_result, mic_offset)
 
 

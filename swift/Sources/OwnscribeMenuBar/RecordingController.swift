@@ -43,6 +43,19 @@ public final class RecordingController {
         return false
     }
 
+    public var isLocalMicMuted: Bool {
+        micCapture?.isMuted ?? false
+    }
+
+    @discardableResult
+    public func setLocalMicMute(_ muted: Bool) -> Bool {
+        guard let mic = micCapture else { return false }
+        if mic.isMuted != muted {
+            mic.toggleMute()
+        }
+        return mic.isMuted
+    }
+
     public func start(outputPath: String) async throws {
         guard state == .idle else { return }
 

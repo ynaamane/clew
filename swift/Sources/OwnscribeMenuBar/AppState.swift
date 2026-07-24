@@ -14,15 +14,47 @@ public final class AppState {
 
     public private(set) var phase: Phase = .idle
     public private(set) var recentMeetings: [MeetingSummary] = []
+    public private(set) var isMuted: Bool = false
+    public private(set) var muteWarning: String?
 
     private let recordingController = RecordingController()
+    private let muteDevice: AudioMuteDevice
+    private let hotKeyRegistration = GlobalHotKeyRegistration()
     private let homeDir: URL
     private var pipelineRunner: PipelineRunner?
 
-    public init(homeDir: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(
+        homeDir: URL = FileManager.default.homeDirectoryForCurrentUser,
+        muteDevice: AudioMuteDevice = DefaultInputAudioMuteDevice()
+    ) {
         self.homeDir = homeDir
+        self.muteDevice = muteDevice
         self.pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
         refreshRecentMeetings()
+        registerMuteHotKey()
+    }
+
+    private func registerMuteHotKey() {
+        _ = hotKeyRegistration.register(.defaultMuteToggle) { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.toggleMasterMute()
+            }
+        }
+    }
+
+    public func toggleMasterMute() {
+        let outcome = applyMasterMute(!isMuted, device: muteDevice) { [weak self] muted in
+            self?.recordingController.setLocalMicMute(muted)
+        }
+        isMuted = outcome.displayMuted
+        muteWarning = outcome.warning
+    }
+
+    public func restoreUnmutedOnQuit() {
+        guard isMuted else { return }
+        _ = applyMasterMute(false, device: muteDevice) { [weak self] muted in
+            self?.recordingController.setLocalMicMute(muted)
+        }
     }
 
     public var outputDir: URL {

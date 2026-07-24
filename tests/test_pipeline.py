@@ -31,6 +31,90 @@ def _loud_samples(n=16000):
     return (np.sin(np.linspace(0, 100 * np.pi, n)) * 0.1).astype("float32")
 
 
+def _write_segmented_wav(path, loud_spans, total_seconds, sample_rate=16000):
+    """Write a WAV that is silent everywhere except the given (start, end) second spans."""
+    import numpy as np
+
+    n = int(total_seconds * sample_rate)
+    samples = np.zeros(n, dtype="float32")
+    for start_s, end_s in loud_spans:
+        start_i = int(start_s * sample_rate)
+        end_i = int(end_s * sample_rate)
+        samples[start_i:end_i] = (np.sin(np.linspace(0, 100 * np.pi, end_i - start_i)) * 0.1).astype("float32")
+    _write_wav(path, samples, sample_rate)
+
+
+class TestGateSilentMicSegments:
+    def test_loud_segment_is_kept(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[(0.0, 2.0)], total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="hello", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["hello"]
+
+    def test_silent_segment_is_dropped(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[], total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="hallucinated", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_mixed_segments_only_silent_ones_dropped(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[(0.0, 1.0), (2.0, 3.0)], total_seconds=3.0)
+
+        result = TranscriptResult(
+            segments=[
+                Segment(text="real speech", start=0.0, end=1.0),
+                Segment(text="phantom during silence", start=1.0, end=2.0),
+                Segment(text="more real speech", start=2.0, end=3.0),
+            ]
+        )
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["real speech", "more real speech"]
+
+    def test_missing_mic_file_returns_result_unchanged(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        result = TranscriptResult(segments=[Segment(text="untouched", start=0.0, end=1.0)])
+        gated = gate_silent_mic_segments(result, tmp_path / "does-not-exist.wav")
+
+        assert [seg.text for seg in gated.segments] == ["untouched"]
+
+    def test_does_not_mutate_original_result(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[], total_seconds=1.0)
+
+        original = TranscriptResult(segments=[Segment(text="phantom", start=0.0, end=1.0)])
+        gate_silent_mic_segments(original, mic_path)
+
+        assert len(original.segments) == 1
+
+    def test_custom_threshold_is_respected(self, tmp_path):
+        from ownscribe.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[(0.0, 1.0)], total_seconds=1.0)
+
+        result = TranscriptResult(segments=[Segment(text="quiet but real", start=0.0, end=1.0)])
+        gated = gate_silent_mic_segments(result, mic_path, threshold=1.0)
+
+        assert gated.segments == []
+
+
 class TestTrackRms:
     def test_silent_track_has_near_zero_rms(self, tmp_path):
         from ownscribe.pipeline import _track_rms

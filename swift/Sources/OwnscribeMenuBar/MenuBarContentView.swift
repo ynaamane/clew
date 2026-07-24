@@ -5,6 +5,8 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            muteSection
+            Divider()
             recordingSection
             Divider()
             recentMeetingsSection
@@ -13,6 +15,7 @@ struct MenuBarContentView: View {
                 Text("Settings…")
             }
             Button("Quit ownscribe") {
+                appState.restoreUnmutedOnQuit()
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -20,6 +23,26 @@ struct MenuBarContentView: View {
         .frame(width: 280)
         .task {
             appState.refreshRecentMeetings()
+        }
+    }
+
+    @ViewBuilder
+    private var muteSection: some View {
+        Button {
+            appState.toggleMasterMute()
+        } label: {
+            Label(
+                appState.isMuted ? "Unmute (\u{2318}\u{21E7}M)" : "Mute (\u{2318}\u{21E7}M)",
+                systemImage: appState.isMuted ? "mic.slash.fill" : "mic.fill"
+            )
+        }
+        .font(.headline)
+        .tint(appState.isMuted ? .red : .primary)
+
+        if let warning = appState.muteWarning {
+            Text(warning)
+                .font(.caption)
+                .foregroundStyle(.orange)
         }
     }
 
