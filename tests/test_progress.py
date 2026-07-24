@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import io
+import json
 from unittest import mock
 
 from ownscribe.progress import (
     _BRAILLE,
     DownloadProgressEvent,
     DownloadProgressWriter,
+    JsonProgress,
     PipelineProgress,
     download_event_fraction,
     format_download_progress,
@@ -172,3 +174,148 @@ class TestPipelineProgressDetails:
     def test_preparing_models_can_be_enabled_explicitly(self):
         progress = PipelineProgress(transcribe=False, include_prepare=True)
         assert "preparing_models" in progress._step_map
+
+
+def _read_events(stream: io.StringIO) -> list[dict]:
+    return [json.loads(line) for line in stream.getvalue().strip().splitlines()]
+
+
+class TestJsonProgress:
+    def test_begin_emits_one_json_line(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.begin("transcribing")
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "begin", "step": "transcribing"}]
+
+    def test_complete_emits_complete_event(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.complete("transcribing")
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "complete", "step": "transcribing"}]
+
+    def test_fail_emits_fail_event(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.fail("diarizing")
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "fail", "step": "diarizing"}]
+
+    def test_update_emits_clamped_fraction(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.update("transcribing", 0.42)
+        progress.update("transcribing", 1.5)
+        progress.update("transcribing", -0.5)
+
+        events = _read_events(progress._stream)
+        assert events[0] == {"event": "update", "step": "transcribing", "fraction": 0.42}
+        assert events[1]["fraction"] == 1.0
+        assert events[2]["fraction"] == 0.0
+
+    def test_set_detail_emits_detail_event(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.set_detail("transcribing", "loading model")
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "detail", "step": "transcribing", "detail": "loading model"}]
+
+    def test_set_detail_with_none_emits_null_detail(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.set_detail("transcribing", None)
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "detail", "step": "transcribing", "detail": None}]
+
+    def test_full_pipeline_step_ordering(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        with progress:
+            progress.begin("transcribing")
+            progress.update("transcribing", 0.5)
+            progress.complete("transcribing")
+            progress.begin("summarizing")
+            progress.complete("summarizing")
+
+        events = _read_events(progress._stream)
+        assert [(e["event"], e["step"]) for e in events] == [
+            ("begin", "transcribing"),
+            ("update", "transcribing"),
+            ("complete", "transcribing"),
+            ("begin", "summarizing"),
+            ("complete", "summarizing"),
+        ]
+
+    def test_diarization_hook_begins_step_once_and_updates_fraction(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.diarization_hook("speaker_diarization/segmentation", None, completed=3, total=10)
+        progress.diarization_hook("speaker_diarization/segmentation", None, completed=10, total=10)
+
+        events = _read_events(progress._stream)
+        assert events[0] == {"event": "begin", "step": "segmentation"}
+        assert events[1] == {"event": "update", "step": "segmentation", "fraction": 0.3}
+        assert events[2] == {"event": "update", "step": "segmentation", "fraction": 1.0}
+
+    def test_diarization_hook_maps_discrete_diarization_to_clustering(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.diarization_hook("discrete_diarization", None, completed=1, total=1)
+
+        events = _read_events(progress._stream)
+        assert events[0]["step"] == "clustering"
+
+    def test_diarization_hook_without_total_only_begins(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.diarization_hook("embeddings", None)
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "begin", "step": "embeddings"}]
+
+    def test_complete_allows_a_step_to_begin_again(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        progress.diarization_hook("segmentation", None, completed=1, total=1)
+        progress.complete("segmentation")
+        progress.diarization_hook("segmentation", None, completed=1, total=2)
+
+        events = _read_events(progress._stream)
+        assert [(e["event"], e["step"]) for e in events] == [
+            ("begin", "segmentation"),
+            ("update", "segmentation"),
+            ("complete", "segmentation"),
+            ("begin", "segmentation"),
+            ("update", "segmentation"),
+        ]
+
+    def test_context_manager_does_not_emit_extra_events(self):
+        progress = JsonProgress()
+        progress._stream = io.StringIO()
+
+        with progress as p:
+            p.begin("transcribing")
+
+        events = _read_events(progress._stream)
+        assert events == [{"event": "begin", "step": "transcribing"}]
+
+    def test_constructor_accepts_pipeline_progress_style_kwargs(self):
+        progress = JsonProgress(diarize=True, summarize=True, download_summarizer=True)
+        assert isinstance(progress, JsonProgress)

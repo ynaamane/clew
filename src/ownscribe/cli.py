@@ -51,6 +51,10 @@ def _dir_size(path: str) -> str:
     "--silence-timeout", default=None, type=click.IntRange(min=0),
     help="Seconds of silence before auto-stopping recording (0 to disable).",
 )
+@click.option(
+    "--progress", "progress_mode", type=click.Choice(["tui", "json"]), default=None,
+    help="Progress display: 'tui' (default, animated checklist) or 'json' (one NDJSON event per line on stderr).",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -67,6 +71,7 @@ def cli(
     keep_recording: bool | None,
     template: str | None,
     silence_timeout: int | None,
+    progress_mode: str | None,
 ) -> None:
     """Fully local meeting transcription and summarization.
 
@@ -104,6 +109,8 @@ def cli(
         config.summarization.template = template
     if silence_timeout is not None:
         config.audio.silence_timeout = silence_timeout
+    if progress_mode:
+        config.progress_mode = progress_mode
 
     ctx.obj["config"] = config
 

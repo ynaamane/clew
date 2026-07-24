@@ -19,6 +19,7 @@ from ownscribe.config import Config
 from ownscribe.correction import correct_transcript
 from ownscribe.progress import (
     DownloadProgressEvent,
+    JsonProgress,
     PipelineProgress,
     download_event_fraction,
     format_download_progress,
@@ -29,6 +30,11 @@ from ownscribe.summarization.grounding import find_ungrounded_names
 # A standard WAV file header (RIFF + fmt + data chunk header) is 44 bytes.
 # Files at or below this size contain no audio frames.
 _WAV_HEADER_SIZE = 44
+
+
+def _progress_class(config: Config) -> type:
+    """Pick the progress display class based on config.progress_mode."""
+    return JsonProgress if config.progress_mode == "json" else PipelineProgress
 
 
 def _check_audio_silence(audio_path: Path) -> None:
@@ -466,7 +472,7 @@ def run_warmup(config: Config) -> None:
     hf_token_warning = config.diarization.enabled and not config.diarization.hf_token
     local_sum = config.summarization.enabled and config.summarization.backend == "local"
 
-    with PipelineProgress(
+    with _progress_class(config)(
         diarize=False,
         summarize=False,
         transcribe=False,
@@ -542,7 +548,7 @@ def run_summarize(config: Config, transcript_file: str) -> None:
     local_sum = config.summarization.backend == "local"
 
     try:
-        with PipelineProgress(
+        with _progress_class(config)(
             transcribe=False,
             diarize=False,
             summarize=True,
@@ -629,7 +635,7 @@ def _do_transcribe_and_summarize(
     local_sum = sum_enabled and config.summarization.backend == "local"
     needs_llm = sum_enabled or correction_enabled
 
-    with PipelineProgress(
+    with _progress_class(config)(
         diarize=diar_enabled,
         summarize=sum_enabled,
         download_summarizer=local_sum,

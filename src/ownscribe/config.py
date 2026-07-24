@@ -162,6 +162,7 @@ class Config:
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     templates: dict[str, TemplateConfig] = field(default_factory=dict)
+    progress_mode: str = "tui"
 
     @classmethod
     def load(cls) -> Config:
@@ -180,6 +181,8 @@ class Config:
             config.summarization.host = ollama_host
         if api_key := os.environ.get("OPENAI_API_KEY"):
             config.summarization.api_key = api_key
+        if progress_mode := os.environ.get("OWNSCRIBE_PROGRESS"):
+            config.progress_mode = progress_mode
 
         return config
 

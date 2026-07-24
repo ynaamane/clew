@@ -304,6 +304,31 @@ class TestFormatOutput:
         assert "segments" in parsed
 
 
+class TestProgressClass:
+    def test_defaults_to_pipeline_progress(self):
+        from ownscribe.pipeline import _progress_class
+        from ownscribe.progress import PipelineProgress
+
+        config = Config()
+        assert _progress_class(config) is PipelineProgress
+
+    def test_json_mode_selects_json_progress(self):
+        from ownscribe.pipeline import _progress_class
+        from ownscribe.progress import JsonProgress
+
+        config = Config()
+        config.progress_mode = "json"
+        assert _progress_class(config) is JsonProgress
+
+    def test_unknown_mode_falls_back_to_pipeline_progress(self):
+        from ownscribe.pipeline import _progress_class
+        from ownscribe.progress import PipelineProgress
+
+        config = Config()
+        config.progress_mode = "something-else"
+        assert _progress_class(config) is PipelineProgress
+
+
 class TestSlugify:
     def test_basic(self):
         from ownscribe.pipeline import _slugify
@@ -526,6 +551,37 @@ class TestDoTranscribeAndSummarize:
 
         captured = capsys.readouterr()
         assert "not found in the transcript" not in captured.err
+
+    def test_json_progress_mode_emits_ndjson_events_on_stderr(self, tmp_path, capsys):
+        from ownscribe.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        config.progress_mode = "json"
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nHello world was discussed."
+
+        with (
+            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        captured = capsys.readouterr()
+        json_lines = [line for line in captured.err.splitlines() if line.startswith("{")]
+        events = [json.loads(line) for line in json_lines]
+
+        assert any(e == {"event": "begin", "step": "summarizing"} for e in events)
+        assert any(e == {"event": "complete", "step": "summarizing"} for e in events)
 
     def test_summarizer_unavailable_skips_gracefully(self, tmp_path):
         from ownscribe.pipeline import _do_transcribe_and_summarize

@@ -154,6 +154,41 @@ class TestKeepRecordingFlag:
             assert config.output.keep_recording is True
 
 
+class TestProgressFlag:
+    def test_progress_json_flag_sets_config(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+            result = runner.invoke(cli, ["--progress", "json"])
+            assert result.exit_code == 0
+            config = mock_run.call_args[0][0]
+            assert config.progress_mode == "json"
+
+    def test_progress_default_is_tui(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+            result = runner.invoke(cli, [])
+            assert result.exit_code == 0
+            config = mock_run.call_args[0][0]
+            assert config.progress_mode == "tui"
+
+    def test_progress_rejects_unknown_value(self):
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(cli, ["--progress", "xml"])
+            assert result.exit_code != 0
+
+    def test_progress_flag_applies_to_transcribe_subcommand(self, tmp_path):
+        runner = CliRunner()
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_transcribe") as mock_transcribe:
+            result = runner.invoke(cli, ["--progress", "json", "transcribe", str(audio_path)])
+            assert result.exit_code == 0
+            config = mock_transcribe.call_args[0][0]
+            assert config.progress_mode == "json"
+
+
 class TestWarmupCommand:
     def test_warmup_invokes_pipeline_with_overrides(self):
         runner = CliRunner()

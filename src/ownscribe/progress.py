@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import re
 import sys
@@ -495,3 +496,54 @@ class NullProgress:
 
     def diarization_hook(self, step_name: str, _artifact, **kwargs) -> None:
         pass
+
+
+class JsonProgress:
+    """Machine-readable progress: one JSON object per line on stderr.
+
+    Same interface as PipelineProgress, for callers (e.g. a GUI) that parse
+    structured events instead of rendering the ANSI checklist."""
+
+    def __init__(self, *_args, **_kwargs) -> None:
+        self._stream = sys.stderr
+        self._begun: set[str] = set()
+
+    def __enter__(self) -> JsonProgress:
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        pass
+
+    def _emit(self, event: dict) -> None:
+        self._stream.write(json.dumps(event) + "\n")
+        self._stream.flush()
+
+    def begin(self, key: str) -> None:
+        self._begun.add(key)
+        self._emit({"event": "begin", "step": key})
+
+    def complete(self, key: str) -> None:
+        self._begun.discard(key)
+        self._emit({"event": "complete", "step": key})
+
+    def fail(self, key: str) -> None:
+        self._begun.discard(key)
+        self._emit({"event": "fail", "step": key})
+
+    def update(self, key: str, fraction: float) -> None:
+        self._emit({"event": "update", "step": key, "fraction": max(0.0, min(1.0, fraction))})
+
+    def set_detail(self, key: str, text: str | None) -> None:
+        self._emit({"event": "detail", "step": key, "detail": text})
+
+    def diarization_hook(self, step_name: str, _artifact, **kwargs) -> None:
+        short = step_name.rsplit("/", 1)[-1] if "/" in step_name else step_name
+        key = _DIAR_KEY_MAP.get(short, short)
+
+        completed = kwargs.get("completed")
+        total = kwargs.get("total")
+
+        if key not in self._begun:
+            self.begin(key)
+        if completed is not None and total:
+            self.update(key, completed / total)

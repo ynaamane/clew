@@ -200,6 +200,24 @@ class TestEnvOverrides:
             cfg = Config.load()
         assert cfg.summarization.host == "http://remote:11434"
 
+    def test_progress_mode_from_env(self):
+        with (
+            mock.patch.dict(os.environ, {"OWNSCRIBE_PROGRESS": "json"}),
+            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+        ):
+            mock_path.exists.return_value = False
+            cfg = Config.load()
+        assert cfg.progress_mode == "json"
+
+    def test_progress_mode_default_is_tui_without_env(self):
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+        ):
+            mock_path.exists.return_value = False
+            cfg = Config.load()
+        assert cfg.progress_mode == "tui"
+
 
 class TestEnsureConfigFile:
     def test_creates_file_when_missing(self, tmp_path):

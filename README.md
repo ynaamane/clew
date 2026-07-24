@@ -290,7 +290,7 @@ keep_recording = true     # false = auto-delete WAV after transcription
 retention_days = 0        # days before `ownscribe purge` may remove audio; 0 = keep forever (manual purge only)
 ```
 
-**Precedence:** CLI flags > environment variables (`HF_TOKEN`, `OLLAMA_HOST`, `OPENAI_API_KEY`) > config file > defaults.
+**Precedence:** CLI flags > environment variables (`HF_TOKEN`, `OLLAMA_HOST`, `OPENAI_API_KEY`, `OWNSCRIBE_PROGRESS`) > config file > defaults.
 
 ## Audio Retention
 
