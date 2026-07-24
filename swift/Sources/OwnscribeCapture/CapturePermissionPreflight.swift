@@ -41,3 +41,35 @@ public func runCapturePermissionPreflight(
 
     return ok
 }
+
+public func runCoreAudioTapPermissionPreflight(
+    needsMic: Bool,
+    hasScreenCaptureAccess: Bool = preflightScreenCaptureAccess(),
+    hasMicrophoneAccess: Bool = preflightMicrophoneAccess()
+) -> Bool {
+    var ok = true
+
+    if !hasScreenCaptureAccess {
+        ok = false
+        fputs("""
+        [PERMISSION_MISSING] System Audio Recording permission is not granted.
+        System audio capture will fail or record silence.
+        Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+        Enable your terminal app under "System Audio Recording Only", then restart it.
+        """, stderr)
+        fputs("\n", stderr)
+    }
+
+    if needsMic && !hasMicrophoneAccess {
+        ok = false
+        fputs("""
+        [PERMISSION_MISSING] Microphone permission is not granted.
+        Mic capture will fail or record silence.
+        Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone
+        Enable your terminal app, then restart it.
+        """, stderr)
+        fputs("\n", stderr)
+    }
+
+    return ok
+}

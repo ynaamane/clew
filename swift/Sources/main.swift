@@ -592,15 +592,13 @@ func main() {
             if !runCapturePermissionPreflight(needsMic: enableMic) {
                 exit(1)
             }
-        } else if enableMic && !preflightMicrophoneAccess() {
-            fputs("""
-            [PERMISSION_MISSING] Microphone permission is not granted.
-            Mic capture will fail or record silence.
-            Fix: open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone
-            Enable your terminal app, then restart it.
-            """, stderr)
-            fputs("\n", stderr)
-            exit(1)
+        } else {
+            if !preflightScreenCaptureAccess() {
+                _ = CGRequestScreenCaptureAccess()
+            }
+            if !runCoreAudioTapPermissionPreflight(needsMic: enableMic) {
+                exit(1)
+            }
         }
 
         // Determine paths: if mic enabled, use temp files then merge

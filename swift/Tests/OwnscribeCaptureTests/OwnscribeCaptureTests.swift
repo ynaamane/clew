@@ -184,3 +184,41 @@ final class ComputeMicStartOffsetTests: XCTestCase {
         XCTAssertEqual(result.offsetFrames, Int64(sampleRate))
     }
 }
+
+final class RunCoreAudioTapPermissionPreflightTests: XCTestCase {
+    func testBothGrantedAndMicNotNeededPasses() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: false, hasScreenCaptureAccess: true, hasMicrophoneAccess: false)
+        XCTAssertTrue(ok)
+    }
+
+    func testBothGrantedAndMicNeededPasses() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: true, hasScreenCaptureAccess: true, hasMicrophoneAccess: true)
+        XCTAssertTrue(ok)
+    }
+
+    func testScreenCaptureDeniedFailsRegardlessOfMic() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: false, hasScreenCaptureAccess: false, hasMicrophoneAccess: true)
+        XCTAssertFalse(ok)
+    }
+
+    func testMicDeniedButNotNeededPasses() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: false, hasScreenCaptureAccess: true, hasMicrophoneAccess: false)
+        XCTAssertTrue(ok)
+    }
+
+    func testMicDeniedAndNeededFails() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: true, hasScreenCaptureAccess: true, hasMicrophoneAccess: false)
+        XCTAssertFalse(ok)
+    }
+
+    func testBothDeniedFails() {
+        let ok = runCoreAudioTapPermissionPreflight(
+            needsMic: true, hasScreenCaptureAccess: false, hasMicrophoneAccess: false)
+        XCTAssertFalse(ok)
+    }
+}
