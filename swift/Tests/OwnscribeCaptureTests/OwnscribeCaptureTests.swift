@@ -185,16 +185,6 @@ final class ComputeMicStartOffsetTests: XCTestCase {
     }
 
     func testRealWorldSkewMatchesEmpiricallyMeasuredValue() {
-        // BUG3 repro (~/ownscribe/2026-07-24_1756_emerging-internet-force-impact):
-        // mic's AVAudioEngine.start() is called first and starts near-instantly, while
-        // the CoreAudio process tap's async setup (AudioHardwareCreateProcessTap ->
-        // AudioHardwareCreateAggregateDevice -> IOProc creation -> AudioDeviceStart)
-        // takes much longer to produce its first sample. On this real run the tap took
-        // ~28.28s longer, matching an independent acoustic cross-correlation of the
-        // retained mic.wav/system.wav (28.36s) and same-utterance-position comparison
-        // (28.29s) to within 1% -- confirms computeMicStartOffset's sign/magnitude are
-        // correct; the bug this pins was one level up, in how the Python pipeline
-        // consumed a negative offset.
         let ticksToNanos = 1.0
         let systemStartHostTime: UInt64 = 28_277_794_125
         let micStartHostTime: UInt64 = 0
