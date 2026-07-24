@@ -21,6 +21,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 - [Audio Retention](#audio-retention)
 - [Summarization Templates](#summarization-templates)
 - [Speaker Diarization](#speaker-diarization)
+- [Headphones vs Speakers (Owner Track Purity)](#headphones-vs-speakers-owner-track-purity)
 - [Acknowledgments](#acknowledgments)
 - [Contributing](#contributing)
 - [License](#license)
@@ -245,6 +246,7 @@ backend = "coreaudio"     # "coreaudio" (native macOS helper) or "sounddevice" (
 device = ""               # empty = system audio
 mic = false               # also capture microphone input
 mic_device = ""           # specific mic device name (empty = default)
+echo_cancellation = "off"
 capture_mode = "all"      # "all" = capture all system audio directly (default); "picker" = show source picker
 capture_backend = "coreaudio"  # the native helper's own mechanism: "coreaudio" (tap, macOS 14.2+) or "screencapturekit"
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
@@ -369,6 +371,27 @@ During a meeting, every diarized speaker cluster is compared against enrolled vo
 ownscribe speakers            # list all enrolled names
 ownscribe unenroll "Alice"    # remove an enrolled voiceprint
 ```
+
+## Headphones vs Speakers (Owner Track Purity)
+
+The mic track (`mic.wav`, labeled `Owner`) and the system track (`system.wav`, the remote call audio) are captured from two physically separate sources, and on **headphones** that separation is perfect: your microphone only ever picks up your own voice, with nothing from the call bleeding in.
+
+On **Mac speakers**, the call audio plays out loud and the microphone can pick some of it back up (acoustic echo) before it ever reaches `ownscribe`. That bleed lands in `mic.wav` alongside your own voice, which can pollute the `Owner` track with fragments of the remote speaker's audio.
+
+**Recommended: wear headphones for meetings recorded with `--mic`.** It's free, requires no configuration, and gives the cleanest possible separation between what you said and what you heard. See `--mic` under [Usage](#usage) and `[audio] mic` under [Configuration](#configuration).
+
+If headphones aren't an option, `[audio] echo_cancellation` can enable macOS's own native voice-processing echo canceller on the mic input:
+
+```toml
+[audio]
+echo_cancellation = "off"   # "off" (default), "on", or "auto"
+```
+
+- `"off"` — never touches the mic input. The current default.
+- `"on"` — always enables voice processing on the mic.
+- `"auto"` — enables voice processing only when the current default output device is the Mac's built-in speakers (detected via CoreAudio's transport type, not by matching a device name), since that's the only case where mic-into-speaker acoustic echo actually happens. Headphones and external outputs are left untouched.
+
+macOS's voice processing also ducks non-voice audio playing through the speakers relative to detected speech — correct behavior for suppressing acoustic echo, but it means the effect on your own voice specifically has not been validated against a real recorded meeting in this fork; test it against your own voice before relying on it for anything you need transcribed precisely.
 
 ## Transcript Correction
 

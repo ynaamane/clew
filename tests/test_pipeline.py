@@ -173,7 +173,8 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="all", silence_timeout=120, capture_backend="coreaudio"
+                mic=False, mic_device="", capture_mode="all", silence_timeout=120,
+                capture_backend="coreaudio", echo_cancellation="off"
             )
 
     def test_capture_mode_defaults_to_all(self):
@@ -187,7 +188,8 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="all", silence_timeout=300, capture_backend="coreaudio"
+                mic=False, mic_device="", capture_mode="all", silence_timeout=300,
+                capture_backend="coreaudio", echo_cancellation="off"
             )
 
     def test_capture_mode_picker_override_passed_to_coreaudio(self):
@@ -202,7 +204,8 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="picker", silence_timeout=300, capture_backend="coreaudio"
+                mic=False, mic_device="", capture_mode="picker", silence_timeout=300,
+                capture_backend="coreaudio", echo_cancellation="off"
             )
 
     def test_capture_backend_defaults_to_coreaudio_tap(self):
@@ -229,6 +232,31 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             assert mock_cls.call_args.kwargs["capture_backend"] == "screencapturekit"
+
+    def test_echo_cancellation_defaults_to_off(self):
+        from ownscribe.pipeline import _create_recorder
+
+        config = Config()
+        config.audio.backend = "coreaudio"
+        config.audio.device = ""
+
+        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+            mock_cls.return_value.is_available.return_value = True
+            _create_recorder(config)
+            assert mock_cls.call_args.kwargs["echo_cancellation"] == "off"
+
+    def test_echo_cancellation_override_passed_through(self):
+        from ownscribe.pipeline import _create_recorder
+
+        config = Config()
+        config.audio.backend = "coreaudio"
+        config.audio.device = ""
+        config.audio.echo_cancellation = "auto"
+
+        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+            mock_cls.return_value.is_available.return_value = True
+            _create_recorder(config)
+            assert mock_cls.call_args.kwargs["echo_cancellation"] == "auto"
 
     def test_silence_timeout_passed_to_sounddevice(self):
         from ownscribe.pipeline import _create_recorder

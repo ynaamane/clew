@@ -31,6 +31,12 @@ func computePeakLevel(in channelData: UnsafePointer<UnsafeMutablePointer<Float>>
     return peak
 }
 
+func collapseDuplicatedVoiceProcessingChannels(of format: AVAudioFormat) -> AVAudioFormat {
+    guard format.channelCount > 2 else { return format }
+    return AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: format.sampleRate,
+                          channels: 1, interleaved: true) ?? format
+}
+
 // MARK: - Mic Capture via AVAudioEngine
 
 class MicCapture {
@@ -88,18 +94,21 @@ class MicCapture {
         fputs(muted ? "[MIC_MUTED]\n" : "[MIC_UNMUTED]\n", stderr)
     }
 
-    func start(outputPath: String, deviceName: String?) throws {
+    func start(outputPath: String, deviceName: String?, echoCancellation: String = "off") throws {
         micDeviceName = deviceName
         try applyInputDevice()
+        applyEchoCancellation(mode: echoCancellation)
 
         let format = engine.inputNode.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else {
             throw MicError.noInputAvailable
         }
 
+        let fileWriteFormat = collapseDuplicatedVoiceProcessingChannels(of: format)
+
         let url = URL(fileURLWithPath: outputPath)
         let file = try AVAudioFile(forWriting: url,
-                                   settings: format.settings,
+                                   settings: fileWriteFormat.settings,
                                    commonFormat: .pcmFormatFloat32,
                                    interleaved: true)
         audioFile = file
@@ -141,6 +150,17 @@ class MicCapture {
             &id, UInt32(MemoryLayout<AudioDeviceID>.size))
         if err != noErr {
             throw MicError.cannotSetDevice(name)
+        }
+    }
+
+    private func applyEchoCancellation(mode: String) {
+        let shouldEnableForBuiltInSpeakerEcho = mode == "auto" && defaultOutputDeviceIsBuiltIn()
+        let shouldEnableExplicitly = mode == "on"
+        guard shouldEnableExplicitly || shouldEnableForBuiltInSpeakerEcho else { return }
+        do {
+            try engine.inputNode.setVoiceProcessingEnabled(true)
+        } catch {
+            fputs("Warning: could not enable echo cancellation: \(error)\n", stderr)
         }
     }
 
@@ -733,47 +753,42 @@ func writeTrackAlignmentSidecar(outputDir: URL, micStartOffsetSeconds: Double) {
     try? json.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
 }
 
+func openAudioFileWithFrames(atPath path: String) -> AVAudioFile? {
+    guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) else { return nil }
+    return file.length > 0 ? file : nil
+}
+
 func mergeAudioFiles(systemPath: String, micPath: String,
                      systemStartHostTime: UInt64, micStartHostTime: UInt64,
                      outputPath: String) throws {
-    // A standard WAV file header (RIFF + fmt + data chunk header) is 44 bytes.
-    // Files at or below this size contain no audio frames.
-    let wavHeaderSize = 44
     let fm = FileManager.default
-    let systemFileSize = (try? fm.attributesOfItem(atPath: systemPath)[.size] as? Int) ?? 0
-    let micFileSize = (try? fm.attributesOfItem(atPath: micPath)[.size] as? Int) ?? 0
+    let systemFile = openAudioFileWithFrames(atPath: systemPath)
+    let micFile = openAudioFileWithFrames(atPath: micPath)
 
     let outputDir = URL(fileURLWithPath: outputPath).deletingLastPathComponent()
     let systemKeepPath = outputDir.appendingPathComponent("system.wav").path
     let micKeepPath = outputDir.appendingPathComponent("mic.wav").path
-    if systemFileSize > wavHeaderSize {
+    if systemFile != nil {
         try? fm.removeItem(atPath: systemKeepPath)
         try? fm.copyItem(atPath: systemPath, toPath: systemKeepPath)
     }
-    if micFileSize > wavHeaderSize {
+    if micFile != nil {
         try? fm.removeItem(atPath: micKeepPath)
         try? fm.copyItem(atPath: micPath, toPath: micKeepPath)
     }
 
-    // Both empty — clean up temp files and let the caller handle it
-    if systemFileSize <= wavHeaderSize && micFileSize <= wavHeaderSize {
+    if systemFile == nil && micFile == nil {
         try? fm.removeItem(atPath: systemPath)
         try? fm.removeItem(atPath: micPath)
         return
     }
 
-    // Mic empty but system has data — just rename system file
-    if micFileSize <= wavHeaderSize && systemFileSize > wavHeaderSize {
+    guard let micFile else {
         try? fm.removeItem(atPath: micPath)
         try fm.moveItem(atPath: systemPath, toPath: outputPath)
         fputs("Merged audio saved to \(outputPath) (system only, no mic audio)\n", stderr)
         return
     }
-
-    // Open files — system is optional (may be empty when only mic captured audio)
-    let systemFile: AVAudioFile? = systemFileSize > wavHeaderSize
-        ? try AVAudioFile(forReading: URL(fileURLWithPath: systemPath)) : nil
-    let micFile = try AVAudioFile(forReading: URL(fileURLWithPath: micPath))
 
     let outputSampleRate: Double = kSystemAudioSampleRate
     let outputChannels: AVAudioChannelCount = 1
@@ -996,6 +1011,18 @@ func defaultInputDeviceID() -> AudioDeviceID? {
     return status == noErr ? deviceID : nil
 }
 
+func defaultOutputDeviceIsBuiltIn() -> Bool {
+    guard let deviceID = defaultOutputDeviceID() else { return false }
+    var transportType: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyTransportType,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transportType)
+    return status == noErr && transportType == kAudioDeviceTransportTypeBuiltIn
+}
+
 func isAudioDeviceRunningSomewhere(_ deviceID: AudioDeviceID) -> Bool? {
     var isRunning: UInt32 = 0
     var size = UInt32(MemoryLayout<UInt32>.size)
@@ -1150,6 +1177,7 @@ func main() {
         var captureModeAll = false
         var silenceTimeout: TimeInterval = 0
         var captureBackend = "coreaudio"
+        var echoCancellation = "off"
 
         var i = 2
         while i < args.count {
@@ -1180,6 +1208,13 @@ func main() {
                 }
                 micDeviceName = args[i]
                 enableMic = true  // --mic-device implies --mic
+            case "--echo-cancellation":
+                i += 1
+                guard i < args.count, ["off", "on", "auto"].contains(args[i]) else {
+                    fputs("Error: --echo-cancellation requires off, on, or auto\n", stderr)
+                    exit(1)
+                }
+                echoCancellation = args[i]
             case "--silence-timeout":
                 i += 1
                 guard i < args.count, let val = TimeInterval(args[i]) else {
@@ -1246,7 +1281,10 @@ func main() {
         if enableMic {
             let mic = MicCapture()
             do {
-                try mic.start(outputPath: micPath, deviceName: micDeviceName)
+                try mic.start(
+                    outputPath: micPath,
+                    deviceName: micDeviceName,
+                    echoCancellation: echoCancellation)
             } catch {
                 fputs("Error starting mic capture: \(error)\n", stderr)
                 exit(1)

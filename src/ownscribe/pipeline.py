@@ -146,6 +146,7 @@ def _create_recorder(config: Config):
             capture_mode=config.audio.capture_mode,
             silence_timeout=config.audio.silence_timeout,
             capture_backend=config.audio.capture_backend,
+            echo_cancellation=config.audio.echo_cancellation,
         )
         if recorder.is_available():
             return recorder

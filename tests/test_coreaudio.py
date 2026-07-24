@@ -178,3 +178,67 @@ class TestCoreAudioRecorderCaptureBackend:
             cmd = mock_popen.call_args[0][0]
             assert "--capture-backend" in cmd
             assert "--capture-mode-all" not in cmd
+
+
+class TestCoreAudioRecorderEchoCancellation:
+    """--echo-cancellation is only ever passed when --mic is also active (the
+    Swift binary's own flag has no effect without a mic input to process) and
+    is omitted entirely for the "off" default, matching --capture-backend's
+    omit-by-default convention."""
+
+    def _make_patched_binary(self, tmp_path):
+        binary = tmp_path / "patched.sh"
+        binary.write_text("#!/bin/sh\necho 'Error: --sustained-seconds requires a number of seconds'\nexit 1\n")
+        binary.chmod(0o755)
+        return binary
+
+    def test_default_off_omits_the_flag_even_with_mic(self, tmp_path):
+        binary = self._make_patched_binary(tmp_path)
+        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary):
+            recorder = CoreAudioRecorder(mic=True)
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio.binary_supports_separate_tracks", return_value=True),
+            mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen,
+        ):
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--echo-cancellation" not in cmd
+
+    def test_on_mode_passes_the_flag_with_mic(self, tmp_path):
+        binary = self._make_patched_binary(tmp_path)
+        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary):
+            recorder = CoreAudioRecorder(mic=True, echo_cancellation="on")
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio.binary_supports_separate_tracks", return_value=True),
+            mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen,
+        ):
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--echo-cancellation" in cmd
+            assert cmd[cmd.index("--echo-cancellation") + 1] == "on"
+
+    def test_auto_mode_passes_the_flag_with_mic(self, tmp_path):
+        binary = self._make_patched_binary(tmp_path)
+        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary):
+            recorder = CoreAudioRecorder(mic=True, echo_cancellation="auto")
+
+        with (
+            mock.patch("ownscribe.audio.coreaudio.binary_supports_separate_tracks", return_value=True),
+            mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen,
+        ):
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--echo-cancellation" in cmd
+            assert cmd[cmd.index("--echo-cancellation") + 1] == "auto"
+
+    def test_on_mode_without_mic_never_passes_the_flag(self, tmp_path):
+        binary = self._make_patched_binary(tmp_path)
+        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary):
+            recorder = CoreAudioRecorder(mic=False, echo_cancellation="on")
+
+        with mock.patch("ownscribe.audio.coreaudio.subprocess.Popen") as mock_popen:
+            recorder.start(tmp_path / "recording.wav")
+            cmd = mock_popen.call_args[0][0]
+            assert "--echo-cancellation" not in cmd
