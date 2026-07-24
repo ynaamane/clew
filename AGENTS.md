@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development hygiene (standing rule for this project)
+
+Default on every non-trivial change — not a per-task ask:
+
+- **TDD, test-first.** Write the failing test first, watch it fail for the right reason (red), then the minimum code to green, then refactor. Report the red→green transition. Not test-after.
+- **Independent review.** A separate reviewer (not the implementer self-reviewing) audits each delivery with empirical verification — re-run the real repro, don't just read the diff. Findings go through a DEFEND/CONCEDE/FIX pass.
+- **Scrutinize high-blast-radius code hardest** — the system-wide mic mute (reaches Zoom/all apps), the CoreAudio tap, anything that can leave the system in a bad state (e.g. mic left muted after quit). The dangerous failures are silent: a false sense of mute in public, a scrambled transcript that looks fine.
+- **Verify, don't assume.** Disk/`git log` is ground truth, not a message saying "it's done". Prefer a real run over reading code. State what you actually ran.
+- **No new code comments** (self-documenting names; the "why" goes in commits / NOTES.md / LESSONS_LEARNED.md). Commit to `main`; no hardcoded secrets/tokens.
+
 ## Commands
 
 ```bash
