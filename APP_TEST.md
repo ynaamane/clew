@@ -44,7 +44,7 @@ dist/MeetingScribe.app` with no errors.
       Microphone — the earlier grant should still apply. If you ARE
       re-prompted, something is wrong (most likely: the app was signed with
       a different or ad-hoc identity). Check `codesign -dvvv
-    dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
+  dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
       `Signature=adhoc`.
 
 ## End-to-end recording
@@ -58,6 +58,52 @@ dist/MeetingScribe.app` with no errors.
 - [ ] Confirm a `transcript.md` (and, if summarization is enabled,
       `summary.md`) exists in that folder and its content roughly matches
       what was actually said.
+
+## Master mute (built-in mic)
+
+- [ ] With the built-in mic as the active input, click the menu-bar mute
+      button (or press ⌘⇧M). The icon switches to `mic.slash` and the
+      button label changes to "Unmute".
+- [ ] Play audio in another app while muted, then check System Settings →
+      Sound → Input — the input level meter should show no activity.
+- [ ] If a call app (Zoom/Meet/Teams) is open, confirm ITS mic level also
+      shows silent — this is the "one mute, not two" requirement.
+- [ ] Unmute (⌘⇧M or the button again). The icon returns to `waveform`/
+      `mic.fill`, and the input level meter shows activity again.
+- [ ] No warning banner appears in the dropdown — a warning means the
+      verify-after-set check failed even on the built-in mic, which would
+      be unexpected and worth reporting.
+
+## Master mute (AirPods Max / Pro)
+
+- [ ] Connect the AirPods, wait for them to become the active input
+      (System Settings → Sound → Input, or just start using them), then
+      repeat the built-in-mic checklist above.
+- [ ] Specifically watch for: does the mute reach the call app (Zoom etc.),
+      or only the recording? If a warning banner appears in the dropdown
+      ("Couldn't mute the microphone system-wide...Bluetooth..."), that
+      means the verify-after-set check caught a failure — the recording
+      should still be protected (confirm via the level meter / a test
+      recording), but the call itself may not be muted. This is the
+      known, documented AirPods failure mode (Apple Developer Forums
+      thread 693516) the fail-loud path exists for — expected to
+      _sometimes_ happen on AirPods, never expected to happen silently.
+- [ ] Try muting right after AirPods connect (before other apps have used
+      the mic) vs. mid-call — the HFP/A2DP profile-switch timing differs
+      and this is the scenario most likely to expose a settling issue.
+- [ ] Quit the app while muted (via AirPods or built-in). Reopen it and
+      check System Settings → Sound → Input is NOT still muted — the app
+      should have restored the unmuted state on quit.
+
+## Global hotkey while unfocused
+
+- [ ] With the app running and a DIFFERENT app focused (a browser, Zoom,
+      a text editor — not the menu-bar dropdown), press ⌘⇧M. The mute
+      state should toggle exactly as if you'd clicked the menu-bar button,
+      confirmed via the icon changing next time you open the dropdown.
+- [ ] This was verified once end-to-end during development (real keystroke
+      while a different real app had focus, callback fired) — this is
+      the first real confirmation on your actual machine/hardware.
 
 ## Settings / Keychain token
 

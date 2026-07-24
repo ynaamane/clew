@@ -41,7 +41,9 @@ export HF_TOKEN=hf_xxxxx
 
 ## Menu-bar app (in progress)
 
-SwiftUI MenuBarExtra app scaffolded + runs in dev (`swift run OwnscribeMenuBar`), drives the existing CLI venv, coexists with the CLI. FINAL phase in progress: package a real `.app` signed with a STABLE self-signed cert (so macOS permissions granted once survive rebuilds). Build/recreate steps → BUILD.md; first-launch checklist → APP_TEST.md (both coming with the packaging commit).
+SwiftUI MenuBarExtra app scaffolded + runs in dev (`swift run OwnscribeMenuBar`), drives the existing CLI venv, coexists with the CLI. Master mute (system-wide, verify-after-set + AirPods fail-loud, ⌘⇧M hotkey + menu-bar button, icon reflects verified state) + the acoustic silence gate are built and tested — see NOTES.md Task#28. Global hotkey confirmed firing once end-to-end (real keystroke, real focused app); further live re-verification blocked mid-session by the physical display going to sleep, not a code issue.
+
+Packaging: package a real `.app` signed with a STABLE self-signed cert (so macOS permissions granted once survive rebuilds). Build/recreate steps → BUILD.md; first-launch checklist → APP_TEST.md. Remaining: create the cert (`scripts/setup-codesign-identity.sh`, needs the user to run it — writes to the login keychain), then user-side verification of the mute's built-in-vs-AirPods behavior on real hardware (fold into APP_TEST.md).
 
 ## Deferred / out of scope (by design)
 
