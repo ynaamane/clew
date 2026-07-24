@@ -3,18 +3,8 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 
-protocol SystemAudioCapturing: AnyObject {
-    var silenceTimeout: TimeInterval { get set }
-    var onSilenceTimeout: (() -> Void)? { get set }
-    var micCapture: MicCapture? { get set }
-    var startHostTime: UInt64 { get }
-
-    func start() async throws
-    func stop()
-}
-
 @available(macOS 14.2, *)
-class CoreAudioTapCapture: SystemAudioCapturing {
+public class CoreAudioTapCapture: SystemAudioCapturing {
     private var tapID: AudioObjectID = kAudioObjectUnknown
     private var aggregateDeviceID: AudioObjectID = kAudioObjectUnknown
     private var deviceProcID: AudioDeviceIOProcID?
@@ -23,24 +13,24 @@ class CoreAudioTapCapture: SystemAudioCapturing {
     private let outputPath: String
     private var audioFile: AVAudioFile?
 
-    private(set) var startHostTime: UInt64 = 0
+    public private(set) var startHostTime: UInt64 = 0
 
     private var peakLevel: Float = 0.0
     private var totalFrames: Int64 = 0
     private var silenceChecked: Bool = false
 
-    var silenceTimeout: TimeInterval = 0
-    var onSilenceTimeout: (() -> Void)?
-    var micCapture: MicCapture?
+    public var silenceTimeout: TimeInterval = 0
+    public var onSilenceTimeout: (() -> Void)?
+    public var micCapture: MicCapture?
     private var lastLoudTime: UInt64 = DispatchTime.now().uptimeNanoseconds
     private var lastLoudTimeLock = os_unfair_lock_s()
     private var silenceTimer: DispatchSourceTimer?
 
-    init(outputPath: String) {
+    public init(outputPath: String) {
         self.outputPath = outputPath
     }
 
-    func start() async throws {
+    public func start() async throws {
         try createTapAndAggregateDevice()
 
         var format = try readAudioTapStreamBasicDescription(tapID: tapID)
@@ -191,7 +181,7 @@ class CoreAudioTapCapture: SystemAudioCapturing {
         }
     }
 
-    func stop() {
+    public func stop() {
         silenceTimer?.cancel()
         silenceTimer = nil
 
@@ -220,14 +210,14 @@ class CoreAudioTapCapture: SystemAudioCapturing {
         }
     }
 
-    enum CaptureError: Error, CustomStringConvertible {
+    public enum CaptureError: Error, CustomStringConvertible {
         case tapCreationFailed(OSStatus)
         case aggregateDeviceCreationFailed(OSStatus)
         case ioProcCreationFailed(OSStatus)
         case deviceStartFailed(OSStatus)
         case unsupportedTapFormat
 
-        var description: String {
+        public var description: String {
             switch self {
             case .tapCreationFailed(let status) where status == kAudioDevicePermissionsError:
                 return """
@@ -244,7 +234,7 @@ class CoreAudioTapCapture: SystemAudioCapturing {
         }
     }
 
-    static func cleanupStaleAggregateDevices() {
+    public static func cleanupStaleAggregateDevices() {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
