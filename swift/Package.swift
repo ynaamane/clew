@@ -17,7 +17,7 @@ let package = Package(
             name: "ownscribe-audio",
             dependencies: ["OwnscribeCapture"],
             path: "Sources",
-            exclude: ["OwnscribeCapture"],
+            exclude: ["OwnscribeCapture", "OwnscribeMenuBar"],
             linkerSettings: [
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AudioToolbox"),
@@ -29,9 +29,18 @@ let package = Package(
                 ]),
             ]
         ),
+        .executableTarget(
+            name: "OwnscribeMenuBar",
+            dependencies: ["OwnscribeCapture"],
+            path: "Sources/OwnscribeMenuBar"
+        ),
         .testTarget(
             name: "OwnscribeCaptureTests",
             dependencies: ["OwnscribeCapture"]
+        ),
+        .testTarget(
+            name: "OwnscribeMenuBarTests",
+            dependencies: ["OwnscribeMenuBar"]
         ),
     ]
 )
