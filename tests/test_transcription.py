@@ -245,6 +245,36 @@ class TestDiarizeOverride:
 
         mock_diarize.assert_called_once()
 
+    def test_diarize_enabled_without_token_skips_diarize_and_warns(self):
+        from ownscribe.config import DiarizationConfig, TranscriptionConfig
+        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        class _Audio:
+            shape = (16000,)
+
+        fake_whisperx = types.SimpleNamespace(
+            load_audio=lambda _path: _Audio(),
+            align=lambda *args, **kwargs: {"segments": []},
+        )
+
+        diar = DiarizationConfig(enabled=True, hf_token="")
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+        transcriber._model = mock.MagicMock()
+        transcriber._model.transcribe.return_value = {"segments": [], "language": "en"}
+
+        with (
+            mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"),
+            mock.patch.dict("sys.modules", {"whisperx": fake_whisperx}),
+            mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
+            mock.patch.object(transcriber, "_diarize") as mock_diarize,
+            mock.patch("ownscribe.transcription.whisperx_transcriber.click.echo") as mock_echo,
+        ):
+            transcriber.transcribe(mock.MagicMock())
+
+        mock_diarize.assert_not_called()
+        warnings_seen = [call.args[0] for call in mock_echo.call_args_list if call.args]
+        assert any("Diarization requested but no HF token configured" in w for w in warnings_seen)
+
 
 class TestDiarizationApiCompat:
     def test_load_diarization_pipeline_passes_token_kwarg(self):

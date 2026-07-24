@@ -167,6 +167,47 @@ class TestWarmupCommand:
         assert config.diarization.enabled is True
 
 
+class TestResumeCommand:
+    def test_resume_invokes_pipeline_with_overrides(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+            result = runner.invoke(
+                cli,
+                ["resume", str(tmp_path), "--model", "large-v3", "--language", "fr", "--template", "brief"],
+            )
+
+        assert result.exit_code == 0
+        config = mock_resume.call_args[0][0]
+        assert config.transcription.model == "large-v3"
+        assert config.transcription.language == "fr"
+        assert config.summarization.template == "brief"
+        assert mock_resume.call_args[0][1] == str(tmp_path)
+
+    def test_resume_diarize_flag_enables_diarization(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+            result = runner.invoke(cli, ["resume", str(tmp_path), "--diarize"])
+
+        assert result.exit_code == 0
+        config = mock_resume.call_args[0][0]
+        assert config.diarization.enabled is True
+
+    def test_resume_without_diarize_flag_does_not_enable_diarization(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+            result = runner.invoke(cli, ["resume", str(tmp_path)])
+
+        assert result.exit_code == 0
+        config = mock_resume.call_args[0][0]
+        assert config.diarization.enabled is False
+
+    def test_resume_requires_existing_directory(self):
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(cli, ["resume", "/no/such/directory"])
+        assert result.exit_code != 0
+
+
 class TestReprocessCommand:
     def test_reprocess_invokes_pipeline_with_overrides(self, tmp_path):
         runner = CliRunner()
@@ -182,6 +223,24 @@ class TestReprocessCommand:
         assert config.transcription.language == "fr"
         assert config.summarization.template == "brief"
         assert mock_reprocess.call_args[0][1] == str(tmp_path)
+
+    def test_reprocess_diarize_flag_enables_diarization(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+            result = runner.invoke(cli, ["reprocess", str(tmp_path), "--diarize"])
+
+        assert result.exit_code == 0
+        config = mock_reprocess.call_args[0][0]
+        assert config.diarization.enabled is True
+
+    def test_reprocess_without_diarize_flag_does_not_enable_diarization(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+            result = runner.invoke(cli, ["reprocess", str(tmp_path)])
+
+        assert result.exit_code == 0
+        config = mock_reprocess.call_args[0][0]
+        assert config.diarization.enabled is False
 
     def test_reprocess_requires_existing_directory(self):
         runner = CliRunner()

@@ -222,16 +222,19 @@ def summarize(ctx: click.Context, file: str, template: str | None) -> None:
 
 @cli.command()
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--diarize", is_flag=True, help="Enable speaker diarization (needs HF token).")
 @click.option("--model", default=None, help="Whisper model size (tiny, base, small, medium, large-v3).")
 @click.option("--language", default=None, help="Language code for transcription (e.g. en, de, fr).")
 @click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
 @click.pass_context
 def resume(
-    ctx: click.Context, directory: str,
+    ctx: click.Context, directory: str, diarize: bool,
     model: str | None, language: str | None, template: str | None,
 ) -> None:
     """Resume a partially-completed pipeline in a meeting directory."""
     config = ctx.obj["config"]
+    if diarize:
+        config.diarization.enabled = True
     if model:
         config.transcription.model = model
     if language:
@@ -245,16 +248,19 @@ def resume(
 
 @cli.command()
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--diarize", is_flag=True, help="Enable speaker diarization (needs HF token).")
 @click.option("--model", default=None, help="Whisper model size (tiny, base, small, medium, large-v3).")
 @click.option("--language", default=None, help="Language code for transcription (e.g. en, de, fr).")
 @click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
 @click.pass_context
 def reprocess(
-    ctx: click.Context, directory: str,
+    ctx: click.Context, directory: str, diarize: bool,
     model: str | None, language: str | None, template: str | None,
 ) -> None:
     """Force a full re-transcribe+summarize from retained audio, even if output already exists."""
     config = ctx.obj["config"]
+    if diarize:
+        config.diarization.enabled = True
     if model:
         config.transcription.model = model
     if language:
