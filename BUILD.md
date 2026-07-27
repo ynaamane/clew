@@ -41,10 +41,17 @@ bash swift/build-app.sh
 ```
 
 This builds `ownscribe-audio` and `OwnscribeMenuBar` in release mode,
-assembles `dist/MeetingScribe.app`, and signs both binaries plus the bundle
-itself with the `MeetingScribeDev` identity — all three must share the same
-identity or TCC treats them as different apps with different grants. The
-script fails loudly if the identity from step 1 isn't present.
+assembles `dist/MeetingScribe.app`, signs both binaries plus the bundle
+itself with the `MeetingScribeDev` identity, then **installs it to
+`/Applications/MeetingScribe.app`** — quitting a running instance first, and
+failing if the installed binary ends up differing from the one just built.
+Pass `SKIP_INSTALL=1` to stop at `dist/`. Installing is part of the build on
+purpose: a real 17-minute call was once recorded against a stale bundle
+because building and installing were separate manual steps.
+
+The two binaries and the bundle must all share the same identity or TCC treats
+them as different apps with different grants. The script fails loudly if the
+identity from step 1 isn't present.
 
 It ends with `codesign -dvvv` / `--entitlements -` output so you can confirm:
 
@@ -57,14 +64,18 @@ It ends with `codesign -dvvv` / `--entitlements -` output so you can confirm:
 ## 3. Launch it
 
 ```bash
-open dist/MeetingScribe.app
+open /Applications/MeetingScribe.app
 ```
 
-Always launch via `open` (or double-click in Finder) — this goes through
-LaunchServices, which is what actually triggers the TCC permission prompts on
-first launch. Running the inner binary directly from a shell
-(`dist/MeetingScribe.app/Contents/MacOS/OwnscribeMenuBar`) skips
+Launch the INSTALLED copy, not the one in `dist/` — otherwise you can be
+testing a different build than the one you think is current. Always launch via
+`open` (or double-click in Finder): this goes through LaunchServices, which is
+what actually triggers the TCC permission prompts on first launch. Running the
+inner binary directly from a shell
+(`/Applications/MeetingScribe.app/Contents/MacOS/OwnscribeMenuBar`) skips
 LaunchServices and the permission prompts may not fire correctly.
+
+The app is `LSUIElement`, so it has no Dock icon — look for it in the menu bar.
 
 See `APP_TEST.md` for the first-launch checklist — some of the permission
 behavior can only be verified interactively, not from a build script.

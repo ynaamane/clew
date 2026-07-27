@@ -21,7 +21,16 @@ uv run pytest -v -k test_search      # run a specific test module
 uv run pytest -v -k "TestRankMeetings::test_speaker_boost"  # single test
 uv run ruff check src/ tests/        # lint
 uv run ruff format src/ tests/       # auto-format
+
+cd swift && swift test               # Swift suite (capture lib + menu-bar app)
+bash swift/build-app.sh              # build, sign AND install to /Applications
+SKIP_INSTALL=1 bash swift/build-app.sh   # stop at dist/ without installing
 ```
+
+`build-app.sh` installs on purpose and fails if the installed binary differs
+from the one just built — a real call was once recorded against a stale bundle
+because building and installing were separate steps. Always launch the
+installed copy (`open /Applications/MeetingScribe.app`), never the inner binary.
 
 ## Architecture
 
@@ -56,6 +65,8 @@ Each stage has a base class in its subpackage and one or more implementations:
 
 - **`PipelineProgress`** (in `progress.py`) is the live checklist TUI that shows transcription, diarization sub-steps, and summarization with animated spinners/progress bars. It should not be replaced or simplified.
 - **`README.md`** should be kept in sync when CLI commands are added or changed.
+- **Before touching anything under `swift/`, the capture backend or the mute path, read `.claude/skills/macos-audio-capture/SKILL.md`.** It holds the macOS facts that cost real failures: why the CoreAudio tap beats ScreenCaptureKit on permissions, why the embedded Info.plist is load-bearing (its absence froze Zoom), the verify-after-set mute guard for the documented AirPods bug, why restore-unmute must cover every exit path, and why the signing cert must never be recreated.
+- **Transcription threads**: whisperx defaults to `threads=4`; this project sizes CTranslate2 to the performance-core count instead (`transcription.cpu_threads` to override). Do not raise it to `os.cpu_count()` — including the efficiency cores measurably slows the batch.
 
 ## Style
 

@@ -4,7 +4,11 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**Code complet, zéro bug ouvert.** 655 tests verts (563 Python + 92 Swift). Tout sur `main`, poussé sur le repo privé `ynaamane/meeting-scribe`. Il ne reste que la passe matériel côté utilisateur — voir `TODO.md` § YOUR TURN.
+**Zéro bug ouvert.** 667 tests verts (568 Python + 99 Swift). Tout sur `main`, poussé sur le repo privé `ynaamane/meeting-scribe`. L'app est signée et installée dans `/Applications`.
+
+**Éprouvée sur un vrai call de 17,5 min** (2026-07-27, réunion de travail bilingue sur Google Meet dans Dia) : le tap a tenu tout le call malgré des changements d'app et des coupures réseau, zéro minute silencieuse, 3 locuteurs séparés, résumé factuel. Mais ce call a tourné sur un bundle antérieur au fix BUG4, donc il n'a capté que les autres participants — la voix du propriétaire n'y est pas.
+
+Il reste la passe matériel côté utilisateur — voir `TODO.md` § YOUR TURN.
 
 ## Comment on est arrivé là (décisions et pourquoi)
 
@@ -36,6 +40,17 @@ Trouvés par des runs RÉELS, pas par des tests synthétiques :
 TDD test-first (rouge → vert, transition rapportée), reviewer **indépendant** qui re-exécute les preuves au lieu de lire le diff, scrutin renforcé sur le code à fort blast radius (mute système, tap CoreAudio), et « vérifie, ne suppose pas » — le disque et `git log` sont la vérité, pas un message disant « c'est fait ».
 
 Cette boucle a attrapé, entre autres : une preuve de vérification inexacte, un faux négatif de test (venv qui shadow-importait le repo principal), deux violations de la règle no-comments, un test qui dormait 3,2 s, et une commande erronée dans la checklist de test elle-même.
+
+## Ce que le token et le build ne demandent plus
+
+- **Le token HF n'est plus à exporter.** Il vit dans `~/.config/ownscribe/config.toml` (chmod 600, hors du repo) pour le CLI, et dans le Keychain login (`com.ownscribe.menubar` / `hf_token`) pour l'app. `export HF_TOKEN=...` reste un override ponctuel.
+- **`swift/build-app.sh` installe lui-même dans `/Applications`** et échoue si le binaire installé diffère de celui buildé. Raison : un call de 17 min a été enregistré contre un bundle périmé parce que builder et installer étaient deux gestes manuels séparés.
+
+## Performance — le levier trouvé
+
+whisperx impose `threads=4` par défaut (`asr.py:329`) et le code ne le surchargeait pas : sur un M4 Max à 12 cœurs performance, un quart de la machine travaillait. La transcription se dimensionne maintenant sur `hw.perflevel0.physicalcpu`. Mesuré sur 90 s du vrai call : **30,9 s → 20,5 s, transcript identique au mot près**. Contre-intuitif : 16 threads est PIRE (23-25 s), les 4 cœurs d'efficacité freinent le lot.
+
+La diarisation est désormais l'étape la plus chère (0,63x temps réel contre 0,33x pour l'ASR). Le détail des pistes ouvertes (FluidAudio, turbo, mlx-whisper) et des mesures est dans `TODO.md` § Performance.
 
 ## Points ouverts / pièges connus
 

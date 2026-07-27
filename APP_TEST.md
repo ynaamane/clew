@@ -11,12 +11,12 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
 
 1. `bash scripts/setup-codesign-identity.sh` has been run once on this
    machine (see `BUILD.md`).
-2. `bash swift/build-app.sh` completed and printed `Built and signed:
-dist/MeetingScribe.app` with no errors.
+2. `bash swift/build-app.sh` completed and printed `Built, signed and installed:
+/Applications/MeetingScribe.app` with no errors.
 
 ## First launch
 
-- [ ] `open dist/MeetingScribe.app` (or double-click it in Finder — do NOT
+- [ ] `open /Applications/MeetingScribe.app` (or double-click it in Finder — do NOT
       run the inner binary directly, see `BUILD.md` § 3).
 - [ ] Gatekeeper shows an "unidentified developer" warning (expected —
       self-signed, no Apple notarization). Right-click → Open, confirm once.
@@ -38,13 +38,13 @@ dist/MeetingScribe.app` with no errors.
 ## Grants survive a rebuild (the whole point of the stable identity)
 
 - [ ] With permissions already granted, run `bash swift/build-app.sh` again
-      to rebuild `dist/MeetingScribe.app`.
-- [ ] `open dist/MeetingScribe.app` again and start a recording.
+      to rebuild `/Applications/MeetingScribe.app`.
+- [ ] `open /Applications/MeetingScribe.app` again and start a recording.
 - [ ] Confirm you are **not** re-prompted for System Audio Recording or
       Microphone — the earlier grant should still apply. If you ARE
       re-prompted, something is wrong (most likely: the app was signed with
       a different or ad-hoc identity). Check `codesign -dvvv
-dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
+/Applications/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
       `Signature=adhoc`.
 
 ## End-to-end recording
@@ -58,6 +58,17 @@ dist/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
 - [ ] Confirm a `transcript.md` (and, if summarization is enabled,
       `summary.md`) exists in that folder and its content roughly matches
       what was actually said.
+- [ ] **Talk out loud during the clip, then confirm the folder contains
+      `mic.wav` AND `system.wav` (not just `recording.wav`) and that your own
+      words appear in the transcript labelled `Owner`.** This is the BUG4
+      regression check: `enableMic` used to default to false with no way to
+      turn it on, so the app recorded everyone except you. A recording with a
+      single `recording.wav` and no `Owner` line means the mic path is off
+      again.
+- [ ] Sanity-check the duration: a 2-minute recording must produce a
+      ~2-minute file, not ~4 minutes. A doubled duration (voices deep and
+      slowed) is BUG5 returning — the merge falling back to a hardcoded
+      sample rate instead of the captured one.
 
 ## Master mute (built-in mic)
 
