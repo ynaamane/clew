@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 from ownscribe.config import BILINGUAL_INITIAL_PROMPT, Config, OutputConfig, _merge_toml, ensure_config_file
 
 
@@ -79,6 +81,60 @@ class TestDefaults:
     def test_default_canary_max_tokens_per_segment(self):
         cfg = Config()
         assert cfg.canary.max_tokens_per_segment == 200
+
+class TestCpuThreadsValidation:
+    def test_negative_int_raises_error(self):
+        cfg = Config()
+        data = {"transcription": {"cpu_threads": -4}}
+        with pytest.raises(ValueError, match="cpu_threads must be a positive integer"):
+            _merge_toml(cfg, data)
+
+    def test_string_coerces_to_int(self):
+        cfg = Config()
+        data = {"transcription": {"cpu_threads": "8"}}
+        merged = _merge_toml(cfg, data)
+        assert merged.transcription.cpu_threads == 8
+        assert isinstance(merged.transcription.cpu_threads, int)
+
+    def test_invalid_string_raises_error(self):
+        cfg = Config()
+        data = {"transcription": {"cpu_threads": "invalid"}}
+        with pytest.raises(ValueError, match="cpu_threads must be a positive integer"):
+            _merge_toml(cfg, data)
+
+    def test_float_with_fractional_part_raises_error(self):
+        cfg = Config()
+        data = {"transcription": {"cpu_threads": 1.5}}
+        with pytest.raises(ValueError, match="cpu_threads must be a positive integer"):
+            _merge_toml(cfg, data)
+
+    def test_bool_raises_error(self):
+        cfg = Config()
+        data = {"transcription": {"cpu_threads": True}}
+        with pytest.raises(ValueError, match="cpu_threads must be a positive integer"):
+            _merge_toml(cfg, data)
+
+    def test_exceeds_4x_logical_cores_at_boundary(self):
+        cfg = Config()
+        max_allowed = (os.cpu_count() or 1) * 4
+        data_at = {"transcription": {"cpu_threads": max_allowed}}
+        data_over = {"transcription": {"cpu_threads": max_allowed + 1}}
+
+        merged_at = _merge_toml(cfg, data_at)
+        assert merged_at.transcription.cpu_threads == max_allowed
+
+        with pytest.raises(ValueError, match=f"exceeds 4x logical cores.*max {max_allowed}"):
+            _merge_toml(cfg, data_over)
+
+    def test_config_toml_contains_cpu_threads_comment(self, tmp_path):
+        config_dir = tmp_path / "ownscribe"
+        config_path = config_dir / "config.toml"
+        with mock.patch("ownscribe.config.CONFIG_DIR", config_dir), mock.patch(
+            "ownscribe.config.CONFIG_PATH", config_path
+        ):
+            result = ensure_config_file()
+        written = result.read_text()
+        assert "# cpu_threads = 0" in written
 
 
 class TestMergeToml:

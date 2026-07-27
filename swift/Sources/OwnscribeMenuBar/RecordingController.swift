@@ -36,6 +36,8 @@ public final class RecordingController {
     private var currentOutputPath: String?
     private var currentTempPaths: RecordingTempPaths?
 
+    var mergeAudioFilesImpl: (String, String, UInt64, UInt64, String) throws -> Void = mergeAudioFiles
+
     public init() {}
 
     public var isRecording: Bool {
@@ -96,24 +98,27 @@ public final class RecordingController {
         }
         state = .stopping
 
+        defer {
+            systemCapture = nil
+            micCapture = nil
+            currentOutputPath = nil
+            currentTempPaths = nil
+            state = .idle
+        }
+
         systemCapture?.stop()
         micCapture?.stop()
 
         if enableMic, let tempPaths = currentTempPaths,
            let capture = systemCapture, let mic = micCapture {
-            try mergeAudioFiles(
-                systemPath: tempPaths.systemPath,
-                micPath: tempPaths.micPath,
-                systemStartHostTime: capture.startHostTime,
-                micStartHostTime: mic.startHostTime,
-                outputPath: outputPath)
+            try mergeAudioFilesImpl(
+                tempPaths.systemPath,
+                tempPaths.micPath,
+                capture.startHostTime,
+                mic.startHostTime,
+                outputPath)
         }
 
-        systemCapture = nil
-        micCapture = nil
-        currentOutputPath = nil
-        currentTempPaths = nil
-        state = .idle
         return URL(fileURLWithPath: outputPath)
     }
 }

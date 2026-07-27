@@ -31,6 +31,7 @@ model = "large-v3"        # whisper model: tiny, base, small, medium, large-v3
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "__BILINGUAL_INITIAL_PROMPT__"
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
+# cpu_threads = 0         # CTranslate2 threads; 0 = auto-detect (performance core count), or explicit positive int
 engine = "whisperx"
 
 [canary]
@@ -189,6 +190,29 @@ class Config:
         return config
 
 
+def _validate_cpu_threads(value: int | str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"cpu_threads must be a positive integer, got {value!r}")
+    if isinstance(value, float):
+        if value != int(value):
+            raise ValueError(f"cpu_threads must be a positive integer, got {value!r}")
+        value = int(value)
+    try:
+        threads = int(value)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"cpu_threads must be a positive integer, got {value!r}") from e
+    if threads < 0:
+        raise ValueError(f"cpu_threads must be a positive integer, got {threads}")
+
+    max_threads = (os.cpu_count() or 1) * 4
+    if threads > max_threads:
+        raise ValueError(
+            f"cpu_threads={threads} exceeds 4x logical cores (max {max_threads} on this machine)"
+        )
+
+    return threads
+
+
 def _merge_toml(config: Config, data: dict) -> Config:
     """Merge TOML data into config dataclass."""
     if "audio" in data:
@@ -199,6 +223,8 @@ def _merge_toml(config: Config, data: dict) -> Config:
     if "transcription" in data:
         for k, v in data["transcription"].items():
             if hasattr(config.transcription, k):
+                if k == "cpu_threads":
+                    v = _validate_cpu_threads(v)
                 setattr(config.transcription, k, v)
 
     if "canary" in data:

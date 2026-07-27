@@ -370,6 +370,14 @@ Each HF-token-gated check self-determines its own skip condition (`if not hf_tok
 
 pytest after this task: **392 passed** (2 new: `TestPyannoteAudioIoRealDecode`). ruff: clean (fixed 5 line-length + 4 import-order + 1 unused-noqa findings in the new script during its own review, none in `src`/`tests`).
 
+## F9 (code-review finding) — latent ScreenCaptureKit sample-rate assumption in dead code
+
+`swift/Sources/AudioCapture.swift:286` (ScreenCaptureKit backend, `SystemAudioCapture`) trusts `kSystemAudioSampleRate` (48000 Hz constant) instead of reading the delivered audio format — the same assumption BUG5 disproved for the CoreAudio tap path (the real format can differ).
+
+**This code is DEAD in the shipped configuration and will not be fixed.** `RecordingController` (main.swift:69) always instantiates `CoreAudioTapCapture` (the working, BUG5-hardened path), and the repo targets macOS 14.2+ where CoreAudio tap is available — no shipped code path reaches the SCK backend. Editing unreachable code adds regression risk for zero benefit.
+
+**Condition under which it would matter:** if someone re-enables the ScreenCaptureKit fallback for macOS <14.2, this assumption will silently break capture if the system's actual audio format differs from 48 kHz (same failure mode BUG5 reproduced on the CoreAudio path). Fix: query `sampleBuffer.formatDescription.audioStreamBasicDescription.mSampleRate` at capture time, same pattern SystemAudioCapture.swift:425-427 already uses for channel count.
+
 ## Task#14 (archcheck C1) — fail-loud when the swift binary can't retain separate tracks
 
 Archcheck (28-verifier adversarial workflow, run by team-lead) found an active silent-regression risk: `coreaudio.py::_find_binary()`/`_download_binary()` falls all the way back to downloading **upstream's** unpatched GitHub Releases binary when no local build exists — `bin/` is gitignored (confirmed via `git check-ignore -v bin/ownscribe-audio` and `git log --all -- bin/` returning nothing), so a fresh clone or a CI runner that skips `swift/build.sh` gets the unpatched binary with zero error. That binary predates every Swift patch this session's build depends on (Task#4's separate mic/system track retention, Task#7's TCC preflight, Task#9/10's `watch-activity`) — `--mic` would silently degrade to merged-only single-track, exactly the failure mode Task#4/#12's retention/reprocess work assumes never happens.

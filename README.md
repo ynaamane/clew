@@ -256,6 +256,7 @@ model = "large-v3"        # tiny, base, small, medium, large-v3
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "..."    # defaults to a bilingual FR/EN sentence to prime code-switching; override freely
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)
+# cpu_threads = 0         # CTranslate2 threads; 0 = auto-detect (performance core count), or explicit positive int
 engine = "whisperx"       # "whisperx" (default) or "canary_mlx" (A/B pilot, see below)
 
 [canary]

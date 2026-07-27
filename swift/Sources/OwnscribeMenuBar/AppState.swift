@@ -31,10 +31,19 @@ public final class AppState {
         self.homeDir = homeDir
         self.muteDevice = muteDevice
         self.pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
+        applyConfigSettings()
         refreshRecentMeetings()
         registerMuteHotKey()
         registerTerminationObserver()
         registerTerminationSignalHandlers()
+    }
+
+    private func applyConfigSettings() {
+        let configPath = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        let configText = try? String(contentsOf: configPath, encoding: .utf8)
+        let audioSettings = OwnscribeConfigReader.parseAudioSettings(fromTOML: configText)
+        recordingController.enableMic = audioSettings.mic
+        recordingController.silenceTimeout = audioSettings.silenceTimeout
     }
 
     private func registerMuteHotKey() {
@@ -101,6 +110,10 @@ public final class AppState {
     public var isMicCaptureEnabled: Bool {
         get { recordingController.enableMic }
         set { recordingController.enableMic = newValue }
+    }
+
+    public var recordingControllerSilenceTimeout: TimeInterval {
+        recordingController.silenceTimeout
     }
 
     public func refreshRecentMeetings() {

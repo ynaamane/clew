@@ -1,7 +1,11 @@
 import Foundation
 import Security
 
-public struct KeychainTokenStore {
+public protocol TokenSource {
+    func loadHuggingFaceToken() -> String?
+}
+
+public struct KeychainTokenStore: TokenSource {
     public enum TokenKind: String {
         case huggingFace = "hf_token"
         case openAI = "openai_api_key"
@@ -53,5 +57,9 @@ public struct KeychainTokenStore {
         ]
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    public func loadHuggingFaceToken() -> String? {
+        load(.huggingFace)
     }
 }

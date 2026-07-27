@@ -8,7 +8,10 @@ from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber, de
 
 class TestDefaultCpuThreads:
     def test_uses_performance_cores_not_every_core(self):
-        with patch("ownscribe.transcription.whisperx_transcriber._performance_core_count", return_value=12):
+        with (
+            patch("ownscribe.transcription.whisperx_transcriber._performance_core_count", return_value=12),
+            patch("os.cpu_count", return_value=16),
+        ):
             assert default_cpu_threads() == 12
 
     def test_falls_back_to_logical_cores_when_performance_count_unavailable(self):
@@ -35,6 +38,7 @@ class TestThreadsArePassedToWhisperx:
         with patch.dict("sys.modules", {"whisperx": fake_whisperx}):
             transcriber._load_model()
 
+        assert fake_whisperx.load_model.called, "load_model was not called"
         _, kwargs = fake_whisperx.load_model.call_args
         assert kwargs["threads"] == 12, (
             "whisperx.load_model defaults to threads=4, which caps CTranslate2 at a quarter of this "

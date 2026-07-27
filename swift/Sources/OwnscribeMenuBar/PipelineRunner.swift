@@ -17,10 +17,12 @@ public final class PipelineRunner {
     }
 
     private let binary: URL
+    private let tokenStore: TokenSource
     private var process: Process?
 
-    public init(binary: URL) {
+    public init(binary: URL, tokenStore: TokenSource = KeychainTokenStore()) {
         self.binary = binary
+        self.tokenStore = tokenStore
     }
 
     public static func makeDefault(homeDir: URL = FileManager.default.homeDirectoryForCurrentUser) -> PipelineRunner? {
@@ -35,6 +37,12 @@ public final class PipelineRunner {
         let process = Process()
         process.executableURL = binary
         process.arguments = ["--progress", "json"] + arguments
+
+        var env = ProcessInfo.processInfo.environment
+        if let token = tokenStore.loadHuggingFaceToken() {
+            env["HF_TOKEN"] = token
+        }
+        process.environment = env
 
         let stderrPipe = Pipe()
         process.standardError = stderrPipe

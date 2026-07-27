@@ -1,6 +1,10 @@
 import AVFAudio
 import Foundation
 
+public enum MergeError: Error {
+    case audioConverterCreationFailed
+}
+
 public func writeTrackAlignmentSidecar(outputDir: URL, micStartOffsetSeconds: Double) {
     let sidecarPath = outputDir.appendingPathComponent("track_alignment.json").path
     let json = "{\"mic_start_offset_seconds\": \(micStartOffsetSeconds)}\n"
@@ -91,7 +95,9 @@ public func mergeAudioFiles(systemPath: String, micPath: String,
 
     // Mic converter using callback API (handles sample rate + channel conversion)
     let micFormat = micFile.processingFormat
-    let micConverter = AVAudioConverter(from: micFormat, to: outputFormat)!
+    guard let micConverter = AVAudioConverter(from: micFormat, to: outputFormat) else {
+        throw MergeError.audioConverterCreationFailed
+    }
     let micRate = micFormat.sampleRate
 
     let chunkSize: AVAudioFrameCount = 8192

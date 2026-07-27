@@ -1,5 +1,10 @@
 import Foundation
 
+public struct AudioSettings {
+    public var mic: Bool
+    public var silenceTimeout: TimeInterval
+}
+
 public struct OwnscribeConfigReader {
     public static let defaultOutputDirName = "ownscribe"
 
@@ -8,6 +13,45 @@ public struct OwnscribeConfigReader {
             return expand(path: dir, homeDir: homeDir)
         }
         return homeDir.appendingPathComponent(defaultOutputDirName)
+    }
+
+    public static func parseAudioSettings(fromTOML text: String?) -> AudioSettings {
+        guard let text else {
+            return AudioSettings(mic: true, silenceTimeout: 300)
+        }
+
+        var mic: Bool?
+        var silenceTimeout: TimeInterval?
+        var inAudioSection = false
+
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inAudioSection = line == "[audio]"
+                continue
+            }
+            guard inAudioSection, let eqIndex = line.firstIndex(of: "=") else { continue }
+            let key = line[line.startIndex..<eqIndex].trimmingCharacters(in: .whitespaces)
+
+            if key == "mic" {
+                if let value = valueAfterEquals(in: line) {
+                    if value == "true" {
+                        mic = true
+                    } else if value == "false" {
+                        mic = false
+                    }
+                }
+            } else if key == "silence_timeout" {
+                if let value = valueAfterEquals(in: line), let intValue = Int(value) {
+                    silenceTimeout = TimeInterval(intValue)
+                }
+            }
+        }
+
+        return AudioSettings(
+            mic: mic ?? true,
+            silenceTimeout: silenceTimeout ?? 300
+        )
     }
 
     static func parseOutputDir(fromTOML text: String) -> String? {

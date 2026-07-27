@@ -2,15 +2,30 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-CONFIG_FILE="$HOME/.config/ownscribe/config.toml"
+if [[ -z "${HF_TOKEN:-}" ]]; then
+  TOKEN_CHECK_OUTPUT=$(.venv/bin/python -c "
+from ownscribe.config import Config
+import sys
+try:
+    cfg = Config.load()
+    sys.exit(0 if cfg.diarization.hf_token else 1)
+except Exception as e:
+    print(f'Config load failed: {e}', file=sys.stderr)
+    sys.exit(2)
+" 2>&1) && TOKEN_EXIT=0 || TOKEN_EXIT=$?
 
-if [[ -z "${HF_TOKEN:-}" ]] && ! grep -qE '^[[:space:]]*hf_token[[:space:]]*=[[:space:]]*"[^"]+"' "$CONFIG_FILE" 2>/dev/null; then
-  echo "⚠️  No HuggingFace token found."
-  echo "   Put it in $CONFIG_FILE under [diarization] as hf_token = \"hf_...\" (chmod 600),"
-  echo "   or export HF_TOKEN=hf_xxxxx for a one-off run."
-  echo "   Get one at https://huggingface.co/settings/tokens after accepting"
-  echo "   https://huggingface.co/pyannote/speaker-diarization-community-1"
-  exit 1
+  if [[ $TOKEN_EXIT -eq 2 ]]; then
+    echo "⚠️  Config validation failed:" >&2
+    echo "$TOKEN_CHECK_OUTPUT" >&2
+    exit 1
+  elif [[ $TOKEN_EXIT -ne 0 ]]; then
+    echo "⚠️  No HuggingFace token found."
+    echo "   Put it in $HOME/.config/ownscribe/config.toml under [diarization] as hf_token = \"hf_...\" (chmod 600),"
+    echo "   or export HF_TOKEN=hf_xxxxx for a one-off run."
+    echo "   Get one at https://huggingface.co/settings/tokens after accepting"
+    echo "   https://huggingface.co/pyannote/speaker-diarization-community-1"
+    exit 1
+  fi
 fi
 
 MODE="${1:-call}"

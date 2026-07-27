@@ -78,6 +78,9 @@ final class MergeSampleRateTests: XCTestCase {
         let mergedSeconds = Double(merged.length) / merged.fileFormat.sampleRate
 
         XCTAssertEqual(
+            merged.fileFormat.sampleRate, 44100,
+            "With no system track, the mic's 44100 Hz rate must drive the output rate; a hardcoded fallback breaks mic-only recordings.")
+        XCTAssertEqual(
             mergedSeconds, 2.0, accuracy: 0.05,
             "With no system track the mic rate must drive the output, so a mic-only recording is not resampled to a wrong duration.")
     }

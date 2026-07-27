@@ -12,7 +12,7 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
 
     private let outputPath: String
     private var audioFile: AVAudioFile?
-    private var capturedSampleRate: Double = kSystemAudioSampleRate
+    private var capturedSampleRate: Double?
 
     public private(set) var startHostTime: UInt64 = 0
 
@@ -235,10 +235,20 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
 
         audioFile = nil
 
-        let seconds = Double(totalFrames) / capturedSampleRate
-        fputs("Saved \(outputPath) (\(String(format: "%.1f", seconds)) seconds, peak=\(String(format: "%.6f", peakLevel)))\n", stderr)
+        let summary = stopSummary(totalFrames: totalFrames, rate: capturedSampleRate, peak: peakLevel)
+        fputs("Saved \(outputPath) \(summary)\n", stderr)
+
         if totalFrames > 0 && peakLevel < 1e-6 {
             fputs("[SILENCE_WARNING] Recording appears silent. Check System Audio Recording permission.\n", stderr)
+        }
+    }
+
+    func stopSummary(totalFrames: Int64, rate: Double?, peak: Float) -> String {
+        if let rate = rate {
+            let seconds = Double(totalFrames) / rate
+            return "(\(String(format: "%.1f", seconds)) seconds, peak=\(String(format: "%.6f", peak)))"
+        } else {
+            return "(\(totalFrames) frames, rate unknown)"
         }
     }
 
