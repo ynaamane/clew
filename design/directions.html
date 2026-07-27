@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MeetingScribe — trois directions visuelles</title>
+<style>
+  /* ============================================================
+     Shared substrate. Mode sombre en premier : le système de Yanis
+     est en Dark avec l'accent violet (AppleAccentColor = 3).
+     Toutes les valeurs typographiques et de contrôle viennent des
+     pages HIG macOS d'Apple : corps 13pt, subhead 11pt, caption 10pt,
+     contrôle 28pt, barre de menus 24pt, séparateur split-view 1pt.
+     ============================================================ */
+  :root {
+    --sf: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", monospace;
+    --t-lg: 26px; --t-t1: 22px; --t-t2: 17px; --t-t3: 15px;
+    --t-body: 13px; --t-call: 12px; --t-sub: 11px; --t-cap: 10px;
+    --purple: #a855f7;
+    --purple-dim: rgba(168,85,247,0.16);
+  }
+  * { box-sizing: border-box; }
+  html { background: #08080a; }
+  body {
+    margin: 0; padding: 44px 30px 100px;
+    font: var(--t-body)/1.4 var(--sf);
+    color: rgba(255,255,255,0.92);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .masthead h1 { font-size: var(--t-lg); line-height: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px; }
+  .masthead p { color: rgba(255,255,255,0.55); margin: 0; max-width: 68ch; font-size: var(--t-body); }
+  .masthead .facts {
+    margin: 18px 0 0; padding: 11px 14px; border-radius: 9px;
+    background: rgba(168,85,247,0.10); border: 0.5px solid rgba(168,85,247,0.28);
+    font-size: var(--t-sub); color: rgba(255,255,255,0.72); max-width: 84ch;
+  }
+  .masthead .facts b { color: var(--purple); }
+
+  h2.dir {
+    font-size: var(--t-t1); font-weight: 700; letter-spacing: -0.3px;
+    margin: 74px 0 2px; padding-top: 26px; border-top: 1px solid rgba(255,255,255,0.10);
+  }
+  h2.dir .idx {
+    font: 600 var(--t-sub)/1 var(--mono); color: var(--purple);
+    letter-spacing: 1.4px; text-transform: uppercase; display: block; margin-bottom: 9px;
+  }
+  .thesis { color: rgba(255,255,255,0.58); font-size: var(--t-body); margin: 6px 0 4px; max-width: 76ch; }
+  .basis {
+    font-size: var(--t-sub); color: rgba(255,255,255,0.48); margin: 0 0 22px; max-width: 80ch;
+    padding-left: 11px; border-left: 2px solid rgba(255,255,255,0.14);
+  }
+  .basis b { color: rgba(255,255,255,0.8); font-weight: 600; }
+  .verdict {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; margin: 20px 0 0;
+    font-size: var(--t-sub); color: rgba(255,255,255,0.55);
+  }
+  .verdict h4 { font-size: var(--t-cap); text-transform: uppercase; letter-spacing: 0.8px;
+                color: rgba(255,255,255,0.4); margin: 0 0 5px; font-weight: 600; }
+  .verdict li { margin-bottom: 4px; }
+  .verdict ul { padding-left: 15px; margin: 0 0 12px; }
+
+  /* window chrome shared by all three */
+  .win { border-radius: 12px; overflow: hidden; box-shadow: 0 22px 64px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.09); }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .l1 { background: #ff5f57; } .l2 { background: #febc2e; } .l3 { background: #28c840; }
+  .tabnum { font-variant-numeric: tabular-nums; }
+  .glyph { opacity: 0.9; }
+
+  /* ==========================================================
+     A — STUDIO : la forme d'onde est l'interface.
+     ========================================================== */
+  .A { background: #16161a; }
+  .A .bar {
+    height: 52px; display: flex; align-items: center; gap: 14px; padding: 0 15px;
+    background: rgba(30,30,36,0.72); backdrop-filter: blur(34px) saturate(180%);
+    border-bottom: 0.5px solid rgba(255,255,255,0.08);
+  }
+  .A .name { font-size: var(--t-body); font-weight: 600; }
+  .A .sub { font-size: var(--t-sub); color: rgba(255,255,255,0.45); }
+  .A .sp { flex: 1; }
+  .A .chip {
+    height: 28px; padding: 0 11px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--t-call); background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.09);
+  }
+  .A .chip.rec { background: rgba(255,69,58,0.16); border-color: rgba(255,69,58,0.4); color: #ff6961; font-weight: 600; }
+  .A .chip.go { background: var(--purple); border-color: transparent; color: #fff; font-weight: 600; }
+
+  .A .stage { padding: 26px 24px 20px; }
+  .A .wave { display: flex; align-items: flex-end; gap: 1px; height: 108px; }
+  .A .wave i {
+    flex: 1; border-radius: 1px; background: linear-gradient(180deg, var(--purple) 0%, rgba(168,85,247,0.35) 100%);
+    min-height: 1px; display: block;
+  }
+  .A .wave i.q { background: linear-gradient(180deg, #ffd60a 0%, rgba(255,214,10,0.3) 100%); }
+  .A .wave i.mute { background: rgba(255,255,255,0.07); }
+  .A .ruler {
+    display: flex; justify-content: space-between; margin-top: 7px;
+    font: var(--t-cap)/1 var(--mono); color: rgba(255,255,255,0.32); letter-spacing: 0.4px;
+  }
+  .A .lanes { margin-top: 20px; display: grid; gap: 7px; }
+  .A .lane { display: flex; align-items: center; gap: 11px; }
+  .A .lane-n { width: 92px; font-size: var(--t-sub); color: rgba(255,255,255,0.6); text-align: right; }
+  .A .lane-t { flex: 1; height: 15px; border-radius: 4px; background: rgba(255,255,255,0.045); position: relative; overflow: hidden; }
+  .A .lane-t s { position: absolute; top: 0; bottom: 0; border-radius: 3px; display: block; }
+  .A .s0 { background: rgba(10,132,255,0.62); }
+  .A .s1 { background: rgba(168,85,247,0.62); }
+  .A .sO { background: rgba(48,209,88,0.55); }
+  .A .split2 { display: grid; grid-template-columns: 1fr 300px; border-top: 0.5px solid rgba(255,255,255,0.08); }
+  .A .txt { padding: 18px 24px 26px; }
+  .A .cue { display: flex; gap: 13px; padding: 6px 0; }
+  .A .cue-t { font: var(--t-cap)/1.7 var(--mono); color: rgba(255,255,255,0.3); min-width: 38px; padding-top: 1px; }
+  .A .cue-b { font-size: var(--t-body); line-height: 1.46; }
+  .A .cue-s { font: 600 var(--t-cap)/1.7 var(--mono); letter-spacing: 0.7px; min-width: 30px; }
+  .A .n0 { color: #5ac8fa; } .A .n1 { color: #c88dff; } .A .nU { color: rgba(255,255,255,0.34); }
+  .A .cue.hit .cue-b { background: rgba(255,214,10,0.13); border-radius: 4px; padding: 0 5px; margin: 0 -5px;
+                       box-shadow: inset 2px 0 0 #ffd60a; }
+  .A .aside { border-left: 0.5px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); padding: 18px 18px 26px; }
+  .A .ah { font: 600 var(--t-cap)/1 var(--mono); letter-spacing: 1.1px; color: rgba(255,255,255,0.38);
+           text-transform: uppercase; margin: 0 0 9px; }
+  .A .ab { font-size: var(--t-call); line-height: 1.5; color: rgba(255,255,255,0.8); margin: 0 0 20px; }
+  .A .claim { padding: 8px 0; border-bottom: 0.5px solid rgba(255,255,255,0.06); font-size: var(--t-call); line-height: 1.45; }
+  .A .anchor { font: var(--t-cap)/1 var(--mono); color: #ffd60a; letter-spacing: 0.3px; }
+  .A .noanchor { font: var(--t-cap)/1 var(--mono); color: rgba(255,159,10,0.9); }
+
+  /* ==========================================================
+     B — GLASS : la couche fonctionnelle flotte, le contenu respire.
+     ========================================================== */
+  .B { background:
+        radial-gradient(1100px 460px at 12% -8%, rgba(168,85,247,0.30), transparent 62%),
+        radial-gradient(880px 420px at 92% 4%, rgba(10,132,255,0.24), transparent 60%),
+        #101014; }
+  .B .bar {
+    height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 15px;
+    background: rgba(255,255,255,0.055); backdrop-filter: blur(42px) saturate(190%);
+    border-bottom: 0.5px solid rgba(255,255,255,0.10);
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.14);
+  }
+  .B .pill {
+    height: 28px; padding: 0 12px; border-radius: 14px; display: inline-flex; align-items: center; gap: 7px;
+    font-size: var(--t-call); background: rgba(255,255,255,0.09);
+    border: 0.5px solid rgba(255,255,255,0.13); box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.2);
+  }
+  .B .pill.act { background: rgba(168,85,247,0.34); border-color: rgba(168,85,247,0.5); font-weight: 600; }
+  .B .pill.amber { background: rgba(255,159,10,0.2); border-color: rgba(255,159,10,0.42); color: #ffb340; }
+  .B .grid { display: grid; grid-template-columns: 208px 1fr 286px; min-height: 470px; }
+  .B .rail {
+    background: rgba(255,255,255,0.045); backdrop-filter: blur(42px);
+    border-right: 0.5px solid rgba(255,255,255,0.08); padding: 12px 9px;
+  }
+  .B .rg { font: 600 var(--t-cap)/1 var(--mono); letter-spacing: 1.1px; text-transform: uppercase;
+           color: rgba(255,255,255,0.34); padding: 13px 9px 6px; }
+  .B .rr { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 9px;
+           border-radius: 7px; font-size: var(--t-body); color: rgba(255,255,255,0.82); }
+  .B .rr.on { background: rgba(168,85,247,0.30); box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.16); color: #fff; }
+  .B .rr .c { margin-left: auto; font: var(--t-sub)/1 var(--mono); color: rgba(255,255,255,0.28); }
+  .B .body { padding: 0; background: rgba(16,16,20,0.86); }
+  .B .hero { padding: 22px 26px 14px; }
+  .B .hero h3 { font-size: var(--t-t2); font-weight: 700; margin: 0 0 4px; letter-spacing: -0.2px; }
+  .B .hero .m { font-size: var(--t-sub); color: rgba(255,255,255,0.46); }
+  .B .strip { display: flex; align-items: flex-end; gap: 1px; height: 40px; padding: 0 26px; opacity: 0.85; }
+  .B .strip i { flex: 1; background: rgba(168,85,247,0.55); border-radius: 1px; min-height: 1px; }
+  .B .flow { padding: 16px 26px 24px; }
+  .B .say { margin-bottom: 15px; }
+  .B .who { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .B .av { width: 20px; height: 20px; border-radius: 50%; font: 600 9px/20px var(--sf); text-align: center; color: #fff; }
+  .B .a0 { background: #0a84ff; } .B .a1 { background: var(--purple); } .B .aU { background: rgba(255,255,255,0.2); }
+  .B .wn { font-size: var(--t-call); font-weight: 600; }
+  .B .wt { font: var(--t-cap)/1 var(--mono); color: rgba(255,255,255,0.3); }
+  .B .ln { font-size: var(--t-body); line-height: 1.5; color: rgba(255,255,255,0.88); padding-left: 28px; }
+  .B .fold { margin-left: 28px; font-size: var(--t-sub); color: rgba(255,255,255,0.36);
+             background: rgba(255,255,255,0.04); border-radius: 7px; padding: 5px 10px; display: inline-block; }
+  .B .insp {
+    background: rgba(255,255,255,0.05); backdrop-filter: blur(42px);
+    border-left: 0.5px solid rgba(255,255,255,0.08); padding: 20px 18px 26px;
+  }
+  .B .ih { font: 600 var(--t-cap)/1 var(--mono); letter-spacing: 1.1px; text-transform: uppercase;
+           color: rgba(255,255,255,0.36); margin: 0 0 9px; }
+  .B .ib { font-size: var(--t-call); line-height: 1.5; color: rgba(255,255,255,0.82); margin: 0 0 20px; }
+  .B .kp { display: flex; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid rgba(255,255,255,0.06);
+           font-size: var(--t-call); line-height: 1.45; }
+  .B .kp .t { font: var(--t-cap)/1.5 var(--mono); color: var(--purple); white-space: nowrap; }
+  .B .none { color: rgba(255,255,255,0.42); font-style: italic; }
+
+  /* ==========================================================
+     C — TERMINAL : monospace, densité, zéro décor.
+     ========================================================== */
+  .C { background: #0c0c0e; font-family: var(--mono); }
+  .C .bar { height: 44px; display: flex; align-items: center; gap: 13px; padding: 0 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.09); background: #101013; }
+  .C .tag { font: 600 var(--t-cap)/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase;
+            color: rgba(255,255,255,0.34); }
+  .C .st { font: var(--t-sub)/1 var(--mono); color: #30d158; }
+  .C .st.warn { color: #ffd60a; }
+  .C .grid { display: grid; grid-template-columns: 250px 1fr; min-height: 460px; }
+  .C .idx { border-right: 1px solid rgba(255,255,255,0.09); }
+  .C .row { padding: 9px 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .C .row.on { background: rgba(168,85,247,0.14); box-shadow: inset 2px 0 0 var(--purple); }
+  .C .r1 { font: var(--t-call)/1.3 var(--mono); color: rgba(255,255,255,0.9); }
+  .C .r2 { font: var(--t-cap)/1.5 var(--mono); color: rgba(255,255,255,0.38); letter-spacing: 0.2px; }
+  .C .r3 { font: var(--t-cap)/1.4 var(--mono); color: rgba(255,255,255,0.3); margin-top: 3px; }
+  .C .flag { color: #ffd60a; }
+  .C .ok { color: #30d158; }
+  .C .main { padding: 16px 18px 26px; }
+  .C .head { font: var(--t-call)/1.4 var(--mono); color: rgba(255,255,255,0.92); margin-bottom: 3px; }
+  .C .meta { font: var(--t-cap)/1.6 var(--mono); color: rgba(255,255,255,0.36); margin-bottom: 15px; }
+  .C .sect { font: 600 var(--t-cap)/1 var(--mono); letter-spacing: 1.1px; color: var(--purple);
+             text-transform: uppercase; margin: 20px 0 8px; }
+  .C .kv { display: flex; gap: 11px; font: var(--t-call)/1.55 var(--mono); padding: 2px 0; }
+  .C .kv .k { color: rgba(255,255,255,0.3); min-width: 46px; }
+  .C .kv .v { color: rgba(255,255,255,0.86); }
+  .C .kv .a { color: #ffd60a; }
+  .C .spk { font: 600 var(--t-cap)/1.55 var(--mono); min-width: 78px; }
+  .C .p0 { color: #5ac8fa; } .C .p1 { color: #c88dff; } .C .pU { color: rgba(255,255,255,0.3); }
+  .C .hl { background: rgba(255,214,10,0.12); box-shadow: inset 2px 0 0 #ffd60a; padding-left: 6px; margin-left: -6px; }
+  .C .env { display: flex; align-items: flex-end; gap: 1px; height: 34px; margin: 6px 0 2px; }
+  .C .env i { flex: 1; background: rgba(168,85,247,0.5); min-height: 1px; }
+  .C .dim { color: rgba(255,255,255,0.3); }
+
+  /* menu bar comparison strip */
+  .mbrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 26px; }
+  .mb {
+    height: 24px; border-radius: 7px 7px 0 0; display: flex; align-items: center; justify-content: flex-end;
+    gap: 13px; padding: 0 11px; font-size: var(--t-cap); color: rgba(255,255,255,0.62);
+    background: rgba(255,255,255,0.07); backdrop-filter: blur(30px);
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.15);
+  }
+  .mb b { font-variant-numeric: tabular-nums; }
+  .mbcap { font-size: var(--t-sub); color: rgba(255,255,255,0.45); margin-top: 8px; }
+  .mbcap b { color: rgba(255,255,255,0.85); }
+  .pop {
+    width: 100%; margin-top: 7px; border-radius: 11px; padding: 8px;
+    background: rgba(38,38,44,0.82); backdrop-filter: blur(46px) saturate(190%);
+    box-shadow: 0 16px 42px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.10),
+                inset 0 0.5px 0 rgba(255,255,255,0.13);
+  }
+  .pr { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 9px;
+        border-radius: 7px; font-size: var(--t-body); }
+  .pr.sel { background: rgba(255,255,255,0.09); }
+  .pr .kb { margin-left: auto; font: var(--t-cap)/1 var(--mono); color: rgba(255,255,255,0.3); }
+  .psep { height: 0.5px; background: rgba(255,255,255,0.10); margin: 6px 9px; }
+  .lvl { padding: 5px 9px 2px; }
+  .lvlab { display: flex; justify-content: space-between; font: var(--t-cap)/1.5 var(--mono);
+           color: rgba(255,255,255,0.42); }
+  .lvbar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.10); overflow: hidden; margin-top: 3px; }
+  .lvbar i { display: block; height: 100%; border-radius: 2px; }
+  .g-ok { background: #30d158; } .g-bad { background: #ff453a; } .g-pur { background: var(--purple); }
+  .warnbox { margin: 7px 5px 0; padding: 8px 10px; border-radius: 8px; font-size: var(--t-sub); line-height: 1.45;
+             background: rgba(255,159,10,0.16); border: 0.5px solid rgba(255,159,10,0.36); color: #ffcf70; }
+
+  .pick {
+    margin: 66px 0 0; padding: 22px 24px; border-radius: 13px;
+    background: rgba(168,85,247,0.10); border: 0.5px solid rgba(168,85,247,0.3);
+  }
+  .pick h3 { font-size: var(--t-t3); margin: 0 0 10px; font-weight: 700; }
+  .pick p { font-size: var(--t-call); color: rgba(255,255,255,0.72); margin: 0 0 9px; line-height: 1.55; max-width: 82ch; }
+  .pick b { color: var(--purple); }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <h1>Trois directions visuelles</h1>
+  <p>Mêmes fonctions, mêmes règles HIG, même architecture d'information. Ce qui change est le langage visuel — et donc ce que l'app <em>dit</em> d'elle-même.</p>
+  <div class="facts">
+    Conçu pour <b>ton</b> système, pas pour un système théorique : <b>mode sombre</b> et <b>accent violet</b> (relevés dans tes préférences). La forme d'onde n'est pas décorative — c'est <b>l'enveloppe RMS réelle</b> de ton call du 27 juillet, 170 points sur 1050 s, dont <b>107 non silencieux</b>. Les creux du début et la densité de la fin sont ceux de ta vraie réunion. Textes et timestamps sont extraits de ton <code>transcript.md</code>.
+  </div>
+</div>
+
+<!-- ============================ A ============================ -->
+<h2 class="dir"><span class="idx">Direction A</span>Studio</h2>
+<p class="thesis">La forme d'onde est l'interface. On ne lit pas un document, on navigue un enregistrement — comme dans Logic ou QuickTime, mais pour de la parole.</p>
+<p class="basis"><b>Pourquoi ça tient debout :</b> ton besoin dominant est de <em>vérifier une affirmation contre sa preuve</em>. Un timeline rend cette opération spatiale : chaque affirmation du résumé a un ancrage, et l'ancrage est un endroit sur la barre. Les rubans par locuteur montrent d'un coup d'œil qui a parlé quand — l'information que « SPEAKER_01 » ne donne jamais. <b>HIG :</b> la couche verre porte la toolbar ; la timeline et le texte sont du contenu, sans verre.</p>
+
+<div class="win A">
+  <div class="bar">
+    <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+    <div style="margin-left:4px">
+      <div class="name">Project technical review</div>
+      <div class="sub">27 juil · 17:30 · fr/en</div>
+    </div>
+    <div class="sp"></div>
+    <span class="chip"><span class="glyph">⇄</span> Renommer les voix</span>
+    <span class="chip"><span class="glyph">◑</span> 1 en cours</span>
+    <span class="chip go"><span class="glyph">●</span> Enregistrer</span>
+  </div>
+
+  <div class="stage">
+    <div class="wave" id="waveA"></div>
+    <div class="ruler"><span>00:00</span><span>04:22</span><span>08:45</span><span>13:07</span><span>17:30</span></div>
+
+    <div class="lanes">
+      <div class="lane">
+        <div class="lane-n">Owner</div>
+        <div class="lane-t"><s class="sO" style="left:2%;width:5%"></s><s class="sO" style="left:31%;width:8%"></s><s class="sO" style="left:74%;width:14%"></s></div>
+      </div>
+      <div class="lane">
+        <div class="lane-n">SPEAKER_01</div>
+        <div class="lane-t"><s class="s1" style="left:0%;width:4%"></s><s class="s1" style="left:29%;width:11%"></s><s class="s1" style="left:48%;width:7%"></s><s class="s1" style="left:62%;width:9%"></s><s class="s1" style="left:79%;width:18%"></s></div>
+      </div>
+      <div class="lane">
+        <div class="lane-n">SPEAKER_00</div>
+        <div class="lane-t"><s class="s0" style="left:6%;width:3%"></s><s class="s0" style="left:26%;width:2%"></s><s class="s0" style="left:41%;width:4%"></s><s class="s0" style="left:56%;width:3%"></s></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="split2">
+    <div class="txt">
+      <div class="cue">
+        <span class="cue-t">05:09</span><span class="cue-s n1">S01</span>
+        <span class="cue-b">Et sur la partie architecture, du coup, là, maintenant, j'entends une image de cœur qui se déploie sur la <b>Lambda</b>.</span>
+      </div>
+      <div class="cue hit">
+        <span class="cue-t">05:28</span><span class="cue-s n1">S01</span>
+        <span class="cue-b">Et devant, par la partie sécurité, c'est toujours le <b>JWT</b>, c'est ça ?</span>
+      </div>
+      <div class="cue">
+        <span class="cue-t">05:37</span><span class="cue-s n1">S01</span>
+        <span class="cue-b">Et du coup, l'agent, quand il appelle le tool, il envoie le token <b>GWT</b> de l'utilisateur et après, ça exploite les mots-clés, genre le projet et la molécule.</span>
+      </div>
+      <div class="cue">
+        <span class="cue-t">05:54</span><span class="cue-s n0">S00</span>
+        <span class="cue-b" style="color:rgba(255,255,255,0.4)">Ok.</span>
+      </div>
+      <div class="cue">
+        <span class="cue-t">08:30</span><span class="cue-s n1">S01</span>
+        <span class="cue-b">Le bug qu'avait <b>Gary</b>, tu m'as dit qu'il faut voir avec lui si ça a été fixé ou pas demain, c'est ça ?</span>
+      </div>
+    </div>
+
+    <div class="aside">
+      <p class="ah">Résumé</p>
+      <p class="ab">Discussion des aspects techniques : HTML, architecture, sécurité, évaluation, tests.</p>
+      <p class="ah">Affirmations · 6/7 ancrées</p>
+      <div class="claim">Architecture déployée sur Lambda, sécurité JWT <span class="anchor">05:09 · 05:28</span></div>
+      <div class="claim">L'agent transmet le token GWT au tool <span class="anchor">05:37 · 16:06</span></div>
+      <div class="claim">Bug de Gary à confirmer demain <span class="anchor">08:30</span></div>
+      <div class="claim">Documentation d'évaluation <span class="noanchor">aucun ancrage</span></div>
+      <p class="ah" style="margin-top:22px">Actions</p>
+      <p class="ab" style="color:rgba(255,255,255,0.42);font-style:italic">Aucune mentionnée.</p>
+    </div>
+  </div>
+</div>
+
+<div class="verdict">
+  <div>
+    <h4>Ce que ça sert bien</h4>
+    <ul>
+      <li>Vérifier une affirmation : l'ancrage est un lieu, pas une note de bas de page</li>
+      <li>« Qui a parlé quand » avant même de connaître les noms</li>
+      <li>Repérer un silence anormal — le bug qui t'a coûté un call</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Le prix à payer</h4>
+    <ul>
+      <li>Le plus de code neuf des trois : rendu de forme d'onde, rubans, synchronisation</li>
+      <li>Il faut un transcript structuré, pas le markdown actuel</li>
+      <li>Ça ressemble à un outil audio ; si tu ne réécoutes jamais, la timeline est du décor</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================ B ============================ -->
+<h2 class="dir"><span class="idx">Direction B</span>Glass</h2>
+<p class="thesis">La lecture d'abord. Le verre porte la navigation, le contenu flotte dessous, le texte a de l'air. C'est l'app la plus proche de ce que macOS 27 fait nativement.</p>
+<p class="basis"><b>Pourquoi ça tient debout :</b> ton usage réel est majoritairement de la <em>lecture</em> — le lendemain matin, tu relis pour rédiger. Les avatars colorés remplacent « SPEAKER_01 » par quelque chose que l'œil distingue instantanément. <b>HIG cité :</b> le verre forme « une couche fonctionnelle distincte qui flotte au-dessus de la couche contenu » ; « ne pas utiliser Liquid Glass dans la couche contenu » — donc rail et inspecteur en verre, le transcript non ; variante <code>regular</code> car « composants avec une quantité significative de texte ».</p>
+
+<div class="win B">
+  <div class="bar">
+    <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+    <span class="pill" style="margin-left:4px"><span class="glyph">⌕</span> Rechercher</span>
+    <div style="flex:1"></div>
+    <span class="pill amber"><span class="glyph">◑</span> 1 en transcription</span>
+    <span class="pill"><span class="glyph">⇄</span> Voix</span>
+    <span class="pill act"><span class="glyph">●</span> Enregistrer</span>
+  </div>
+
+  <div class="grid">
+    <div class="rail">
+      <div class="rg">Bibliothèque</div>
+      <div class="rr on"><span class="glyph">◳</span> Toutes <span class="c">42</span></div>
+      <div class="rr"><span class="glyph">☆</span> Avec actions <span class="c">11</span></div>
+      <div class="rr"><span class="glyph">⚑</span> Non ancrées <span class="c">3</span></div>
+      <div class="rr"><span class="glyph">⊘</span> Non indexées <span class="c">2</span></div>
+      <div class="rg">Personnes</div>
+      <div class="rr"><span class="glyph">◉</span> Sam <span class="c">14</span></div>
+      <div class="rr"><span class="glyph">◉</span> Idris <span class="c">9</span></div>
+      <div class="rr"><span class="glyph">＋</span> Enrôler…</div>
+    </div>
+
+    <div class="body">
+      <div class="hero">
+        <h3>Project technical review</h3>
+        <div class="m">27 juillet 2026 · 15:36 · 17:30 · français / anglais · 3 voix</div>
+      </div>
+      <div class="strip" id="stripB"></div>
+      <div class="flow">
+        <div class="say">
+          <div class="who"><span class="av a1">01</span><span class="wn">SPEAKER_01</span><span class="wt">05:09</span></div>
+          <div class="ln">Et sur la partie architecture, du coup, là, maintenant, j'entends une image de cœur qui se déploie sur la Lambda.</div>
+          <div class="ln" style="margin-top:5px">Et devant, par la partie sécurité, c'est toujours le JWT, c'est ça ?</div>
+        </div>
+        <div class="fold">▸ 4 interventions courtes — « Ok », « Merci », « Mm-hmm »</div>
+        <div class="say" style="margin-top:15px">
+          <div class="who"><span class="av a1">01</span><span class="wn">SPEAKER_01</span><span class="wt">08:30</span></div>
+          <div class="ln">Le bug qu'avait Gary, tu m'as dit qu'il faut voir avec lui si ça a été fixé ou pas demain, c'est ça ?</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insp">
+      <p class="ih">Résumé</p>
+      <p class="ib">Discussion des aspects techniques du projet : HTML, architecture, sécurité, évaluation et processus de test.</p>
+      <p class="ih">Points clés · 6/7 ancrés</p>
+      <div class="kp"><span>Architecture sur Lambda, sécurité JWT</span><span class="t">05:09</span></div>
+      <div class="kp"><span>Token GWT transmis au tool</span><span class="t">05:37</span></div>
+      <div class="kp"><span>Bug de Gary — à confirmer</span><span class="t">08:30</span></div>
+      <div class="kp"><span>Documentation d'évaluation</span><span class="t" style="color:#ffb340">—</span></div>
+      <p class="ih" style="margin-top:22px">Actions</p>
+      <p class="ib none">Aucune mentionnée.</p>
+      <p class="ih">Pistes</p>
+      <div class="kp"><span>system.wav</span><span class="t" style="color:#30d158">17:30 ✓</span></div>
+      <div class="kp"><span>mic.wav</span><span class="t" style="color:#30d158">17:30 ✓</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="verdict">
+  <div>
+    <h4>Ce que ça sert bien</h4>
+    <ul>
+      <li>La lecture longue — le cas dominant, le lendemain matin</li>
+      <li>Ressemble à une app système : zéro dissonance sur macOS 27</li>
+      <li>Le moins de code neuf : composants standard, verre gratuit</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Le prix à payer</h4>
+    <ul>
+      <li>Aucune vue temporelle : un silence anormal reste invisible</li>
+      <li>Le plus « conventionnel » — beau, mais peu mémorable</li>
+      <li>Les dégradés doivent être discrets, sinon ça vieillit mal</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================ C ============================ -->
+<h2 class="dir"><span class="idx">Direction C</span>Terminal</h2>
+<p class="thesis">Assumer ce que c'est : un outil d'ingénieur, local, sans compromis. Monospace partout, densité maximale, zéro décor. L'esthétique vient de la précision, pas de l'ornement.</p>
+<p class="basis"><b>Pourquoi ça tient debout :</b> tu es le seul utilisateur, tu viens du terminal, et les données sont techniques — timestamps, noms de fichiers, RMS, codes de langue. Le monospace aligne tout naturellement et rend les chiffres comparables ligne à ligne. <b>Risque HIG assumé :</b> c'est la direction la moins « native » ; Apple dit « avoid creating custom window UI ». Ici le chrome reste système, seule la typographie du contenu dévie.</p>
+
+<div class="win C">
+  <div class="bar">
+    <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+    <span class="tag" style="margin-left:5px">meetingscribe</span>
+    <span class="st">● rec 12:04</span>
+    <span class="st warn">⚑ mute non vérifié</span>
+    <div style="flex:1"></div>
+    <span class="tag">42 réunions · 18h12</span>
+  </div>
+
+  <div class="grid">
+    <div class="idx">
+      <div class="row on">
+        <div class="r1">2026-07-27_1536</div>
+        <div class="r2">17:30 · fr/en · 3 voix</div>
+        <div class="r3"><span class="flag">⚑ 1/7 non ancré</span></div>
+      </div>
+      <div class="row">
+        <div class="r1">2026-07-27_1531</div>
+        <div class="r2">04:02 · 2 voix</div>
+        <div class="r3 dim">⊘ pas de résumé — non indexé</div>
+      </div>
+      <div class="row">
+        <div class="r1">2026-07-27_1352</div>
+        <div class="r2">00:34 · —</div>
+        <div class="r3 dim">system.wav rms=0.000</div>
+      </div>
+      <div class="row">
+        <div class="r1">2026-07-24_1005</div>
+        <div class="r2">32:11 · 4 voix</div>
+        <div class="r3"><span class="ok">✓ 5 actions</span></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="head">project-technical-review-key-points</div>
+      <div class="meta">~/ownscribe/2026-07-27_1536 · 48000 Hz · 2 ch · 1050.1 s</div>
+      <div class="env" id="envC"></div>
+      <div class="meta" style="margin:0">rms envelope · 107/170 buckets actifs</div>
+
+      <div class="sect">summary</div>
+      <div class="kv"><span class="k">prose</span><span class="v">Discussion des aspects techniques : HTML, architecture, sécurité, évaluation, tests.</span></div>
+      <div class="sect">claims 6/7 anchored</div>
+      <div class="kv"><span class="k a">05:09</span><span class="v">architecture → Lambda · sécurité → JWT</span></div>
+      <div class="kv"><span class="k a">05:37</span><span class="v">agent → token GWT → tool</span></div>
+      <div class="kv"><span class="k a">08:30</span><span class="v">bug Gary → confirmer demain</span></div>
+      <div class="kv"><span class="k" style="color:#ffb340">—</span><span class="v dim">documentation d'évaluation · aucun terme rare retrouvable</span></div>
+      <div class="sect">actions</div>
+      <div class="kv"><span class="k">—</span><span class="v dim">none mentioned</span></div>
+
+      <div class="sect">transcript</div>
+      <div class="kv"><span class="k">05:09</span><span class="spk p1">SPEAKER_01</span><span class="v">Et sur la partie architecture, j'entends une image de cœur qui se déploie sur la Lambda.</span></div>
+      <div class="kv hl"><span class="k">05:28</span><span class="spk p1">SPEAKER_01</span><span class="v">Et devant, par la partie sécurité, c'est toujours le JWT, c'est ça ?</span></div>
+      <div class="kv"><span class="k">05:37</span><span class="spk p1">SPEAKER_01</span><span class="v">Et du coup, l'agent, quand il appelle le tool, il envoie le token GWT de l'utilisateur.</span></div>
+      <div class="kv"><span class="k">05:54</span><span class="spk p0">SPEAKER_00</span><span class="v dim">Ok.</span></div>
+      <div class="kv"><span class="k">08:30</span><span class="spk p1">SPEAKER_01</span><span class="v">Le bug qu'avait Gary, il faut voir avec lui si ça a été fixé ou pas demain, c'est ça ?</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="verdict">
+  <div>
+    <h4>Ce que ça sert bien</h4>
+    <ul>
+      <li>Densité maximale : plus d'information par écran que les deux autres</li>
+      <li>Les chiffres s'alignent et se comparent — RMS, durées, ancrages</li>
+      <li>Cohérent avec le reste de ton outillage</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Le prix à payer</h4>
+    <ul>
+      <li>La direction la moins conforme HIG — assumée, pas ignorée</li>
+      <li>Le monospace fatigue sur de la prose longue en lecture soutenue</li>
+      <li>Si tu voulais « une app Apple », ce n'est pas ça</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== MENU BAR ==================== -->
+<h2 class="dir"><span class="idx">Les trois</span>Le menu pendant l'appel</h2>
+<p class="thesis">Neuf des dix-sept histoires bloquantes se déclenchent pendant un appel. Là, aucune fenêtre ne sert : tout se joue dans la barre.</p>
+
+<div class="mbrow">
+  <div>
+    <div class="mb"><span>◔ 74%</span><span>⌘</span><span style="color:#ff6961;font-weight:700"><b>● 12:04</b></span><span>21:07</span></div>
+    <div class="pop">
+      <div class="pr sel"><span style="color:#ff453a">●</span> <b>Arrêter</b> <span class="kb">12:04</span></div>
+      <div class="lvl">
+        <div class="lvlab"><span>toi</span><span>−18 dB</span></div>
+        <div class="lvbar"><i class="g-ok" style="width:42%"></i></div>
+      </div>
+      <div class="lvl">
+        <div class="lvlab"><span>appel</span><span>−12 dB</span></div>
+        <div class="lvbar"><i class="g-ok" style="width:64%"></i></div>
+      </div>
+      <div class="psep"></div>
+      <div class="pr"><span style="color:#30d158">✓</span> Micro coupé — vérifié <span class="kb">⌘⇧M</span></div>
+    </div>
+    <p class="mbcap"><b>Nominal.</b> Le chrono vit dans la barre. Deux niveaux, deux pistes.</p>
+  </div>
+
+  <div>
+    <div class="mb"><span>◔ 74%</span><span>⌘</span><span style="color:#ffd60a;font-weight:700"><b>⚑ 12:04</b></span><span>21:07</span></div>
+    <div class="pop">
+      <div class="pr sel"><span style="color:#ff453a">●</span> <b>Arrêter</b> <span class="kb">12:04</span></div>
+      <div class="lvl">
+        <div class="lvlab"><span>toi</span><span>−18 dB</span></div>
+        <div class="lvbar"><i class="g-ok" style="width:42%"></i></div>
+      </div>
+      <div class="lvl">
+        <div class="lvlab"><span style="color:#ff6961">appel — muet depuis 8 s</span><span style="color:#ff6961">—</span></div>
+        <div class="lvbar"><i class="g-bad" style="width:2%"></i></div>
+      </div>
+      <div class="warnbox">Aucune voix sur la piste d'appel. Vérifie que la visio joue sur cette sortie.</div>
+    </div>
+    <p class="mbcap"><b>L'appel silencieux</b> — détecté à la 8ᵉ seconde, plus après coup.</p>
+  </div>
+
+  <div>
+    <div class="mb"><span>◔ 74%</span><span>⌘</span><span style="color:#ffd60a;font-weight:700">⚠</span><span>21:07</span></div>
+    <div class="pop">
+      <div class="pr"><span style="color:#ffd60a">⚠</span> <b>Coupure non confirmée</b> <span class="kb">⌘⇧M</span></div>
+      <div class="warnbox">L'enregistrement est muet, mais l'appel t'entend peut-être encore. Coupe aussi dans Zoom.</div>
+      <div class="psep"></div>
+      <div class="pr sel"><span style="color:#a855f7">●</span> Enregistrer <span class="kb">⌘⇧R</span></div>
+      <div class="lvl">
+        <div class="lvlab"><span>project-technical-review</span><span>4:12 / 17:30</span></div>
+        <div class="lvbar"><i class="g-pur" style="width:24%"></i></div>
+      </div>
+      <div class="pr" style="font-size:var(--t-sub);color:rgba(255,255,255,0.45)">Transcription — ~6 min restantes</div>
+    </div>
+    <p class="mbcap"><b>Les deux fixes de la vague 0</b> — l'ambre livré aujourd'hui, et Enregistrer qui survit à la transcription.</p>
+  </div>
+</div>
+
+<div class="pick">
+  <h3>Ma recommandation</h3>
+  <p><b>B comme socle, l'idée maîtresse de A greffée dessus.</b> B est ce que macOS 27 fait nativement : le moins de code neuf, aucune dissonance visuelle, et il sert le cas dominant — relire pour rédiger. Mais A détient la seule chose que B n'a pas : <b>la vue temporelle</b>, qui rend un silence anormal visible et transforme la vérification d'une affirmation en un geste spatial.</p>
+  <p>Concrètement : la structure et les matériaux de B, plus la <b>bande d'enveloppe</b> sous l'en-tête de réunion (déjà esquissée dans B) et les <b>rubans par locuteur</b> de A. Ça donne « qui a parlé quand » sans construire un éditeur audio.</p>
+  <p><b>C, je le déconseille</b> — mais je te le montre parce que la tentation est réelle, et parce qu'il détient une vérité que les deux autres perdent : la densité. Si tu le choisis, ce sera contre la HIG, en connaissance de cause. Une variante existe : garder B et n'utiliser le monospace <b>que</b> pour les timestamps, les noms de fichiers et les chiffres — j'ai déjà fait ça dans les trois maquettes, et c'est probablement 80 % du bénéfice de C sans son coût.</p>
+</div>
+
+</div>
+
+<script>
+  // Enveloppe RMS réelle du call du 27 juillet : 170 buckets sur 1050,1 s,
+  // normalisée sur le pic. Mesurée avec soundfile sur recording.wav.
+  const ENV = [0.133,0.004,0.142,0.548,0.800,0.044,0.005,0.091,0.000,0.000,0.111,0.592,0.124,0.004,0.004,0.149,0.005,0.199,0.002,0.012,0.000,0.077,0.163,0.000,0.000,0.107,0.004,0.005,0.202,0.008,0.003,0.003,0.204,0.150,0.002,0.002,0.010,0.129,0.020,0.009,0.007,0.006,0.058,0.009,0.008,0.014,0.188,0.044,0.054,0.008,0.007,0.299,0.723,0.538,0.767,0.756,0.469,0.059,0.030,0.121,0.014,0.049,0.183,0.083,0.547,0.006,0.025,0.951,0.448,0.002,0.004,0.017,0.008,0.013,0.010,0.008,0.073,0.002,0.043,0.098,0.146,0.193,0.591,0.348,0.001,0.216,0.009,0.004,0.058,0.280,0.714,0.198,0.117,0.090,0.001,0.006,0.003,0.264,0.785,0.423,0.220,0.388,0.160,0.004,0.002,0.131,0.530,0.834,0.001,0.003,0.659,0.014,0.099,0.674,0.301,0.194,0.605,0.255,0.010,0.410,0.002,0.003,0.007,0.002,0.002,0.259,0.006,0.466,0.579,0.648,0.588,0.651,0.278,0.201,0.014,0.124,0.566,1.000,0.693,0.635,0.541,0.599,0.600,0.012,0.051,0.014,0.156,0.660,0.857,0.580,0.724,0.704,0.572,0.584,0.801,0.805,0.795,0.777,0.728,0.653,0.514,0.015,0.022,0.007,0.004,0.136,0.445,0.446,0.176,0.105];
+
+  function paint(id, height, opts = {}) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    ENV.forEach((v, i) => {
+      const b = document.createElement('i');
+      const h = Math.max(1, Math.round(v * height));
+      b.style.height = h + 'px';
+      // 05:28 ≈ bucket 53 : l'ancrage de l'affirmation JWT mise en évidence
+      if (opts.highlight && i >= 51 && i <= 56) b.className = 'q';
+      if (v < 0.02) b.className = 'mute';
+      el.appendChild(b);
+    });
+  }
+  paint('waveA', 108, { highlight: true });
+  paint('stripB', 40);
+  paint('envC', 34);
+</script>
+</body>
+</html>
