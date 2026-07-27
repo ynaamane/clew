@@ -31,13 +31,16 @@ struct MenuBarContentView: View {
         Button {
             appState.toggleMasterMute()
         } label: {
-            Label(
-                appState.isMuted ? "Unmute (\u{2318}\u{21E7}M)" : "Mute (\u{2318}\u{21E7}M)",
-                systemImage: appState.isMuted ? "mic.slash.fill" : "mic.fill"
-            )
+            Label(muteButtonTitle, systemImage: appState.muteIndicator.symbolName)
         }
         .font(.headline)
-        .tint(appState.isMuted ? .red : .primary)
+        .tint(muteTint)
+
+        if appState.muteIndicator == .mutedUnverified {
+            Text("Recording only — the call may still hear you")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
 
         if let warning = appState.muteWarning {
             Text(warning)
@@ -71,6 +74,22 @@ struct MenuBarContentView: View {
                 Text(step)
                     .font(.caption)
             }
+        }
+    }
+
+    private var muteButtonTitle: String {
+        switch appState.muteIndicator {
+        case .notMuted: return "Mute (\u{2318}\u{21E7}M)"
+        case .mutedVerified: return "Unmute (\u{2318}\u{21E7}M)"
+        case .mutedUnverified: return "Mute not confirmed (\u{2318}\u{21E7}M)"
+        }
+    }
+
+    private var muteTint: Color {
+        switch appState.muteIndicator {
+        case .notMuted: return .primary
+        case .mutedVerified: return .red
+        case .mutedUnverified: return .orange
         }
     }
 

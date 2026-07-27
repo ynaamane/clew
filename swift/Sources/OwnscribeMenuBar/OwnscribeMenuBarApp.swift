@@ -9,7 +9,7 @@ struct OwnscribeMenuBarApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("ownscribe", systemImage: appState.isMuted ? "mic.slash" : "waveform") {
+        MenuBarExtra("ownscribe", systemImage: appState.muteIndicator.symbolName) {
             MenuBarContentView()
                 .environment(appState)
         }

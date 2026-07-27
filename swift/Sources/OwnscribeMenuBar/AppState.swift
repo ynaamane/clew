@@ -17,6 +17,7 @@ public final class AppState {
     public private(set) var recentMeetings: [MeetingSummary] = []
     public private(set) var isMuted: Bool = false
     public private(set) var muteWarning: String?
+    public private(set) var muteIndicator: MuteIndicator = .notMuted
 
     var unmuteOnQuitAttempts = 3
 
@@ -99,6 +100,12 @@ public final class AppState {
         }
         isMuted = outcome.displayMuted
         muteWarning = outcome.warning
+        muteIndicator = indicator(for: outcome)
+    }
+
+    private func indicator(for outcome: MasterMuteOutcome) -> MuteIndicator {
+        guard outcome.displayMuted else { return .notMuted }
+        return outcome.usedLocalFallback ? .mutedUnverified : .mutedVerified
     }
 
     public func restoreUnmutedOnQuit() {
