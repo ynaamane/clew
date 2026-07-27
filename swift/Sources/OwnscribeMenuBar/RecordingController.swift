@@ -15,12 +15,14 @@ public final class RecordingController {
         case permissionDenied
         case unsupportedOSVersion
         case notRecording
+        case alreadyRecording
 
         public var description: String {
             switch self {
             case .permissionDenied: return "System Audio Recording or Microphone permission is not granted."
             case .unsupportedOSVersion: return "CoreAudio process-tap capture requires macOS 14.2 or later."
             case .notRecording: return "No recording is in progress."
+            case .alreadyRecording: return "A recording is already in progress."
             }
         }
     }
@@ -30,6 +32,7 @@ public final class RecordingController {
     public var enableMic: Bool = true
     public var micDeviceName: String?
     public var silenceTimeout: TimeInterval = 0
+    public var onSilenceTimeout: (() -> Void)?
 
     private var systemCapture: SystemAudioCapturing?
     private var micCapture: MicCapture?
@@ -37,6 +40,8 @@ public final class RecordingController {
     private var currentTempPaths: RecordingTempPaths?
 
     var mergeAudioFilesImpl: (String, String, UInt64, UInt64, String) throws -> Void = mergeAudioFiles
+
+    var makeSystemCapture: ((String) -> SystemAudioCapturing)?
 
     public init() {}
 
@@ -58,8 +63,19 @@ public final class RecordingController {
         return mic.isMuted
     }
 
+    private func makeCapture(outputPath: String) throws -> SystemAudioCapturing {
+        if let makeSystemCapture {
+            return makeSystemCapture(outputPath)
+        }
+        guard #available(macOS 14.2, *) else {
+            throw RecordingError.unsupportedOSVersion
+        }
+        CoreAudioTapCapture.cleanupStaleAggregateDevices()
+        return CoreAudioTapCapture(outputPath: outputPath)
+    }
+
     public func start(outputPath: String) async throws {
-        guard state == .idle else { return }
+        guard state == .idle else { throw RecordingError.alreadyRecording }
 
         if !preflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
@@ -76,9 +92,13 @@ public final class RecordingController {
         currentOutputPath = outputPath
         currentTempPaths = tempPaths
 
-        CoreAudioTapCapture.cleanupStaleAggregateDevices()
-        let capture = CoreAudioTapCapture(outputPath: tempPaths.systemPath)
+        var capture = try makeCapture(outputPath: tempPaths.systemPath)
         capture.silenceTimeout = silenceTimeout
+        capture.onSilenceTimeout = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.onSilenceTimeout?()
+            }
+        }
 
         if enableMic {
             let mic = MicCapture()

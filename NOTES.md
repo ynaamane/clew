@@ -372,11 +372,11 @@ pytest after this task: **392 passed** (2 new: `TestPyannoteAudioIoRealDecode`).
 
 ## F9 (code-review finding) — latent ScreenCaptureKit sample-rate assumption in dead code
 
-`swift/Sources/AudioCapture.swift:286` (ScreenCaptureKit backend, `SystemAudioCapture`) trusts `kSystemAudioSampleRate` (48000 Hz constant) instead of reading the delivered audio format — the same assumption BUG5 disproved for the CoreAudio tap path (the real format can differ).
+`swift/Sources/main.swift:286` (ScreenCaptureKit backend, `SystemAudioCapture`) trusts `kSystemAudioSampleRate` (48000 Hz constant) instead of reading the delivered audio format — the same assumption BUG5 disproved for the CoreAudio tap path (the real format can differ).
 
-**This code is DEAD in the shipped configuration and will not be fixed.** `RecordingController` (main.swift:69) always instantiates `CoreAudioTapCapture` (the working, BUG5-hardened path), and the repo targets macOS 14.2+ where CoreAudio tap is available — no shipped code path reaches the SCK backend. Editing unreachable code adds regression risk for zero benefit.
+**This code is DEAD in the shipped configuration and will not be fixed.** `swift/Sources/OwnscribeMenuBar/RecordingController.swift` always instantiates `CoreAudioTapCapture` (the working, BUG5-hardened path), and the repo targets macOS 14.2+ where CoreAudio tap is available — no shipped code path reaches the SCK backend. Editing unreachable code adds regression risk for zero benefit.
 
-**Condition under which it would matter:** if someone re-enables the ScreenCaptureKit fallback for macOS <14.2, this assumption will silently break capture if the system's actual audio format differs from 48 kHz (same failure mode BUG5 reproduced on the CoreAudio path). Fix: query `sampleBuffer.formatDescription.audioStreamBasicDescription.mSampleRate` at capture time, same pattern SystemAudioCapture.swift:425-427 already uses for channel count.
+**Condition under which it would matter:** if someone re-enables the ScreenCaptureKit fallback for macOS <14.2, this assumption will silently break capture if the system's actual audio format differs from 48 kHz (same failure mode BUG5 reproduced on the CoreAudio path). Fix: query `sampleBuffer.formatDescription.audioStreamBasicDescription.mSampleRate` at capture time, same pattern main.swift:190-192 already uses (reading `sampleBuffer.formatDescription` → `CMAudioFormatDescriptionGetStreamBasicDescription` → `AVAudioFormat`).
 
 ## Task#14 (archcheck C1) — fail-loud when the swift binary can't retain separate tracks
 

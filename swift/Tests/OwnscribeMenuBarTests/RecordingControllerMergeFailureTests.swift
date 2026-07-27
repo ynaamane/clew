@@ -38,6 +38,28 @@ final class RecordingControllerMergeFailureTests: XCTestCase {
             XCTFail("Second start() after merge failure recovery should succeed, got error: \(error)")
         }
     }
+
+    func testSecondStartThrowsInsteadOfSilentNoOp() async throws {
+        let controller = RecordingController()
+        controller.enableMic = false
+
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let firstPath = tempDir.appendingPathComponent("recording1.wav").path
+        try await controller.start(outputPath: firstPath)
+
+        let secondPath = tempDir.appendingPathComponent("recording2.wav").path
+        do {
+            try await controller.start(outputPath: secondPath)
+            XCTFail("Second start() without stop() must throw .alreadyRecording, not silently no-op while AppState sets phase=.recording")
+        } catch RecordingController.RecordingError.alreadyRecording {
+
+        } catch {
+            XCTFail("Expected .alreadyRecording, got \(error)")
+        }
+    }
 }
 
 private extension RecordingController.State {

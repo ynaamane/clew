@@ -44,6 +44,16 @@ public final class AppState {
         let audioSettings = OwnscribeConfigReader.parseAudioSettings(fromTOML: configText)
         recordingController.enableMic = audioSettings.mic
         recordingController.silenceTimeout = audioSettings.silenceTimeout
+        recordingController.onSilenceTimeout = { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.stopRecordingIfStillRecording()
+            }
+        }
+    }
+
+    private func stopRecordingIfStillRecording() async {
+        guard case .recording = phase else { return }
+        await stopRecordingAndProcess()
     }
 
     private func registerMuteHotKey() {
@@ -110,6 +120,11 @@ public final class AppState {
     public var isMicCaptureEnabled: Bool {
         get { recordingController.enableMic }
         set { recordingController.enableMic = newValue }
+    }
+
+    var systemCaptureFactory: ((String) -> SystemAudioCapturing)? {
+        get { recordingController.makeSystemCapture }
+        set { recordingController.makeSystemCapture = newValue }
     }
 
     public var recordingControllerSilenceTimeout: TimeInterval {
