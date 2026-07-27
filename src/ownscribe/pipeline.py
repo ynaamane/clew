@@ -759,6 +759,7 @@ def _do_transcribe_and_summarize(
                         ungrounded_names = find_ungrounded_names(summary, result.full_text)
 
                         from ownscribe.output.markdown import format_transcript
+
                         transcript_md = format_transcript(result)
                         anchors = anchor_summary_claims(summary, transcript_md)
                         save_anchors(anchors, out_dir)

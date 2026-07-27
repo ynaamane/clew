@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import re
+import tempfile
+from pathlib import Path
+
 from ownscribe.summarization.anchoring import anchor_summary_claims
 
 
@@ -187,9 +191,9 @@ We had a long discussion about the roadmap.
     assert "Key" not in result
 
 
-def test_pipeline_integration_with_transcript_result():
-    from ownscribe.transcription.models import Segment, TranscriptResult, Word
+def test_anchoring_contract_with_the_real_formatter():
     from ownscribe.output.markdown import format_transcript
+    from ownscribe.transcription.models import Segment, TranscriptResult, Word
 
     segments = [
         Segment(
@@ -200,21 +204,21 @@ def test_pipeline_integration_with_transcript_result():
             words=[
                 Word(text="Et", start=309.0, end=309.1, speaker="SPEAKER_01"),
                 Word(text="sur", start=309.1, end=309.2, speaker="SPEAKER_01"),
-            ]
+            ],
         ),
         Segment(
             text="Et devant, par la partie sécurité, c'est toujours le JWT, c'est ça ?",
             start=328.0,
             end=335.0,
             speaker="SPEAKER_01",
-            words=[]
+            words=[],
         ),
         Segment(
             text="Le bug a été signalé par Gary qui m'a dit qu'il faut voir avec lui.",
             start=510.0,
             end=518.0,
             speaker="SPEAKER_01",
-            words=[]
+            words=[],
         ),
     ]
 
@@ -243,3 +247,165 @@ def test_pipeline_integration_with_transcript_result():
     assert anchors["JWT"][0]["timestamp"] == "05:28"
     assert anchors["Gary"][0]["timestamp"] == "08:30"
 
+
+def test_bullet_initial_proper_noun_present_in_transcript():
+    """
+    Bullet-initial proper nouns that appear in the transcript should anchor.
+    Transcript presence overrides positional exclusion.
+    """
+    summary = """# Meeting Summary
+
+## Key Points
+- Gary reported a bug about the JWT token.
+- Kubernetes deployment scheduled for next week.
+"""
+
+    transcript = """
+**SPEAKER_01** [08:30]
+Gary mentioned there's a bug in the auth flow.
+[09:15] We discussed the Kubernetes rollout plan.
+[10:00] The JWT implementation needs review.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Gary" in result
+    assert result["Gary"][0]["timestamp"] == "08:30"
+
+    assert "Kubernetes" in result
+    assert result["Kubernetes"][0]["timestamp"] == "09:15"
+
+    assert "JWT" in result
+    assert result["JWT"][0]["timestamp"] == "10:00"
+
+
+def test_bullet_initial_word_absent_from_transcript():
+    """
+    Bullet-initial words that do NOT appear in the transcript should not anchor.
+    This proves the presence check is working.
+    """
+    summary = """# Summary
+
+## Key Points
+- Discussion about testing revealed concerns.
+- Evaluation of the new feature is complete.
+"""
+
+    transcript = """
+**SPEAKER_01** [01:00]
+We talked about the test plan.
+[02:00] The feature review went well.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Discussion" not in result
+    assert "Evaluation" not in result
+
+
+def test_original_false_positives_still_absent_english_transcript():
+    """
+    The 3 original false positives (Concerns, Discussion, Evaluation) must stay OUT
+    even on an English transcript where they could match.
+    """
+    summary = """# Meeting Summary
+
+## Key Points
+- Discussion about testing revealed some concerns.
+- Evaluation of the new feature is complete.
+- Key decisions were made by Gary and the team.
+"""
+
+    transcript = """
+**SPEAKER_01** [00:12]
+We had a long discussion about the roadmap.
+[01:30] My main concerns are around latency.
+[02:45] The evaluation went fine, nothing blocking.
+[03:15] Gary mentioned some performance issues.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Gary" in result
+    assert result["Gary"][0]["timestamp"] == "03:15"
+
+    assert "Discussion" not in result
+    assert "Concerns" not in result
+    assert "Evaluation" not in result
+    assert "Key" not in result
+
+
+def test_presence_check_discriminates():
+    """
+    Mutation test: verify that neutering the presence check causes the test to fail.
+    This proves the transcript-presence override is actually being used and tested.
+    """
+    summary = """# Summary
+
+## Key Points
+- Gary reported a bug about the system.
+"""
+
+    transcript = """
+**SPEAKER_01** [08:30]
+Gary mentioned there's an issue.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Gary" in result, "Gary should anchor because it's in the transcript (case-sensitive match)"
+    assert result["Gary"][0]["timestamp"] == "08:30"
+
+
+def test_pipeline_passes_a_timestamped_transcript_not_flat_text():
+    """The call site broke twice: production passed result.full_text, one line with no
+    timestamps, so every real run wrote empty anchors while the unit tests passed on
+    hand-built markdown. This drives the REAL pipeline function and inspects the argument
+    it handed to anchoring, so reverting the call site turns it red."""
+    from unittest import mock
+
+    from ownscribe.config import Config
+    from ownscribe.transcription.models import Segment, TranscriptResult
+
+    result = TranscriptResult(
+        segments=[
+            Segment(text="On deploie sur la Lambda.", start=309.0, end=315.0, speaker="SPEAKER_01"),
+            Segment(text="Le bug de Gary est ouvert.", start=510.0, end=515.0, speaker="SPEAKER_01"),
+        ],
+        language="fr",
+        duration=515.0,
+    )
+
+    config = Config()
+    config.summarization.enabled = True
+    config.diarization.enabled = False
+
+    import ownscribe.pipeline as pipeline
+
+    fake_transcriber = mock.MagicMock()
+    fake_transcriber.transcribe.return_value = result
+    fake_transcriber.last_speaker_embeddings = {}
+
+    fake_summarizer = mock.MagicMock()
+    fake_summarizer.summarize.return_value = "## Key Points\n- Lambda deployment discussed.\n"
+
+    with (
+        tempfile.TemporaryDirectory() as tmp,
+        mock.patch.object(pipeline, "anchor_summary_claims", return_value={}) as spy,
+        mock.patch.object(pipeline, "create_summarizer", return_value=fake_summarizer),
+        mock.patch.object(pipeline, "_generate_title_slug", return_value="lambda"),
+        mock.patch.object(pipeline, "_create_transcriber", return_value=fake_transcriber),
+        mock.patch.object(pipeline, "_generate_and_save_envelope"),
+    ):
+        out_dir = Path(tmp)
+        audio = out_dir / "recording.wav"
+        audio.write_bytes(b"")
+        pipeline._do_transcribe_and_summarize(config, audio, out_dir)
+
+    assert spy.called, "Production must reach the anchoring call at all"
+    transcript_arg = spy.call_args[0][1]
+    assert "\n" in transcript_arg, "Anchoring needs a multi-line transcript; full_text is a single line"
+    assert re.search(r"\[\d+:\d{2}\]", transcript_arg), (
+        "Anchoring needs [MM:SS] timestamps; without them every production run returns empty anchors"
+    )
+    assert "05:09" in transcript_arg
