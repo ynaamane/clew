@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -11,6 +12,12 @@ struct MenuBarContentView: View {
             Divider()
             recentMeetingsSection
             Divider()
+            Button("Ouvrir MeetingScribe") {
+                openWindow(id: LibraryWindow.sceneID)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+            .keyboardShortcut("0", modifiers: .command)
+
             SettingsLink {
                 Text("Settings…")
             }

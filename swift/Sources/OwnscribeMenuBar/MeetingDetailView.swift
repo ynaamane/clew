@@ -1,0 +1,113 @@
+import SwiftUI
+
+struct MeetingDetailView: View {
+    let meeting: MeetingSummary
+
+    @State private var transcript: TranscriptDocument?
+    @State private var showBackchannel = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                transcriptBody
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(.background)
+        .inspector(isPresented: .constant(true)) {
+            MeetingInspector(meeting: meeting, transcript: transcript)
+                .inspectorColumnWidth(min: 240, ideal: 286, max: 360)
+        }
+        .navigationTitle(meeting.displayTitle)
+        .task(id: meeting.id) { transcript = loadTranscript() }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(meeting.displayTitle)
+                .font(.title3.weight(.bold))
+            Text(headerDetail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(EdgeInsets(top: 22, leading: 26, bottom: 14, trailing: 26))
+    }
+
+    private var headerDetail: String {
+        var parts = [meeting.displayDate]
+        if let transcript {
+            if transcript.duration > 0 { parts.append(Self.durationText(transcript.duration)) }
+            if !transcript.language.isEmpty { parts.append(transcript.language) }
+            if !transcript.speakers.isEmpty { parts.append("^[\(transcript.speakers.count) voix](inflect: true)") }
+        }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var transcriptBody: some View {
+        if let transcript, !transcript.utterances.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if transcript.utterances.contains(where: \.isBackchannel) {
+                    Toggle("Afficher les interventions courtes", isOn: $showBackchannel)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .font(.caption)
+                }
+                ForEach(visibleUtterances) { utterance in
+                    UtteranceRow(utterance: utterance)
+                }
+            }
+            .padding(EdgeInsets(top: 4, leading: 26, bottom: 30, trailing: 26))
+        } else {
+            Text(meeting.hasTranscript ? "Transcript illisible." : "Pas encore de transcript pour cette réunion.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(26)
+        }
+    }
+
+    private var visibleUtterances: [Utterance] {
+        guard let transcript else { return [] }
+        return showBackchannel ? transcript.utterances : transcript.utterances.filter { !$0.isBackchannel }
+    }
+
+    private func loadTranscript() -> TranscriptDocument? {
+        let path = meeting.directory.appendingPathComponent("transcript.md")
+        return try? TranscriptDocument(contentsOf: path)
+    }
+
+    static func durationText(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds.rounded())
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+private struct UtteranceRow: View {
+    let utterance: Utterance
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(utterance.timecode)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.tertiary)
+                .frame(width: 40, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(utterance.speaker)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Self.color(for: utterance.speaker))
+                Text(utterance.text)
+                    .font(.body)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    static func color(for speaker: String) -> Color {
+        switch speaker {
+        case "Owner": return .green
+        case "Unknown": return .secondary
+        default: return speaker.hasSuffix("0") ? .blue : .purple
+        }
+    }
+}

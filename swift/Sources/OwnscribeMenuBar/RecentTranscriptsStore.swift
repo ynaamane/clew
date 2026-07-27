@@ -1,16 +1,62 @@
 import Foundation
 
-public struct MeetingSummary: Identifiable, Equatable {
+public struct MeetingSummary: Identifiable, Hashable {
     public let id: String
     public let directory: URL
     public let hasTranscript: Bool
     public let hasSummary: Bool
+    public let actionItemCount: Int
+    public let unanchoredClaimCount: Int
 
-    public init(directory: URL, hasTranscript: Bool, hasSummary: Bool) {
+    public init(
+        directory: URL,
+        hasTranscript: Bool,
+        hasSummary: Bool,
+        actionItemCount: Int = 0,
+        unanchoredClaimCount: Int = 0
+    ) {
         self.id = directory.path
         self.directory = directory
         self.hasTranscript = hasTranscript
         self.hasSummary = hasSummary
+        self.actionItemCount = actionItemCount
+        self.unanchoredClaimCount = unanchoredClaimCount
+    }
+
+    public var displayTitle: String {
+        let parts = directory.lastPathComponent.split(separator: "_", maxSplits: 2, omittingEmptySubsequences: false)
+        let slug = parts.count >= 3 ? String(parts[2]) : (parts.count == 1 ? String(parts[0]) : "")
+        guard !slug.isEmpty else { return "Sans titre" }
+        return slug.replacingOccurrences(of: "-", with: " ").capitalizedFirstLetter
+    }
+
+    public var displayDate: String {
+        let name = directory.lastPathComponent
+        let parts = name.split(separator: "_")
+        guard parts.count >= 2, let day = Self.folderDateFormatter.date(from: "\(parts[0])_\(parts[1])") else {
+            return ""
+        }
+        return Self.readableDateFormatter.string(from: day)
+    }
+
+    private static let folderDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd_HHmm"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let readableDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM · HH:mm"
+        return f
+    }()
+}
+
+extension String {
+    var capitalizedFirstLetter: String {
+        guard let first else { return self }
+        return first.uppercased() + dropFirst()
     }
 }
 

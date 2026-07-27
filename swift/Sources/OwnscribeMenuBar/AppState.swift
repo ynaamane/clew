@@ -142,6 +142,15 @@ public final class AppState {
         set { recordingController.enableMic = newValue }
     }
 
+    public var isRecording: Bool {
+        if case .recording = phase { return true }
+        return false
+    }
+
+    public var enrolledSpeakers: [String] {
+        EnrolledSpeakerStore.names(in: homeDir)
+    }
+
     var systemCaptureFactory: ((String) -> SystemAudioCapturing)? {
         get { recordingController.makeSystemCapture }
         set { recordingController.makeSystemCapture = newValue }
