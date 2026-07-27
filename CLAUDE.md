@@ -17,6 +17,7 @@ Default on every non-trivial change — not a per-task ask:
 ## Commands
 
 ```bash
+bash scripts/check.sh                # everything at once: lint, format, both suites, release build, shell syntax
 uv run pytest                        # run all tests
 uv run pytest -v                     # verbose
 uv run pytest -v -k test_search      # run a specific test module
@@ -28,6 +29,13 @@ cd swift && swift test               # Swift suite (capture lib + menu-bar app)
 bash swift/build-app.sh              # build, sign AND install to /Applications
 SKIP_INSTALL=1 bash swift/build-app.sh   # stop at dist/ without installing
 ```
+
+There is no CI. GitHub Actions never ran on this repo — 29 consecutive
+`startup_failure`s with zero jobs created, on a private repo where `macos-14`
+minutes bill at 10x. `scripts/check.sh` is the replacement and runs the same
+checks locally, plus a release build (the debug build can pass while the release
+build fails on optimiser-sensitive code). Run it before pushing anything
+non-trivial.
 
 `build-app.sh` installs on purpose and fails if the installed binary differs
 from the one just built — a real call was once recorded against a stale bundle
