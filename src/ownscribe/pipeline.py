@@ -25,6 +25,8 @@ from ownscribe.progress import (
     format_download_progress,
 )
 from ownscribe.summarization import create_summarizer
+from ownscribe.summarization.anchoring import anchor_summary_claims
+from ownscribe.summarization.anchors_output import save_anchors
 from ownscribe.summarization.grounding import find_ungrounded_names
 
 # A standard WAV file header (RIFF + fmt + data chunk header) is 44 bytes.
@@ -385,6 +387,17 @@ def _slugify(text: str, max_length: int = 50) -> str:
     return slug[:max_length].rstrip("-")
 
 
+def _generate_and_save_envelope(audio_path: Path, out_dir: Path) -> None:
+    """Generate and save RMS envelope for timeline visualization."""
+    import json
+
+    from ownscribe.audio.envelope import generate_envelope_from_file
+
+    envelope = generate_envelope_from_file(audio_path, n_buckets=500)
+    envelope_path = out_dir / "envelope.json"
+    envelope_path.write_text(json.dumps({"envelope": envelope.tolist()}))
+
+
 def _generate_title_slug(summary: str, summarizer) -> str:
     """Generate a title slug from a summary. Returns empty string on failure."""
     try:
@@ -725,6 +738,9 @@ def _do_transcribe_and_summarize(
             transcript_path = out_dir / f"transcript.{ext}"
             transcript_path.write_text(transcript_str)
 
+            # Generate envelope for timeline visualization
+            _generate_and_save_envelope(audio_path, out_dir)
+
             if sum_enabled and summarizer is not None:
                 if not summarizer.is_available():
                     sum_unavailable = True
@@ -741,6 +757,11 @@ def _do_transcribe_and_summarize(
                             progress.complete("downloading_model")
                         summary = summarizer.summarize(result.full_text)
                         ungrounded_names = find_ungrounded_names(summary, result.full_text)
+
+                        from ownscribe.output.markdown import format_transcript
+                        transcript_md = format_transcript(result)
+                        anchors = anchor_summary_claims(summary, transcript_md)
+                        save_anchors(anchors, out_dir)
                         _, summary_str = _format_output(config, result, summary)
                         summary_path = out_dir / f"summary.{ext}"
                         summary_path.write_text(summary_str or summary)
