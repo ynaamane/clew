@@ -129,9 +129,10 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
         from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(), CanaryConfig())
-        with mock.patch(
-            "subprocess.run", return_value=self._fake_process("", returncode=1, stderr="resolver failed")
-        ), pytest.raises(RuntimeError, match="resolver failed"):
+        with (
+            mock.patch("subprocess.run", return_value=self._fake_process("", returncode=1, stderr="resolver failed")),
+            pytest.raises(RuntimeError, match="resolver failed"),
+        ):
             transcriber.transcribe(synthetic_wav)
 
     def test_raises_when_worker_reports_ok_false(self, synthetic_wav):

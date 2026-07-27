@@ -297,8 +297,12 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="all", silence_timeout=120,
-                capture_backend="coreaudio", echo_cancellation="off"
+                mic=False,
+                mic_device="",
+                capture_mode="all",
+                silence_timeout=120,
+                capture_backend="coreaudio",
+                echo_cancellation="off",
             )
 
     def test_capture_mode_defaults_to_all(self):
@@ -312,8 +316,12 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="all", silence_timeout=300,
-                capture_backend="coreaudio", echo_cancellation="off"
+                mic=False,
+                mic_device="",
+                capture_mode="all",
+                silence_timeout=300,
+                capture_backend="coreaudio",
+                echo_cancellation="off",
             )
 
     def test_capture_mode_picker_override_passed_to_coreaudio(self):
@@ -328,8 +336,12 @@ class TestCreateRecorder:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
-                mic=False, mic_device="", capture_mode="picker", silence_timeout=300,
-                capture_backend="coreaudio", echo_cancellation="off"
+                mic=False,
+                mic_device="",
+                capture_mode="picker",
+                silence_timeout=300,
+                capture_backend="coreaudio",
+                echo_cancellation="off",
             )
 
     def test_capture_backend_defaults_to_coreaudio_tap(self):
@@ -1474,14 +1486,10 @@ class TestRelabelSpeakersWithVoiceprints:
         db.upsert("Alice", [1.0, 0.0, 0.0])
         db.save(db_path)
 
-        result = TranscriptResult(
-            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
-        )
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(
-                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
-            )
+            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker == "Alice"
 
@@ -1494,23 +1502,17 @@ class TestRelabelSpeakersWithVoiceprints:
         db.upsert("Alice", [1.0, 0.0, 0.0])
         db.save(db_path)
 
-        result = TranscriptResult(
-            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
-        )
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(
-                result, {"SPEAKER_00": [0.0, 0.0, 1.0]}
-            )
+            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.0, 0.0, 1.0]})
 
         assert relabeled.segments[0].speaker == "Unknown-1"
 
     def test_no_embeddings_returns_result_unchanged(self, tmp_path):
         from ownscribe.pipeline import _relabel_speakers_with_voiceprints
 
-        result = TranscriptResult(
-            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
-        )
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         relabeled = _relabel_speakers_with_voiceprints(result, {})
 
@@ -1521,23 +1523,17 @@ class TestRelabelSpeakersWithVoiceprints:
 
         db_path = tmp_path / "voiceprints.json"
 
-        result = TranscriptResult(
-            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
-        )
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(
-                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
-            )
+            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_non_dict_embeddings_returns_result_unchanged(self, tmp_path):
         from ownscribe.pipeline import _relabel_speakers_with_voiceprints
 
-        result = TranscriptResult(
-            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
-        )
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         relabeled = _relabel_speakers_with_voiceprints(result, mock.MagicMock())
 
@@ -1555,9 +1551,7 @@ class TestRelabelSpeakersWithVoiceprints:
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker=None)])
 
         with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(
-                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
-            )
+            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker is None
 
@@ -1735,9 +1729,7 @@ class TestRunWatch:
         binary_path = tmp_path / "ownscribe-audio"
         binary_path.touch()
 
-        fake_process = self._make_fake_process(
-            ["some noise\n", "\n", "[MEETING_DETECTED]\n"]
-        )
+        fake_process = self._make_fake_process(["some noise\n", "\n", "[MEETING_DETECTED]\n"])
 
         with (
             mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),

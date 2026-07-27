@@ -7,10 +7,7 @@ from ownscribe.summarization.grounding import find_ungrounded_names
 
 class TestFindUngroundedNames:
     def test_real_bug2_repro_flags_all_three_invented_names(self):
-        transcript = (
-            "Hi everyone, thanks for joining.\n"
-            "Let's review the quarterly numbers before we start."
-        )
+        transcript = "Hi everyone, thanks for joining.\nLet's review the quarterly numbers before we start."
         summary = (
             "## Action Items\n"
             "- John to update the financial forecast by next week.\n"

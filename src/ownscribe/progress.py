@@ -239,7 +239,7 @@ class DownloadProgressWriter:
                 break
             idx = min(idxs)
             chunk = self._buffer[:idx]
-            self._buffer = self._buffer[idx + 1:]
+            self._buffer = self._buffer[idx + 1 :]
             self._consume(chunk)
         return len(text)
 
@@ -295,12 +295,14 @@ class PipelineProgress:
             steps.append(_Step("transcribing", "Transcribing", indent=0))
         if diarize:
             steps.append(_Step("diarizing", "Diarizing", indent=0))
-            steps.extend([
-                _Step("segmentation", "Segmentation", indent=1),
-                _Step("speaker_counting", "Speaker counting", indent=1),
-                _Step("embeddings", "Embeddings", indent=1),
-                _Step("clustering", "Clustering", indent=1),
-            ])
+            steps.extend(
+                [
+                    _Step("segmentation", "Segmentation", indent=1),
+                    _Step("speaker_counting", "Speaker counting", indent=1),
+                    _Step("embeddings", "Embeddings", indent=1),
+                    _Step("clustering", "Clustering", indent=1),
+                ]
+            )
         if summarize:
             steps.append(_Step("summarizing", "Summarizing", indent=0))
             if download_summarizer:

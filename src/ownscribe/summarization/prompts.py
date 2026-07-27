@@ -15,6 +15,7 @@ def clean_response(text: str) -> str:
         text = _ORPHAN_THINK_CLOSE_RE.sub("", text).strip()
     return text
 
+
 MEETING_SUMMARY_SYSTEM = (
     "You are a meeting notes assistant. You produce clear, structured summaries of meeting transcripts. "
     "Only include names, tasks, dates, and decisions that are explicitly stated in the transcript. "
@@ -96,7 +97,8 @@ TITLE_PROMPT = (
 
 
 def resolve_template(
-    template_name: str, user_templates: dict | None = None,
+    template_name: str,
+    user_templates: dict | None = None,
 ) -> tuple[str, str]:
     """Resolve a template name to (system_prompt, user_prompt).
 
@@ -151,15 +153,15 @@ SEARCH_ANSWER_SYSTEM = (
     "2. Then list supporting quotes grouped by meeting:\n"
     "\n"
     "**Meeting display name**\n"
-    "- **SPEAKER** [timestamp]: \"Verbatim quote from the transcript.\"\n"
+    '- **SPEAKER** [timestamp]: "Verbatim quote from the transcript."\n'
     "\n"
     "Example:\n"
     "\n"
     "The deadline was set for March 15th.\n"
     "\n"
     "**2026-02-13 15:01 — Quarterly Planning**\n"
-    "- **SPEAKER_03** [00:13]: \"So the deadline for Q1 deliverables is March 15th.\"\n"
-    "- **SPEAKER_01** [00:21]: \"They will hear from us by Friday.\"\n"
+    '- **SPEAKER_03** [00:13]: "So the deadline for Q1 deliverables is March 15th."\n'
+    '- **SPEAKER_01** [00:21]: "They will hear from us by Friday."\n'
     "\n"
     "Rules:\n"
     "- Use the meeting display name from the transcript header (after the folder name in brackets).\n"

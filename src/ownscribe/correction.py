@@ -39,7 +39,5 @@ def correct_transcript(
     result: TranscriptResult,
     max_length_delta_ratio: float = 0.4,
 ) -> TranscriptResult:
-    corrected_segments = [
-        correct_segment_text(summarizer, seg, max_length_delta_ratio) for seg in result.segments
-    ]
+    corrected_segments = [correct_segment_text(summarizer, seg, max_length_delta_ratio) for seg in result.segments]
     return replace(result, segments=corrected_segments)

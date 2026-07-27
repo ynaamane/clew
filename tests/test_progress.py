@@ -20,9 +20,7 @@ from ownscribe.progress import (
 
 class TestDownloadProgressParsing:
     def test_parses_tqdm_style_line(self):
-        event = parse_download_progress(
-            "model.bin: 26%|##5       | 123MB/466MB [00:10<00:20, 12.3MB/s]"
-        )
+        event = parse_download_progress("model.bin: 26%|##5       | 123MB/466MB [00:10<00:20, 12.3MB/s]")
 
         assert event is not None
         assert event.filename == "model.bin"

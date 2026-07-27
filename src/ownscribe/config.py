@@ -206,9 +206,7 @@ def _validate_cpu_threads(value: int | str) -> int:
 
     max_threads = (os.cpu_count() or 1) * 4
     if threads > max_threads:
-        raise ValueError(
-            f"cpu_threads={threads} exceeds 4x logical cores (max {max_threads} on this machine)"
-        )
+        raise ValueError(f"cpu_threads={threads} exceeds 4x logical cores (max {max_threads} on this machine)")
 
     return threads
 

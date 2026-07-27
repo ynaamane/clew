@@ -74,7 +74,11 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
         label = f"Searching {len(meetings)} meetings"
         with Spinner(label) as spinner:
             relevant = _find_relevant_meetings(
-                summarizer, question, meetings, context_size, spinner=spinner,
+                summarizer,
+                question,
+                meetings,
+                context_size,
+                spinner=spinner,
             )
             spinner.update(label)  # restore label so exit message is clean
 
@@ -95,7 +99,6 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
             click.echo(f"({skipped_transcripts} transcripts did not fit within context budget, they were skipped)")
 
         click.echo(answer)
-
 
 
 def _resolve_context_size(config: Config) -> int:
@@ -144,7 +147,9 @@ def _parse_folder_name(name: str) -> tuple[str, str] | None:
 
 
 def _discover_meetings(
-    output_dir: Path, since: str | None, limit: int | None,
+    output_dir: Path,
+    since: str | None,
+    limit: int | None,
 ) -> tuple[list[Meeting], int]:
     if not output_dir.exists():
         return [], 0
@@ -211,7 +216,8 @@ def _estimate_tokens(text: str) -> int:
 
 
 def _build_summary_chunks(
-    meetings: list[Meeting], context_budget: int,
+    meetings: list[Meeting],
+    context_budget: int,
 ) -> list[list[Meeting]]:
     effective = int(context_budget * 0.8)
     overhead = 1000  # system prompt + question + response headroom
@@ -244,7 +250,7 @@ def _build_summary_chunks(
 
 
 _JSON_RE = re.compile(r'\{[^{}]*"relevant"[^{}]*\}', re.DOTALL)
-_ARRAY_RE = re.compile(r'\[.*?\]', re.DOTALL)
+_ARRAY_RE = re.compile(r"\[.*?\]", re.DOTALL)
 
 
 def _parse_relevant_ids(response: str) -> list[str] | None:
@@ -287,22 +293,134 @@ def _parse_relevant_ids(response: str) -> list[str] | None:
     return None
 
 
-_STOP_WORDS = frozenset([
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "of", "in", "to", "for", "on",
-    "with", "at", "by", "from", "about", "into", "through", "during", "before",
-    "after", "above", "below", "between", "out", "off", "over", "under",
-    "again", "further", "then", "once", "here", "there", "when", "where",
-    "why", "how", "all", "each", "every", "both", "few", "more", "most",
-    "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so",
-    "than", "too", "very", "and", "but", "or", "if", "what", "which", "who",
-    "whom", "this", "that", "these", "those", "i", "me", "my", "myself", "we",
-    "our", "ours", "ourselves", "you", "your", "yours", "yourself",
-    "yourselves", "he", "him", "his", "himself", "she", "her", "hers",
-    "herself", "it", "its", "itself", "they", "them", "their", "theirs",
-    "themselves", "am", "s", "t", "d", "ll", "ve", "re",
-])
+_STOP_WORDS = frozenset(
+    [
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "of",
+        "in",
+        "to",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "about",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "and",
+        "but",
+        "or",
+        "if",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "me",
+        "my",
+        "myself",
+        "we",
+        "our",
+        "ours",
+        "ourselves",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "yourselves",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves",
+        "am",
+        "s",
+        "t",
+        "d",
+        "ll",
+        "ve",
+        "re",
+    ]
+)
 
 
 def _extract_keywords(text: str) -> set[str]:
@@ -313,7 +431,8 @@ def _extract_keywords(text: str) -> set[str]:
 
 
 def _keyword_fallback(
-    question: str, meetings: list[Meeting],
+    question: str,
+    meetings: list[Meeting],
 ) -> list[Meeting]:
     """Return meetings whose summary or transcript shares keywords with *question*."""
     kw = _extract_keywords(question)
@@ -544,6 +663,6 @@ def _verify_quotes(answer: str, transcripts: dict[str, str]) -> str:
             for uq in unverified_quotes:
                 target = f'"{uq}"'
                 if target in modified:
-                    modified = modified.replace(target, f'{target} [unverified]')
+                    modified = modified.replace(target, f"{target} [unverified]")
             result_lines.append(modified)
     return "\n".join(result_lines)

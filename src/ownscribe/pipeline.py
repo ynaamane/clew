@@ -234,9 +234,7 @@ def _shift_result(result, offset: float):
     shifted_segments = []
     for seg in result.segments:
         shifted_words = [replace(w, start=w.start + offset, end=w.end + offset) for w in seg.words]
-        shifted_segments.append(
-            replace(seg, start=seg.start + offset, end=seg.end + offset, words=shifted_words)
-        )
+        shifted_segments.append(replace(seg, start=seg.start + offset, end=seg.end + offset, words=shifted_words))
     return replace(result, segments=shifted_segments)
 
 
@@ -326,9 +324,7 @@ def _relabel_speakers_with_voiceprints(result, cluster_embeddings: dict[str, lis
         return result
 
     assignments = assign_speaker_names(cluster_embeddings, db)
-    relabeled_segments = [
-        replace(seg, speaker=assignments.get(seg.speaker, seg.speaker)) for seg in result.segments
-    ]
+    relabeled_segments = [replace(seg, speaker=assignments.get(seg.speaker, seg.speaker)) for seg in result.segments]
     return replace(result, segments=relabeled_segments)
 
 
@@ -649,10 +645,7 @@ def run_summarize(config: Config, transcript_file: str) -> None:
         # Require the transcript to live in the output tree so summarizing a
         # transcript elsewhere cannot rename an unrelated audio directory whose
         # name happens to match.
-        if (
-            config.output.uses_separate_audio_dir
-            and old_out_dir.parent == config.output.resolved_dir
-        ):
+        if config.output.uses_separate_audio_dir and old_out_dir.parent == config.output.resolved_dir:
             audio_dir = config.output.resolved_audio_dir / old_out_dir.name
             if audio_dir.is_dir() and out_dir != old_out_dir:
                 _rename_output_dir(audio_dir, title_slug)
@@ -720,9 +713,7 @@ def _do_transcribe_and_summarize(
             if correction_enabled:
                 if summarizer is not None and summarizer.is_available():
                     try:
-                        result = correct_transcript(
-                            summarizer, result, config.correction.max_length_delta_ratio
-                        )
+                        result = correct_transcript(summarizer, result, config.correction.max_length_delta_ratio)
                     except Exception:
                         correction_failed = True
                 else:

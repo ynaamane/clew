@@ -48,11 +48,16 @@ def _dir_size(path: str) -> str:
 )
 @click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
 @click.option(
-    "--silence-timeout", default=None, type=click.IntRange(min=0),
+    "--silence-timeout",
+    default=None,
+    type=click.IntRange(min=0),
     help="Seconds of silence before auto-stopping recording (0 to disable).",
 )
 @click.option(
-    "--progress", "progress_mode", type=click.Choice(["tui", "json"]), default=None,
+    "--progress",
+    "progress_mode",
+    type=click.Choice(["tui", "json"]),
+    default=None,
     help="Progress display: 'tui' (default, animated checklist) or 'json' (one NDJSON event per line on stderr).",
 )
 @click.pass_context
@@ -116,6 +121,7 @@ def cli(
 
     if ctx.invoked_subcommand is None:
         from ownscribe.pipeline import run_pipeline
+
         run_pipeline(config)
 
 
@@ -136,18 +142,22 @@ def ask(ctx: click.Context, question: str, since: str | None, limit: int | None)
 def devices() -> None:
     """List available audio input devices."""
     from ownscribe.audio.coreaudio import CoreAudioRecorder
+
     recorder = CoreAudioRecorder()
     if recorder.is_available():
         click.echo(recorder.list_devices())
     else:
         import sounddevice as sd
+
         click.echo("Available audio devices:\n")
         click.echo(sd.query_devices())
 
 
 @cli.command()
 @click.option(
-    "--sustained-seconds", default=3.0, type=float,
+    "--sustained-seconds",
+    default=3.0,
+    type=float,
     help="Seconds of continuous mic+output activity before starting a recording (default 3).",
 )
 @click.pass_context
@@ -155,6 +165,7 @@ def watch(ctx: click.Context, sustained_seconds: float) -> None:
     """Wait for a meeting to start (sustained mic AND output activity together), then record it."""
     config = ctx.obj["config"]
     from ownscribe.pipeline import run_watch
+
     run_watch(config, sustained_seconds)
 
 
@@ -166,8 +177,12 @@ def watch(ctx: click.Context, sustained_seconds: float) -> None:
 @click.option("--format", "output_format", type=click.Choice(["markdown", "json"]), default=None)
 @click.pass_context
 def transcribe(
-    ctx: click.Context, file: str, diarize: bool,
-    model: str | None, language: str | None, output_format: str | None,
+    ctx: click.Context,
+    file: str,
+    diarize: bool,
+    model: str | None,
+    language: str | None,
+    output_format: str | None,
 ) -> None:
     """Transcribe an audio file."""
     config = ctx.obj["config"]
@@ -181,6 +196,7 @@ def transcribe(
         config.output.format = output_format
 
     from ownscribe.pipeline import run_transcribe
+
     run_transcribe(config, file)
 
 
@@ -210,6 +226,7 @@ def warmup(
         config.diarization.enabled = with_diarization
 
     from ownscribe.pipeline import run_warmup
+
     run_warmup(config)
 
 
@@ -224,6 +241,7 @@ def summarize(ctx: click.Context, file: str, template: str | None) -> None:
         config.summarization.template = template
 
     from ownscribe.pipeline import run_summarize
+
     run_summarize(config, file)
 
 
@@ -235,8 +253,12 @@ def summarize(ctx: click.Context, file: str, template: str | None) -> None:
 @click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
 @click.pass_context
 def resume(
-    ctx: click.Context, directory: str, diarize: bool,
-    model: str | None, language: str | None, template: str | None,
+    ctx: click.Context,
+    directory: str,
+    diarize: bool,
+    model: str | None,
+    language: str | None,
+    template: str | None,
 ) -> None:
     """Resume a partially-completed pipeline in a meeting directory."""
     config = ctx.obj["config"]
@@ -250,6 +272,7 @@ def resume(
         config.summarization.template = template
 
     from ownscribe.pipeline import run_resume
+
     run_resume(config, directory)
 
 
@@ -261,8 +284,12 @@ def resume(
 @click.option("--template", default=None, help="Summarization template (meeting, lecture, brief, or custom).")
 @click.pass_context
 def reprocess(
-    ctx: click.Context, directory: str, diarize: bool,
-    model: str | None, language: str | None, template: str | None,
+    ctx: click.Context,
+    directory: str,
+    diarize: bool,
+    model: str | None,
+    language: str | None,
+    template: str | None,
 ) -> None:
     """Force a full re-transcribe+summarize from retained audio, even if output already exists."""
     config = ctx.obj["config"]
@@ -276,12 +303,16 @@ def reprocess(
         config.summarization.template = template
 
     from ownscribe.pipeline import run_reprocess
+
     run_reprocess(config, directory)
 
 
 @cli.command()
 @click.option(
-    "--older-than", "older_than_days", default=None, type=click.IntRange(min=0),
+    "--older-than",
+    "older_than_days",
+    default=None,
+    type=click.IntRange(min=0),
     help="Purge retained audio older than this many days (overrides retention_days from config).",
 )
 @click.option("--all", "purge_all", is_flag=True, help="Purge all retained audio regardless of age.")
@@ -291,6 +322,7 @@ def purge(ctx: click.Context, older_than_days: int | None, purge_all: bool, dry_
     """Delete retained audio according to the retention policy (keep-N-days, forever, or --all)."""
     config = ctx.obj["config"]
     from ownscribe.pipeline import run_purge
+
     run_purge(config, older_than_days, purge_all, dry_run)
 
 
@@ -302,6 +334,7 @@ def enroll(ctx: click.Context, name: str, file: str) -> None:
     """Enroll a speaker's voiceprint from a short reference audio clip."""
     config = ctx.obj["config"]
     from ownscribe.pipeline import run_enroll
+
     run_enroll(config, name, file)
 
 
@@ -310,6 +343,7 @@ def enroll(ctx: click.Context, name: str, file: str) -> None:
 def unenroll(name: str) -> None:
     """Remove an enrolled speaker's voiceprint."""
     from ownscribe.pipeline import run_unenroll
+
     run_unenroll(name)
 
 
@@ -317,6 +351,7 @@ def unenroll(name: str) -> None:
 def list_speakers() -> None:
     """List all enrolled speaker names."""
     from ownscribe.pipeline import run_list_enrolled
+
     run_list_enrolled()
 
 
@@ -324,6 +359,7 @@ def list_speakers() -> None:
 def apps() -> None:
     """List running apps with PIDs for use with --pid."""
     from ownscribe.audio.coreaudio import CoreAudioRecorder
+
     recorder = CoreAudioRecorder()
     click.echo(recorder.list_apps())
 

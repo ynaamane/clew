@@ -103,9 +103,13 @@ class CoreAudioRecorder(AudioRecorder):
     """Records system audio using the ownscribe-audio Swift helper."""
 
     def __init__(
-        self, mic: bool = False, mic_device: str = "",
-        capture_mode: str = "picker", silence_timeout: int = 0,
-        capture_backend: str = "coreaudio", echo_cancellation: str = "off",
+        self,
+        mic: bool = False,
+        mic_device: str = "",
+        capture_mode: str = "picker",
+        silence_timeout: int = 0,
+        capture_backend: str = "coreaudio",
+        echo_cancellation: str = "off",
     ) -> None:
         self._mic = mic
         self._mic_device = mic_device
@@ -200,9 +204,9 @@ class CoreAudioRecorder(AudioRecorder):
                 _NOISE_PREFIXES = ("Recording ", "Saved ", "Merged audio saved")
                 _NOISE_LINES = ("[MIC_MUTED]", "[MIC_UNMUTED]", "[SILENCE_TIMEOUT]")
                 lines = [
-                    line for line in stderr_output.strip().splitlines()
-                    if line not in _NOISE_LINES
-                    and not line.startswith(_NOISE_PREFIXES)
+                    line
+                    for line in stderr_output.strip().splitlines()
+                    if line not in _NOISE_LINES and not line.startswith(_NOISE_PREFIXES)
                 ]
                 if lines:
                     click.echo("\n".join(lines), err=True)

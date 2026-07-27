@@ -32,6 +32,5 @@ def create_summarizer(config: Config) -> Summarizer:
     except ImportError as exc:
         hint = _INSTALL_HINTS.get(backend, f"uv add 'ownscribe[{backend}]'")
         raise ImportError(
-            f"The '{backend}' summarization backend requires additional dependencies.\n"
-            f"Install with: {hint}"
+            f"The '{backend}' summarization backend requires additional dependencies.\nInstall with: {hint}"
         ) from exc

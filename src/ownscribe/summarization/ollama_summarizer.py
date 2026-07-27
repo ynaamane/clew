@@ -18,8 +18,11 @@ class OllamaSummarizer(Summarizer):
         self._client = ollama.Client(host=config.host)
 
     def chat(
-        self, system_prompt: str, user_prompt: str,
-        json_mode: bool = False, json_schema: dict | None = None,
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         kwargs = {}
         if json_mode:
