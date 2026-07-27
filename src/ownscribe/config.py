@@ -91,6 +91,7 @@ class TranscriptionConfig:
     initial_prompt: str = BILINGUAL_INITIAL_PROMPT
     hotwords: str = ""
     engine: str = "whisperx"
+    cpu_threads: int = 0
 
 
 @dataclass
@@ -151,6 +152,7 @@ class OutputConfig:
     @property
     def uses_separate_audio_dir(self) -> bool:
         return self.resolved_audio_dir != self.resolved_dir
+
 
 @dataclass
 class Config:

@@ -61,6 +61,33 @@ echo "Verifying Info.plist keys..."
 /usr/libexec/PlistBuddy -c "Print :NSMicrophoneUsageDescription" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP_DIR/Contents/Info.plist"
 
+INSTALL_DIR="/Applications/$APP_NAME"
+
+if [[ "${SKIP_INSTALL:-0}" == "1" ]]; then
+  echo
+  echo "Built and signed: $APP_DIR (not installed, SKIP_INSTALL=1)"
+  echo "Launch with: open \"$APP_DIR\""
+  exit 0
+fi
+
 echo
-echo "Built and signed: $APP_DIR"
-echo "Launch with: open \"$APP_DIR\""
+echo "Installing to $INSTALL_DIR..."
+if pgrep -f "$INSTALL_DIR/Contents/MacOS/" >/dev/null 2>&1; then
+  echo "Quitting the running instance first..."
+  pkill -f "$INSTALL_DIR/Contents/MacOS/" || true
+  sleep 1
+fi
+rm -rf "$INSTALL_DIR"
+cp -R "$APP_DIR" /Applications/
+codesign --verify --deep --strict "$INSTALL_DIR"
+
+INSTALLED_BIN=$(find "$INSTALL_DIR/Contents/MacOS" -type f -perm +111 -name '*MenuBar*' | head -1)
+BUILT_BIN=$(find "$APP_DIR/Contents/MacOS" -type f -perm +111 -name '*MenuBar*' | head -1)
+if ! cmp -s "$INSTALLED_BIN" "$BUILT_BIN"; then
+  echo "Error: the installed binary differs from the one just built." >&2
+  exit 1
+fi
+
+echo
+echo "Built, signed and installed: $INSTALL_DIR"
+echo "Launch with: open \"$INSTALL_DIR\""

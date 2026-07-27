@@ -25,6 +25,26 @@ from ownscribe.transcription.models import Segment, TranscriptResult, Word
 _SAMPLE_RATE = 16000
 
 
+def _performance_core_count() -> int | None:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["sysctl", "-n", "hw.perflevel0.physicalcpu"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=True,
+        )
+        return int(out.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def default_cpu_threads() -> int:
+    return _performance_core_count() or os.cpu_count() or 1
+
+
 class WhisperXTranscriber(Transcriber):
     """Transcribes audio using WhisperX (faster-whisper + optional pyannote diarization)."""
 
@@ -56,12 +76,14 @@ class WhisperXTranscriber(Transcriber):
             asr_options["initial_prompt"] = self._tx_config.initial_prompt
         if self._tx_config.hotwords:
             asr_options["hotwords"] = self._tx_config.hotwords
+        threads = self._tx_config.cpu_threads or default_cpu_threads()
         self._model = whisperx.load_model(
             self._tx_config.model,
             device,
             compute_type=compute_type,
             language=self._tx_config.language or None,
             asr_options=asr_options or None,
+            threads=threads,
         )
 
     def _configure_runtime_env(self) -> None:
@@ -89,9 +111,7 @@ class WhisperXTranscriber(Transcriber):
             self._set_detail(step_key, f"{stage_label}: {int(event.percent)}%")
 
     def _capture_download_output(self, step_key: str, stage_label: str, fn, *args, **kwargs):
-        writer = DownloadProgressWriter(
-            lambda event: self._on_download_progress(step_key, stage_label, event)
-        )
+        writer = DownloadProgressWriter(lambda event: self._on_download_progress(step_key, stage_label, event))
         self._set_detail(step_key, stage_label)
         with contextlib.ExitStack() as stack:
             stack.enter_context(contextlib.redirect_stdout(writer))
@@ -171,11 +191,7 @@ class WhisperXTranscriber(Transcriber):
                 show_deferred_align_note=True,
             )
 
-            if (
-                self._diar_config
-                and self._diar_config.enabled
-                and self._diar_config.hf_token
-            ):
+            if self._diar_config and self._diar_config.enabled and self._diar_config.hf_token:
                 self._load_diarization_pipeline()
 
             progress.complete("preparing_models")
@@ -241,18 +257,18 @@ class WhisperXTranscriber(Transcriber):
 
                 tx_writer = ProgressWriter(
                     lambda frac: progress.update("transcribing", frac),
-                    offset=0.0, scale=0.5,
+                    offset=0.0,
+                    scale=0.5,
                 )
                 align_writer = ProgressWriter(
                     lambda frac: progress.update("transcribing", frac),
-                    offset=0.5, scale=0.5,
+                    offset=0.5,
+                    scale=0.5,
                 )
 
                 # Nested redirect overrides devnull → captures progress
                 with contextlib.redirect_stdout(tx_writer):
-                    result = self._model.transcribe(
-                        audio, batch_size=16, print_progress=True, combined_progress=True
-                    )
+                    result = self._model.transcribe(audio, batch_size=16, print_progress=True, combined_progress=True)
 
                 language = result.get("language", "")
 
@@ -326,9 +342,7 @@ class WhisperXTranscriber(Transcriber):
             diarize_kwargs["max_speakers"] = self._diar_config.max_speakers
 
         # Call pyannote pipeline directly with progress hook
-        diarization = diarize_model.model(
-            audio_data, hook=progress.diarization_hook, **diarize_kwargs
-        )
+        diarization = diarize_model.model(audio_data, hook=progress.diarization_hook, **diarize_kwargs)
 
         progress.complete("diarizing")
 
