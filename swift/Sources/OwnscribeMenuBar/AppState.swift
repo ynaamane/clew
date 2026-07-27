@@ -18,6 +18,8 @@ public final class AppState {
     public private(set) var isMuted: Bool = false
     public private(set) var muteWarning: String?
 
+    var unmuteOnQuitAttempts = 3
+
     private let recordingController = RecordingController()
     private let muteDevice: AudioMuteDevice
     private let hotKeyRegistration = GlobalHotKeyRegistration()
@@ -101,10 +103,21 @@ public final class AppState {
 
     public func restoreUnmutedOnQuit() {
         guard isMuted else { return }
-        isMuted = false
-        _ = applyMasterMute(false, device: muteDevice) { [weak self] muted in
-            self?.recordingController.setLocalMicMute(muted)
+
+        for _ in 0..<unmuteOnQuitAttempts {
+            let outcome = applyMasterMute(false, device: muteDevice) { [weak self] muted in
+                self?.recordingController.setLocalMicMute(muted)
+            }
+            if !outcome.usedLocalFallback {
+                isMuted = false
+                muteWarning = nil
+                return
+            }
+            muteWarning = outcome.warning
         }
+
+        FileHandle.standardError.write(Data(
+            "[MUTE_NOT_RESTORED] Quitting with the microphone still muted system-wide — unmute it in System Settings > Sound > Input.\n".utf8))
     }
 
     public var outputDir: URL {
