@@ -57,7 +57,8 @@ public func mergeAudioFiles(systemPath: String, micPath: String,
         return
     }
 
-    let outputSampleRate: Double = kSystemAudioSampleRate
+    let outputSampleRate: Double = systemFile?.processingFormat.sampleRate
+        ?? micFile.processingFormat.sampleRate
     let outputChannels: AVAudioChannelCount = 1
 
     // Compute offset in seconds between the two start times using mach_timebase_info

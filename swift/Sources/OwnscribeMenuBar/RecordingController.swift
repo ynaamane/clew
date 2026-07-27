@@ -27,7 +27,7 @@ public final class RecordingController {
 
     public private(set) var state: State = .idle
 
-    public var enableMic: Bool = false
+    public var enableMic: Bool = true
     public var micDeviceName: String?
     public var silenceTimeout: TimeInterval = 0
 

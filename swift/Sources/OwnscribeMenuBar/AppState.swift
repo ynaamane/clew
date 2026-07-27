@@ -98,6 +98,11 @@ public final class AppState {
         pipelineRunner != nil
     }
 
+    public var isMicCaptureEnabled: Bool {
+        get { recordingController.enableMic }
+        set { recordingController.enableMic = newValue }
+    }
+
     public func refreshRecentMeetings() {
         recentMeetings = RecentTranscriptsStore.recentMeetings(in: outputDir)
     }

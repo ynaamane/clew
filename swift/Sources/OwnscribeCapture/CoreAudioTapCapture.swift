@@ -12,6 +12,7 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
 
     private let outputPath: String
     private var audioFile: AVAudioFile?
+    private var capturedSampleRate: Double = kSystemAudioSampleRate
 
     public private(set) var startHostTime: UInt64 = 0
 
@@ -49,6 +50,7 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
             interleaved: avFormat.isInterleaved
         )
         self.audioFile = audioFile
+        self.capturedSampleRate = avFormat.sampleRate
 
         if silenceTimeout > 0 {
             lastLoudTime = DispatchTime.now().uptimeNanoseconds
@@ -233,7 +235,7 @@ public class CoreAudioTapCapture: SystemAudioCapturing {
 
         audioFile = nil
 
-        let seconds = Double(totalFrames) / kSystemAudioSampleRate
+        let seconds = Double(totalFrames) / capturedSampleRate
         fputs("Saved \(outputPath) (\(String(format: "%.1f", seconds)) seconds, peak=\(String(format: "%.6f", peakLevel)))\n", stderr)
         if totalFrames > 0 && peakLevel < 1e-6 {
             fputs("[SILENCE_WARNING] Recording appears silent. Check System Audio Recording permission.\n", stderr)
