@@ -729,3 +729,25 @@ Built `GlobalHotKeyRegistration` using Carbon's `RegisterEventHotKey`/`InstallEv
 ### Acoustic silence gate — the always-on recording-side complement
 
 `gate_silent_mic_segments(result, mic_path, threshold)` (Python) drops any transcript segment whose corresponding span in the retained `mic.wav` has RMS below threshold (`1e-4`, distinct from the whole-track `_check_dual_track_silence` threshold of `1e-5` — segment-level spans are shorter and noisier than a 5s whole-track sample, so a slightly higher floor avoids false-dropping quiet real speech). Wired into `_transcribe_dual_track` unconditionally, independent of whether the manual mute fired — covers the case where the user forgot to mute, or muted the call but not (yet, pre-verify-fix) the recording. Gates emission only; never fabricates a segment that wasn't produced by the transcriber. 6 new tests (loud-kept, silent-dropped, mixed-only-silent-dropped, missing-file-passthrough, no-mutation, custom-threshold) — all pass against the exact `gate_silent_mic_segments` implementation via `PYTHONPATH=.../src` (the venv's `ownscribe.pth` unconditionally prepends the main repo's `src/` to `sys.path` regardless of `cwd` — confirmed by `cat`-ing the `.pth` file directly — so any isolated/scratch-copy test run needs an explicit `PYTHONPATH` override or it silently re-imports the live tree). (6 new: `test_echo_cancellation_defaults_to_off` + `test_echo_cancellation_override_passed_through` in `test_pipeline.py`, plus `TestCoreAudioRecorderEchoCancellation`'s 4 tests in `test_coreaudio.py`; separately fixed 3 pre-existing `test_pipeline.py` tests broken by the new `echo_cancellation` kwarg, no net count change from those). ruff: clean. Swift: compiles clean via the rebuilt `swift/build.sh`; verified via 3 real end-to-end captures (off/on/auto) plus the isolated `mergeAudioFiles` regression harness (6/6) for the unrelated pre-existing bug fixed alongside this task.
+
+### The envelope reader's `dtype="float32"` is load-bearing and NO test protects it
+
+`src/ownscribe/audio/envelope.py:65` reads the recording with an explicit
+`dtype="float32"`. Do not "simplify" that away.
+
+`soundfile.read` defaults to **float64** even when the file is already stored as float32,
+which is what this project's captures are. On the real 17.5-minute recording (385 MB,
+1050.1 s, 48 kHz, 2 ch) the default read peaked at **1.47 GB** — a float64 copy plus the
+channel mean plus a float32 downcast — versus **629 MB** with the explicit dtype: a 55%
+reduction, and 38% faster as a side effect (0.54 s → 0.33 s). Extrapolated, a 2-hour
+meeting goes from ~10 GB to ~4.5 GB, and this runs at the end of transcription while torch
+still holds its own allocations. `MemoryError` is not in the reader's `except` clause, so
+it would propagate.
+
+**Why no test guards it:** the envelopes produced by a float32 read and a float64 read are
+bit-identical (max abs diff 0.0). It is a memory property, not a value property, so no
+value assertion can detect its removal — mutation-verified: deleting the dtype leaves the
+whole suite green (552 passed, 0 failed). Only a peak-RSS assertion could catch it, and
+that is machine-dependent and flaky enough to be worse than the risk. Hence this note: the
+commit message is where the why was first recorded, but a commit message is not where
+anyone looks before editing a line.
