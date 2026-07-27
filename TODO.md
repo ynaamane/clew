@@ -114,6 +114,32 @@ uv run python scripts/verify_with_token.py
 
 Also: **regenerate your HF token** — the one used during the build transited a chat session.
 
+## The Swift side was independently audited (2026-07-27, late)
+
+Eight mutations over the shipped code, in an isolated copy, on the five areas that carry risk.
+Everything held, and two gaps were found and closed:
+
+- **Mute path CLEAN** — the concern that mattered, since `AppState.swift` changed in this batch.
+  Collapsing the mute indicator to always-verified → 1 red. Cutting the quit-time unmute retry
+  loop to one attempt → 1 red. Dropping the verify-after-set read-back → **6 reds**. Exit paths
+  enumerated by grep, not assumed: ⌘Q, force-quit and logout all route through
+  `willTerminateNotification`. No uncovered path, and this batch's changes to `AppState` are
+  additive only.
+- **`TranscriptDocument`** — 72 utterances on the real transcript, not 52, cross-checked as
+  52 inline stamps + 20 speaker headers. The one duplicate (`[08:50] OK.`) is real repeated
+  speech in the audio, verified at source before being reported.
+- **`SummaryDocument`** — "None mentioned." survives verbatim on the real summary. Guarded.
+- **`EnrolledSpeakerStore`** — the biometric constraint is structural, not defensive: the decoder
+  type declares only `name`, so embeddings are un-decodable by construction. Corrupt, wrong-schema
+  and missing files all degrade to an empty list without crashing.
+- **`WindowActivationPolicy`** — a stray close cannot drive the counter negative.
+
+**Two properties passed 160 tests while replaceable by a constant**, both now guarded:
+`isRecording` (the window's record button would read "Enregistrer" mid-recording — UI asserting an
+unverified state, same class as the mute-icon bug) and the parser's double-count guard (header →
+stamped line → bare line invents an utterance and puts it out of chronological order). A property
+with a single consumer is the shape that escapes coverage.
+
 ## What comes next, in order
 
 1. **Look at the window** (⌘0). Everything below is cheaper to do once you have said whether the
