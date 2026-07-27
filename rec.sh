@@ -2,8 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [[ -z "${HF_TOKEN:-}" ]]; then
-  echo "⚠️  HF_TOKEN not set. Run:  export HF_TOKEN=hf_xxxxx   (then re-run)"
+CONFIG_FILE="$HOME/.config/ownscribe/config.toml"
+
+if [[ -z "${HF_TOKEN:-}" ]] && ! grep -qE '^[[:space:]]*hf_token[[:space:]]*=[[:space:]]*"[^"]+"' "$CONFIG_FILE" 2>/dev/null; then
+  echo "⚠️  No HuggingFace token found."
+  echo "   Put it in $CONFIG_FILE under [diarization] as hf_token = \"hf_...\" (chmod 600),"
+  echo "   or export HF_TOKEN=hf_xxxxx for a one-off run."
   echo "   Get one at https://huggingface.co/settings/tokens after accepting"
   echo "   https://huggingface.co/pyannote/speaker-diarization-community-1"
   exit 1

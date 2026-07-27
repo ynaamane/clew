@@ -40,8 +40,9 @@ The checks that structurally cannot run without your machine (GUI prompts, real 
 
 ### 3. Token pass — `scripts/verify_with_token.py`
 
+Token already stored (see "Everyday usage" below) — this only needs the community-1 model licence accepted on huggingface.co under the same account.
+
 ```bash
-export HF_TOKEN=hf_xxxxx   # after accepting the community-1 model licence on huggingface.co
 uv run python scripts/verify_with_token.py
 ```
 
@@ -53,9 +54,10 @@ Also: **regenerate your HF token** — the one used during the build transited a
 
 ## Everyday usage
 
+The HF token now lives in `~/.config/ownscribe/config.toml` (chmod 600, outside the repo) and in the login Keychain under service `com.ownscribe.menubar` / account `hf_token` for the app. Nothing to export anymore; `export HF_TOKEN=...` still works as a one-off override.
+
 ```bash
 cd ~/meeting-scribe
-export HF_TOKEN=hf_xxxxx
 ./rec.sh          # English call (Ctrl+C to stop) — output in ~/ownscribe/
 ./rec.sh fr       # French call ← use this for FR audio
 ./rec.sh redo DIR # re-transcribe a past meeting from its retained audio
