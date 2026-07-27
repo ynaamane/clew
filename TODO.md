@@ -1,8 +1,12 @@
 # TODO — meeting-scribe
 
-## Status: app built, installed and proven on a real 17-minute call. No open bugs.
+## Status: app built, installed, proven on a real 17-minute call. 11 review findings closed.
 
-667 tests green (568 Python + 99 Swift), HEAD `c1e1f3d`, pushed to `main` (private repo ynaamane/meeting-scribe). The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` now installs it and refuses to leave a stale bundle behind.
+698 tests green (575 Python + 123 Swift), HEAD `eec7be4`. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind.
+
+**A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
+
+**Two commits are not yet pushed** (`c805897`, `eec7be4`) — they touch the capture path.
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
@@ -10,7 +14,24 @@
 
 ## Open bugs
 
-None. BUG0/1/2/3/4/5 + all review findings closed and independently audited. See LESSONS_LEARNED.md.
+None. BUG0/1/2/3/4/5 + all 11 review findings closed, each verified by mutation rather than by a green suite. See LESSONS_LEARNED.md.
+
+## What the review changed (2026-07-27)
+
+The two that could have cost you a meeting:
+
+- **The record button bricked itself after a failed merge.** `stop()` set `state = .stopping` before the throwing merge and never restored it; `start()` then returned *silently* while `AppState` still set `phase = .recording`. The menu bar claimed an active recording while nothing was captured, every stop threw, and only relaunching fixed it. Now the state is restored on the throwing path and `start()` throws `alreadyRecording` instead of lying.
+- **The app never auto-stopped on silence.** The value travelled config → AppState → controller → tap, and the tap fired `onSilenceTimeout` into a nil optional because the CLI was its only assigner. It logged `[SILENCE_TIMEOUT]` to a stderr nobody reads and recorded forever. Now forwarded end-to-end, and a late timeout after the recording stopped is a no-op (otherwise a perfectly good recording would have flipped to `.failed`).
+
+The rest:
+
+- `[audio] mic` and `silence_timeout` are read from the config. Absent → mic **ON** (a deliberate, documented divergence from `AudioConfig.mic = False`: `rec.sh` always passes `--mic`, and an app that drops your half of every call is the worse failure). An explicit `mic = false` is now honored — before, it was unreachable, so a deliberate choice to mute yourself was ignored.
+- The Keychain HF token now reaches the pipeline child's environment. It was write-only dead storage.
+- `cpu_threads` is validated at config load, before any recording: `0`→auto, `'8'`→8, `2.0`→2; negative, `'abc'`, `1.5`, `True` and anything above 4x the core count are rejected with a message naming the value. A crash *after* the audio is captured is much worse than a bad thread count.
+- `build-app.sh` can no longer destroy your install on a failed build, can no longer compare the wrong binary (a stray `*MenuBar*` match), and no longer kills dev instances or the capture helper.
+- `rec.sh` asks Python's real loader instead of grepping TOML, so single-quoted tokens work and a config error is reported as a config error rather than "no token found".
+
+**Three of the fixes' own tests could not fail** and were caught by mutation: a bare `XCTAssert(true)`, a spy asserted instead of the child process, and a `phase == .recording(startedAt: Date())` comparison that is false in every state. A green suite is not evidence — breaking the thing a test defends and watching it go red is.
 
 ## YOUR TURN — 2 steps left (step 1 is DONE)
 
@@ -36,6 +57,7 @@ The checks that structurally cannot run without your machine (GUI prompts, real 
 - [x] First launch: permission prompts appear (System Audio Recording + Microphone) and were granted — the 17.5-min call recorded through them
 - [ ] Grants SURVIVE a rebuild (re-run build-app.sh → permissions still there; this is what the stable cert is for)
 - [ ] **A call recorded with the CURRENT bundle produces `mic.wav` + `system.wav` and labels your voice `Owner`** ← the BUG4 fix; the 17.5-min call predates it, so it captured only the other participants
+- [ ] **Auto-stop on silence**: start a recording, leave it silent, confirm it stops on its own after 5 minutes AND that the meeting is transcribed (not merely cut). This never worked before `eec7be4` — the value was plumbed but the callback reached nothing. Note the app must be rebuilt+reinstalled first: the installed bundle predates the fix.
 - [ ] Master mute on the **built-in mic** → verify Zoom/others actually stop hearing you
 - [ ] Master mute on **AirPods Max 2 / Pro 3** → the fragile case (documented macOS Bluetooth mute bug); if the fail-loud warning fires, that's the guard working, not a break
 - [ ] Global hotkey ⌘⇧M while **Zoom has focus** (only one dev-time positive so far; display-sleep blocked re-verification)

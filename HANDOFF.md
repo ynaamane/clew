@@ -4,7 +4,11 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**Zéro bug ouvert.** 667 tests verts (568 Python + 99 Swift). Tout sur `main`, poussé sur le repo privé `ynaamane/meeting-scribe`. L'app est signée et installée dans `/Applications`.
+**Zéro bug ouvert.** 698 tests verts (575 Python + 123 Swift), HEAD `eec7be4`. L'app est signée et installée dans `/Applications`. Deux commits pas encore poussés (`c805897`, `eec7be4`) — ils touchent le chemin de capture.
+
+**Une revue de code complète (2026-07-27) a fermé 11 findings réels sur 14.** Quatre relectures indépendantes ont tourné sur le même diff, et **chacune a trouvé ce que les trois autres avaient manqué**. La pire trouvaille est arrivée deux heures après que tout le monde ait déclaré le lot terminé : `silence_timeout` était câblé jusqu'au tap mais le callback n'atteignait personne — l'app ne s'arrêtait donc toujours jamais. Détail dans `TODO.md` § What the review changed.
+
+Leçon de méthode qui vaut pour la suite : **trois des tests écrits pour ces corrections ne pouvaient pas échouer** (un `XCTAssert(true)` nu, un espion asserté au lieu du processus enfant, une comparaison `phase == .recording(startedAt: Date())` fausse dans tous les cas). Une suite verte n'est pas une preuve. Casser ce qu'un test défend et le voir rougir, si.
 
 **Éprouvée sur un vrai call de 17,5 min** (2026-07-27, réunion de travail bilingue sur Google Meet dans Dia) : le tap a tenu tout le call malgré des changements d'app et des coupures réseau, zéro minute silencieuse, 3 locuteurs séparés, résumé factuel. Mais ce call a tourné sur un bundle antérieur au fix BUG4, donc il n'a capté que les autres participants — la voix du propriétaire n'y est pas.
 
