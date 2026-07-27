@@ -32,11 +32,8 @@ def format_transcript(result: TranscriptResult) -> str:
             current_speaker = seg.speaker
             speaker_label = seg.speaker or "Unknown"
             lines.append(f"\n**{speaker_label}** {timestamp}")
-        else:
-            lines.append(f"{timestamp} {seg.text.strip()}")
-            continue
 
-        lines.append(f"{seg.text.strip()}")
+        lines.append(f"{timestamp} {seg.text.strip()}")
 
     return "\n".join(lines) + "\n"
 
