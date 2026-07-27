@@ -1,12 +1,16 @@
 # TODO — meeting-scribe
 
-## Status: app built, installed, proven on a real 17-minute call. 11 review findings closed.
+## Status: the app has a window. 770 tests green, HEAD `6bbf5d3`, everything pushed.
 
-698 tests green (575 Python + 123 Swift), HEAD `eec7be4`. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind.
+770 tests green (610 Python + 160 Swift). The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
+
+**⚠️ ONE THING NEEDS YOU: the window has never been seen.** It has 160 passing tests and zero visual verification — every `screencapture` came back black because the display was asleep, and the accessibility API reports no windows for one never opened. Open it with **⌘0** from the menu bar and say what you think. No audit can close this.
+
+**The installed bundle is from before the window landed.** Re-run `bash swift/build-app.sh` to get it.
 
 **A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
 
-**Two commits are not yet pushed** (`c805897`, `eec7be4`) — they touch the capture path.
+Everything is pushed. `design/directions.html` holds the three visual directions that were mocked up; **Glass** is the one being built.
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
@@ -15,6 +19,37 @@
 ## Open bugs
 
 None. BUG0/1/2/3/4/5 + all 11 review findings closed, each verified by mutation rather than by a green suite. See LESSONS_LEARNED.md.
+
+## The Glass batch — what the app gained (2026-07-27, evening)
+
+The design direction is **Glass** (direction B in `design/directions.html`), chosen after three
+directions were mocked up against this Mac's real appearance — Dark mode, purple accent — and
+against the real RMS envelope of the 27 July call rather than invented bars.
+
+- **The app has a real window.** Three columns via `NavigationSplitView`: sidebar → meeting list →
+  detail with an inspector. This was a HIG requirement, not taste: *"Avoid relying on the presence
+  of menu bar extras"* and *"Avoid making a dynamic menu item the only way to accomplish a task"*.
+  Until now the dropdown WAS the entire interface. Standard components carry Liquid Glass
+  automatically, and none of it lands on the transcript — *"Don't use Liquid Glass in the content
+  layer"*, and a transcript is content made almost entirely of text.
+- **Deployment target raised to macOS 26.** This Mac runs 27 while the package declared `.v14`, so
+  the app was being rendered in the pre-26 visual language — the concrete reason it did not look
+  like an Apple app here. `glassEffect()` now compiles with no availability guard. Note `.macOS(.v26)`
+  does not exist in this toolchain's PackageDescription, so the target is the string `"26.0"`; and
+  raising `swift-tools-version` to 6.0 switched every target into Swift 6 language mode, which
+  produced 3 real strict-concurrency errors in the CoreAudio path — all five targets are therefore
+  pinned to `.swiftLanguageMode(.v5)`. Migrating that audio code is its own piece of work.
+- **Claim anchoring** links each summary key point to the timestamps where its rare tokens appear
+  in the transcript. On the real meeting: 9 tokens, including Gary at 08:30 — the name the old
+  guard missed while flagging three false positives.
+- **The pipeline emits an RMS envelope** so the window can draw a timeline without opening a
+  400 MB wav. This is what will make an abnormal silence visible.
+- **Transcript reading handles both formats.** Meetings already on disk were written before the
+  timestamp fix, so a turn's first utterance has no `[mm:ss]`; the reader inherits it from the
+  speaker header. On the real transcript: 72 utterances, not the 52 a naive reader sees.
+- **The menu bar icon can no longer lie about mute.** Three distinct states — not muted, muted and
+  verified, muted but UNVERIFIED in amber — because the old code reported a hardware-refused mute
+  as verified. The app said "muted" while Zoom could still hear you.
 
 ## What the review changed (2026-07-27)
 
@@ -78,6 +113,24 @@ uv run python scripts/verify_with_token.py
 - [ ] The 5-source capture matrix: `[x]` system audio proven twice — a YouTube test and a real Google Meet call inside Dia. Still to prove individually: Zoom (native), WhatsApp (native), Teams / Discord (web in Dia).
 
 Also: **regenerate your HF token** — the one used during the build transited a chat session.
+
+## What comes next, in order
+
+1. **Look at the window** (⌘0). Everything below is cheaper to do once you have said whether the
+   Glass direction reads right in practice.
+2. **W0-2 — seed the mute state from the hardware at launch.** `AppState.swift` hardcodes
+   `isMuted = false` and never calls `readInputMute()`, even though the device implements it. If the
+   mic was left muted by a crash, a force-quit or another app, the menu reads "Mute" — meaning NOT
+   muted — and you join a call believing you are live.
+3. **W0-3 — keep Start Recording alive during transcription.** `toggleRecording` has
+   `case .processing: break`, so the click is swallowed, and the dropdown renders no Start button at
+   all. Stop a 17-minute call, have the next one dial in, and call two is never recorded.
+4. **Swift side of the envelope strip and the per-speaker lanes.** The Python half ships the data;
+   the window does not draw it yet. This is what makes a silent recording visible at a glance.
+5. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
+   evidence. The anchors exist on disk; nothing reads them in Swift yet.
+6. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
+   output dir all live only in TOML.
 
 ## Performance — what is settled and what is open
 
