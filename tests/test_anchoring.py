@@ -4,6 +4,8 @@ import re
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from ownscribe.summarization.anchoring import anchor_summary_claims
 
 
@@ -262,7 +264,7 @@ def test_bullet_initial_proper_noun_present_in_transcript():
 
     transcript = """
 **SPEAKER_01** [08:30]
-Gary mentioned there's a bug in the auth flow.
+The bug was found by Gary during testing.
 [09:15] We discussed the Kubernetes rollout plan.
 [10:00] The JWT implementation needs review.
 """
@@ -348,20 +350,25 @@ def test_presence_check_discriminates():
 
     transcript = """
 **SPEAKER_01** [08:30]
-Gary mentioned there's an issue.
+The issue was reported by Gary during testing.
 """
 
     result = anchor_summary_claims(summary, transcript)
 
-    assert "Gary" in result, "Gary should anchor because it's in the transcript (case-sensitive match)"
+    assert "Gary" in result, "Gary should anchor because it's mid-sentence in transcript"
     assert result["Gary"][0]["timestamp"] == "08:30"
 
 
-def test_pipeline_passes_a_timestamped_transcript_not_flat_text():
+@pytest.mark.parametrize("output_format", ["markdown", "json"])
+def test_pipeline_passes_a_timestamped_transcript_not_flat_text(output_format):
     """The call site broke twice: production passed result.full_text, one line with no
     timestamps, so every real run wrote empty anchors while the unit tests passed on
     hand-built markdown. This drives the REAL pipeline function and inspects the argument
-    it handed to anchoring, so reverting the call site turns it red."""
+    it handed to anchoring, so reverting the call site turns it red.
+
+    Parametrised over both output formats because reusing transcript_str — which honours
+    the user's output.format — silently returns empty anchors for anyone who chose JSON,
+    and a markdown-only test cannot see that."""
     from unittest import mock
 
     from ownscribe.config import Config
@@ -379,6 +386,7 @@ def test_pipeline_passes_a_timestamped_transcript_not_flat_text():
     config = Config()
     config.summarization.enabled = True
     config.diarization.enabled = False
+    config.output.format = output_format
 
     import ownscribe.pipeline as pipeline
 
@@ -409,3 +417,64 @@ def test_pipeline_passes_a_timestamped_transcript_not_flat_text():
         "Anchoring needs [MM:SS] timestamps; without them every production run returns empty anchors"
     )
     assert "05:09" in transcript_arg
+
+
+def test_utterance_initial_common_word_excluded():
+    """
+    ASR capitalizes every utterance start. A common word appearing ONLY at
+    utterance-start (capitalized) should NOT be treated as a proper noun.
+    """
+    summary = """# Summary
+
+## Key Points
+- Discussion about the roadmap.
+- Concerns were raised about latency.
+- Evaluation went well.
+- Bug reported by Gary.
+"""
+
+    transcript = """
+**SPEAKER_01** [00:12]
+Discussion about the roadmap happened today.
+**SPEAKER_01** [01:30]
+Concerns are around latency and cost.
+**SPEAKER_01** [02:45]
+Evaluation went fine, nothing blocking.
+**SPEAKER_01** [03:15]
+The bug was reported by Gary who found the issue.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Gary" in result, "Gary mid-sentence should anchor"
+    assert "Discussion" not in result, "Discussion at utterance-start is not a proper noun"
+    assert "Concerns" not in result, "Concerns at utterance-start is not a proper noun"
+    assert "Evaluation" not in result, "Evaluation at utterance-start is not a proper noun"
+
+
+def test_utterance_initial_only_proper_noun_not_anchored():
+    """
+    Deliberate trade-off: a proper noun that appears ONLY at utterance starts
+    will not anchor. This prevents false positives from ASR capitalization
+    at the cost of false negatives on a narrow slice.
+
+    This test documents the current behavior and prevents silent reversal.
+    """
+    summary = """# Summary
+
+## Key Points
+- Alice reported the issue.
+- Bob confirmed the fix.
+"""
+
+    transcript = """
+**SPEAKER_01** [01:00]
+Alice mentioned the problem during standup.
+**SPEAKER_01** [02:00]
+Bob verified everything works now.
+"""
+
+    result = anchor_summary_claims(summary, transcript)
+
+    assert "Alice" not in result, "Alice only appears utterance-initial - not anchored (deliberate)"
+    assert "Bob" not in result, "Bob only appears utterance-initial - not anchored (deliberate)"

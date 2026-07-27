@@ -15,11 +15,14 @@ def anchor_summary_claims(summary_text: str, transcript_text: str) -> dict[str, 
     - ALL-CAPS acronyms (e.g., JWT, GWT, PPTX)
     - Code-like identifiers (CamelCase, snake_case)
     - Numbers with units
+
+    Transcript presence overrides positional exclusion: a bullet-initial capitalised word
+    that appears in the transcript is a real token, not a grammar artifact.
     """
     if not summary_text or not transcript_text:
         return {}
 
-    rare_tokens = _extract_rare_tokens(summary_text)
+    rare_tokens = _extract_rare_tokens(summary_text, transcript_text)
 
     if not rare_tokens:
         return {}
@@ -34,8 +37,13 @@ def anchor_summary_claims(summary_text: str, transcript_text: str) -> dict[str, 
     return anchors
 
 
-def _extract_rare_tokens(text: str) -> set[str]:
-    """Extract rare tokens that survive translation from the text."""
+def _extract_rare_tokens(text: str, transcript: str) -> set[str]:
+    """
+    Extract rare tokens that survive translation from the text.
+
+    Transcript presence overrides positional exclusion: a bullet-initial capitalised word
+    that appears in the transcript is a real token, not a grammar artifact.
+    """
     tokens = set()
 
     all_caps_re = re.compile(r"\b[A-Z]{2,}\b")
@@ -47,7 +55,10 @@ def _extract_rare_tokens(text: str) -> set[str]:
 
     for match in capitalized_word_re.finditer(text):
         word = match.group()
-        if not _is_sentence_start(text, match.start()):
+        is_sentence_start = _is_sentence_start(text, match.start())
+        is_in_transcript = _is_in_transcript(word, transcript)
+
+        if not is_sentence_start or is_in_transcript:
             tokens.add(word)
 
     for match in camel_case_re.finditer(text):
@@ -58,6 +69,36 @@ def _extract_rare_tokens(text: str) -> set[str]:
         tokens.add(match.group())
 
     return tokens
+
+
+def _is_in_transcript(word: str, transcript: str) -> bool:
+    """
+    Check if a word appears in the transcript as a proper noun (mid-sentence capitalized).
+
+    Only counts mid-sentence capitalized occurrences. ASR capitalizes every utterance start,
+    so a word appearing capitalized ONLY at utterance boundaries is not evidence of being
+    a proper noun. This prevents "Discussion" at utterance-start from matching when it's
+    just a common word the ASR capitalized.
+
+    Returns True if the word appears with at least one word before it on the same line
+    (excluding **SPEAKER** [MM:SS] markers).
+    """
+    for line in transcript.split("\n"):
+        stripped = re.sub(r"^\*\*[^\*]+\*\*\s*\[\d{2}:\d{2}\]\s*", "", line)
+        stripped = re.sub(r"^\[\d{2}:\d{2}\]\s*", "", stripped)
+
+        if not stripped:
+            continue
+
+        match = re.search(r"\b" + re.escape(word) + r"\b", stripped)
+        if not match:
+            continue
+
+        before_word = stripped[: match.start()].strip()
+        if before_word and re.search(r"\w", before_word):
+            return True
+
+    return False
 
 
 def _is_sentence_start(text: str, position: int) -> bool:
