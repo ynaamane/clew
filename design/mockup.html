@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MeetingScribe — maquette d'interface</title>
+<style>
+  :root {
+    --text: #1d1d1f;
+    --text-2: rgba(60,60,67,0.60);
+    --text-3: rgba(60,60,67,0.30);
+    --sep: rgba(60,60,67,0.13);
+    --accent: #0071e3;
+    --bg-window: #f5f5f7;
+    --bg-content: #ffffff;
+    --bg-sidebar: rgba(246,246,248,0.72);
+    --glass: rgba(255,255,255,0.66);
+    --amber: #b25000;
+    --amber-bg: rgba(255,159,10,0.14);
+    --green: #1d7f3e;
+    --red: #c9372c;
+    --radius-win: 11px;
+    --radius-ctl: 6px;
+    /* HIG macOS type scale, verbatim point values rendered 1pt = 1px */
+    --t-title2: 17px;
+    --t-title3: 15px;
+    --t-body: 13px;
+    --t-callout: 12px;
+    --t-sub: 11px;
+    --t-caption: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #f5f5f7; --text-2: rgba(235,235,245,0.60); --text-3: rgba(235,235,245,0.28);
+      --sep: rgba(235,235,245,0.15); --accent: #0a84ff;
+      --bg-window: #1e1e1e; --bg-content: #1c1c1e; --bg-sidebar: rgba(40,40,42,0.72);
+      --glass: rgba(58,58,60,0.62); --amber: #ff9f0a; --amber-bg: rgba(255,159,10,0.18);
+      --green: #30d158; --red: #ff453a;
+    }
+    body { background: #101012 !important; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 32px 80px;
+    font: var(--t-body)/1.38 -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--text);
+    background: #e8e8ec;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 26px; line-height: 32px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.4px; }
+  .lede { color: var(--text-2); font-size: var(--t-body); margin: 0 0 8px; max-width: 62ch; }
+  .rule-note {
+    font-size: var(--t-sub); color: var(--text-2); background: rgba(0,113,227,0.07);
+    border-left: 2px solid var(--accent); padding: 8px 11px; margin: 14px 0 0; border-radius: 0 5px 5px 0;
+    max-width: 78ch;
+  }
+  .rule-note code { font: var(--t-caption)/1.4 "SF Mono", ui-monospace, monospace; }
+  h2 {
+    font-size: var(--t-title2); font-weight: 700; margin: 52px 0 4px;
+    letter-spacing: -0.2px; padding-top: 20px; border-top: 1px solid var(--sep);
+  }
+  h2 .num { color: var(--text-3); font-weight: 400; margin-right: 8px; }
+  .why { color: var(--text-2); font-size: var(--t-callout); margin: 0 0 18px; max-width: 76ch; }
+
+  /* ---- window chrome ---- */
+  .win {
+    background: var(--bg-window); border-radius: var(--radius-win);
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.16), 0 14px 40px rgba(0,0,0,0.20);
+    overflow: hidden;
+  }
+  .titlebar {
+    height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    background: var(--glass); backdrop-filter: blur(28px) saturate(180%);
+    border-bottom: 0.5px solid var(--sep);
+  }
+  .lights { display: flex; gap: 8px; margin-right: 6px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .l1 { background: #ff5f57; } .l2 { background: #febc2e; } .l3 { background: #28c840; }
+  .tb-title { font-size: var(--t-body); font-weight: 600; }
+  .tb-sub { font-size: var(--t-sub); color: var(--text-2); }
+  .tb-spacer { flex: 1; }
+  .tbtn {
+    height: 28px; min-width: 28px; padding: 0 10px; border-radius: var(--radius-ctl);
+    border: 0.5px solid var(--sep); background: rgba(255,255,255,0.55);
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--t-callout); color: var(--text); cursor: default;
+  }
+  @media (prefers-color-scheme: dark) { .tbtn { background: rgba(255,255,255,0.09); } }
+  .tbtn.primary { background: var(--accent); color: #fff; border-color: transparent; font-weight: 500; }
+  .tbtn.amber { color: var(--amber); border-color: rgba(255,159,10,0.4); background: var(--amber-bg); }
+  .glyph { font-size: 13px; opacity: 0.85; }
+
+  /* ---- 3-column split ---- */
+  .split { display: grid; grid-template-columns: 216px 1px 292px 1px 1fr; min-height: 560px; }
+  .sidebar { background: var(--bg-sidebar); backdrop-filter: blur(28px); padding: 10px 8px; }
+  .divider { background: var(--sep); }
+  .sb-group { font-size: var(--t-sub); font-weight: 600; color: var(--text-2); padding: 12px 8px 4px; }
+  .sb-row {
+    display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px;
+    border-radius: var(--radius-ctl); font-size: var(--t-body); color: var(--text);
+  }
+  .sb-row.sel { background: var(--accent); color: #fff; }
+  .sb-row.sel .sb-count { color: rgba(255,255,255,0.75); }
+  .sb-row .g { width: 17px; text-align: center; opacity: 0.9; }
+  .sb-count { margin-left: auto; font-size: var(--t-sub); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .list { background: var(--bg-content); overflow: hidden; }
+  .list-hdr {
+    height: 34px; display: flex; align-items: center; padding: 0 12px; gap: 8px;
+    border-bottom: 0.5px solid var(--sep); font-size: var(--t-sub); color: var(--text-2);
+  }
+  .search {
+    height: 24px; flex: 1; border-radius: 5px; border: 0.5px solid var(--sep);
+    background: rgba(0,0,0,0.035); display: flex; align-items: center; gap: 6px; padding: 0 8px;
+    font-size: var(--t-callout); color: var(--text-3);
+  }
+  @media (prefers-color-scheme: dark) { .search { background: rgba(255,255,255,0.07); } }
+  .item { padding: 9px 12px; border-bottom: 0.5px solid var(--sep); }
+  .item.sel { background: var(--accent); }
+  .item.sel .i-t, .item.sel .i-m, .item.sel .i-s { color: #fff; }
+  .item.sel .i-m { color: rgba(255,255,255,0.78); }
+  .item.sel .badge { background: rgba(255,255,255,0.24); color: #fff; }
+  .i-t { font-size: var(--t-body); font-weight: 600; margin-bottom: 2px; }
+  .i-m { font-size: var(--t-sub); color: var(--text-2); display: flex; gap: 7px; align-items: center; }
+  .i-s { font-size: var(--t-callout); color: var(--text-2); margin-top: 3px; line-height: 1.34;
+         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .badge {
+    font-size: var(--t-caption); padding: 1px 5px; border-radius: 4px; font-weight: 600;
+    letter-spacing: 0.1px; white-space: nowrap;
+  }
+  .b-amber { background: var(--amber-bg); color: var(--amber); }
+  .b-grey  { background: rgba(120,120,128,0.16); color: var(--text-2); }
+  .b-green { background: rgba(48,209,88,0.16); color: var(--green); }
+  .b-live  { background: var(--red); color: #fff; }
+
+  .detail { background: var(--bg-content); display: grid; grid-template-columns: 1fr 268px; }
+  .canvas { padding: 0 0 24px; overflow: hidden; }
+  .canvas-hdr { padding: 16px 22px 12px; border-bottom: 0.5px solid var(--sep); }
+  .c-title { font-size: var(--t-title3); font-weight: 700; letter-spacing: -0.1px; }
+  .c-meta { font-size: var(--t-sub); color: var(--text-2); margin-top: 3px; }
+  .warn {
+    margin: 14px 22px 0; padding: 9px 11px; border-radius: 7px;
+    background: var(--amber-bg); border: 0.5px solid rgba(255,159,10,0.34);
+    font-size: var(--t-callout); color: var(--text); display: flex; gap: 9px; align-items: flex-start;
+  }
+  .warn b { color: var(--amber); }
+  .turn { padding: 12px 22px 0; }
+  .spk { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .spk-n { font-size: var(--t-callout); font-weight: 700; letter-spacing: 0.2px; }
+  .s0 { color: #0071e3; } .s1 { color: #8944ab; } .sU { color: var(--text-2); } .sO { color: var(--green); }
+  .ts { font-size: var(--t-caption); color: var(--text-3); font-variant-numeric: tabular-nums; cursor: default; }
+  .line { font-size: var(--t-body); display: flex; gap: 9px; padding: 1px 0; }
+  .line .ts { padding-top: 2px; min-width: 34px; }
+  .line.q { background: rgba(0,113,227,0.10); border-radius: 4px; margin: 1px -5px; padding: 1px 5px; }
+  .fold {
+    margin: 8px 22px 0; font-size: var(--t-sub); color: var(--text-2);
+    background: rgba(120,120,128,0.09); border-radius: 6px; padding: 5px 9px; display: inline-block;
+  }
+  .rename-chip {
+    font-size: var(--t-caption); border: 0.5px dashed var(--text-3); border-radius: 4px;
+    padding: 0 4px; color: var(--text-2); margin-left: 2px;
+  }
+
+  .inspector { border-left: 0.5px solid var(--sep); background: var(--bg-sidebar); backdrop-filter: blur(28px); padding: 16px 16px 24px; }
+  .insp-h { font-size: var(--t-sub); font-weight: 700; color: var(--text-2); letter-spacing: 0.3px; margin: 0 0 7px; text-transform: uppercase; }
+  .insp-b { font-size: var(--t-callout); line-height: 1.45; margin: 0 0 18px; }
+  .insp-b li { margin-bottom: 5px; }
+  ul { padding-left: 16px; margin: 0; }
+  .none { color: var(--text-2); font-style: italic; }
+  .prov { font-size: var(--t-caption); color: var(--accent); }
+
+  /* ---- menu bar popover ---- */
+  .menubar {
+    height: 24px; background: var(--glass); backdrop-filter: blur(28px);
+    border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: flex-end;
+    gap: 14px; padding: 0 12px; font-size: var(--t-caption); color: var(--text-2);
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.14);
+  }
+  .mb-item { display: flex; align-items: center; gap: 4px; }
+  .mb-item.active { color: var(--red); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .popover {
+    width: 300px; background: var(--glass); backdrop-filter: blur(40px) saturate(180%);
+    border-radius: 10px; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.16), 0 12px 32px rgba(0,0,0,0.22);
+    padding: 8px; margin-top: 6px;
+  }
+  .pop-row {
+    display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 8px;
+    border-radius: var(--radius-ctl); font-size: var(--t-body);
+  }
+  .pop-row.hi { background: rgba(0,0,0,0.055); }
+  @media (prefers-color-scheme: dark) { .pop-row.hi { background: rgba(255,255,255,0.09); } }
+  .pop-sep { height: 0.5px; background: var(--sep); margin: 6px 8px; }
+  .kbd { margin-left: auto; font-size: var(--t-caption); color: var(--text-3); }
+  .meter-row { padding: 5px 8px 3px; }
+  .meter-lab { display: flex; justify-content: space-between; font-size: var(--t-caption); color: var(--text-2); margin-bottom: 3px; }
+  .meter { height: 4px; border-radius: 2px; background: rgba(120,120,128,0.22); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 2px; }
+  .m-ok { background: var(--green); } .m-dead { background: var(--red); }
+  .bar { height: 4px; border-radius: 2px; background: rgba(120,120,128,0.22); overflow: hidden; margin-top: 5px; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+  .cap { font-size: var(--t-sub); color: var(--text-2); margin: 9px 0 0; }
+  .cap b { color: var(--text); font-weight: 600; }
+  .state-legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 12px 0 0; }
+  .sl { display: flex; align-items: center; gap: 7px; font-size: var(--t-sub); }
+  .sl .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .settings-body { display: grid; grid-template-columns: 168px 1px 1fr; min-height: 340px; }
+  .form-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
+  .form-lab { width: 168px; text-align: right; font-size: var(--t-body); color: var(--text); }
+  .ctl {
+    height: 22px; border-radius: 5px; border: 0.5px solid var(--sep);
+    background: rgba(255,255,255,0.6); font-size: var(--t-callout); padding: 0 8px;
+    display: inline-flex; align-items: center; gap: 6px; color: var(--text);
+  }
+  @media (prefers-color-scheme: dark) { .ctl { background: rgba(255,255,255,0.09); } }
+  .hint { font-size: var(--t-sub); color: var(--text-2); margin-left: 180px; margin-top: -2px; margin-bottom: 8px; max-width: 46ch; }
+  .toggle { width: 34px; height: 20px; border-radius: 10px; background: var(--green); position: relative; }
+  .toggle i { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: rgba(120,120,128,0.32); }
+  .toggle.off i { left: 2px; right: auto; }
+  .empty { padding: 70px 40px; text-align: center; }
+  .empty .g { font-size: 34px; opacity: 0.22; }
+  .empty h3 { font-size: var(--t-title3); margin: 12px 0 5px; }
+  .empty p { font-size: var(--t-callout); color: var(--text-2); margin: 0 auto; max-width: 40ch; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>MeetingScribe — maquette d'interface</h1>
+<p class="lede">Quatre surfaces, avec le contenu réel de ta réunion du 27 juillet (17:30, FR/EN, 3 locuteurs). Les tailles de texte et de contrôles suivent les valeurs publiées par Apple pour macOS : corps 13&nbsp;pt, sous-titre 11&nbsp;pt, légende 10&nbsp;pt, contrôles 28&nbsp;pt de haut, barre de menus 24&nbsp;pt, séparateur de split view 1&nbsp;pt.</p>
+<p class="rule-note"><b>Pourquoi une fenêtre existe désormais.</b> HIG, <i>The menu bar</i> : « <i>Avoid relying on the presence of menu bar extras</i> » — le système les masque et les réaffiche, et tu ne peux pas prédire leur position. Et « <i>Avoid making a dynamic menu item the only way to accomplish a task</i> ». Aujourd'hui le menu est la <em>seule</em> interface : c'est la violation à corriger d'abord.</p>
+
+<!-- ===================== 1. LIBRARY ===================== -->
+<h2><span class="num">1</span>Bibliothèque — la fenêtre principale</h2>
+<p class="why">Trois colonnes : <code>NavigationSplitView</code>. La sidebar reste à deux niveaux, comme l'exige la HIG ; la colonne du milieu est la « content list » qu'Apple prescrit dès qu'on dépasse deux niveaux. Le verre porte la sidebar et la toolbar — <b>jamais</b> le transcript, qui est du contenu.</p>
+
+<div class="win">
+  <div class="titlebar">
+    <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+    <div>
+      <div class="tb-title">Réunions</div>
+      <div class="tb-sub">42 réunions · 18 h 12 min</div>
+    </div>
+    <div class="tb-spacer"></div>
+    <span class="tbtn amber"><span class="glyph">◑</span> 1 en transcription</span>
+    <span class="tbtn"><span class="glyph">⇄</span> Enrôler une voix</span>
+    <span class="tbtn primary"><span class="glyph">●</span> Enregistrer</span>
+  </div>
+
+  <div class="split">
+    <div class="sidebar">
+      <div class="sb-group">Bibliothèque</div>
+      <div class="sb-row sel"><span class="g">◳</span> Toutes les réunions <span class="sb-count">42</span></div>
+      <div class="sb-row"><span class="g">☆</span> Avec actions <span class="sb-count">11</span></div>
+      <div class="sb-row"><span class="g">⚑</span> Claims non ancrés <span class="sb-count">3</span></div>
+      <div class="sb-row"><span class="g">⊘</span> Non indexées <span class="sb-count">2</span></div>
+      <div class="sb-group">Personnes</div>
+      <div class="sb-row"><span class="g">◉</span> Sam <span class="sb-count">14</span></div>
+      <div class="sb-row"><span class="g">◉</span> Idris <span class="sb-count">9</span></div>
+      <div class="sb-row"><span class="g">＋</span> Enrôler…</div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="list">
+      <div class="list-hdr">
+        <div class="search"><span class="glyph">⌕</span> Rechercher dans les réunions…</div>
+      </div>
+      <div class="item sel">
+        <div class="i-t">Project technical review</div>
+        <div class="i-m">27 juil. 15:36 · 17:30 · 3 voix <span class="badge b-amber">1 non ancré</span></div>
+        <div class="i-s">Discussion technique : HTML, architecture, sécurité JWT, évaluation et tests.</div>
+      </div>
+      <div class="item">
+        <div class="i-t">Point hebdo produit</div>
+        <div class="i-m">27 juil. 15:31 · 4:02 · 2 voix</div>
+        <div class="i-s">Aucun résumé — enregistrement conservé, retranscription possible.</div>
+      </div>
+      <div class="item">
+        <div class="i-t">Sans titre</div>
+        <div class="i-m">27 juil. 13:52 · 0:34 <span class="badge b-grey">piste système muette</span></div>
+        <div class="i-s">Aucune voix détectée sur la piste d'appel.</div>
+      </div>
+      <div class="item">
+        <div class="i-t">Revue trimestrielle</div>
+        <div class="i-m">24 juil. 10:05 · 32:11 · 4 voix <span class="badge b-green">5 actions</span></div>
+        <div class="i-s">Décisions sur le périmètre du T3 et la reprise du backlog de migration.</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="detail">
+      <div class="canvas">
+        <div class="canvas-hdr">
+          <div class="c-title">Project technical review</div>
+          <div class="c-meta">27 juillet 2026, 15:36 · 17:30 · français / anglais · SPEAKER_00, SPEAKER_01, Unknown</div>
+        </div>
+
+        <div class="warn">
+          <span>⚑</span>
+          <div><b>6 des 7 points clés sont ancrés dans le transcript.</b> Le 7ᵉ — « documentation d'évaluation » — n'a aucun terme rare retrouvable. Clique un point clé pour sauter à sa preuve.</div>
+        </div>
+
+        <div class="turn">
+          <div class="spk"><span class="spk-n s1">SPEAKER_01</span><span class="rename-chip">renommer</span><span class="ts">05:09</span></div>
+          <div class="line"><span class="ts">05:09</span><span>Et sur la partie architecture, du coup, là, maintenant, j'entends une image de cœur qui se déploie sur la Lambda.</span></div>
+          <div class="line q"><span class="ts">05:28</span><span>Et devant, par la partie sécurité, c'est toujours le JWT, c'est ça ?</span></div>
+          <div class="line"><span class="ts">05:37</span><span>Et du coup, l'agent, quand il appelle le tool, il envoie le token GWT de l'utilisateur et après, ça exploite les mots-clés, genre le projet et la molécule.</span></div>
+        </div>
+
+        <div class="fold">▸ 4 interventions courtes masquées — « Ok », « Merci », « Mm-hmm »</div>
+        <p class="rule-note" style="margin:12px 22px 0;font-size:var(--t-caption)"><b>Piège de lecture, mesuré.</b> Dans <code>transcript.md</code>, la première réplique après chaque changement de locuteur n'a <em>pas</em> de <code>[mm:ss]</code> à elle : 52 lignes horodatées + 22 en-têtes = <b>74 répliques</b>. Un parseur naïf en perd 22 — dont « Lambda » (05:09) et « Gary » (08:30), soit les deux affirmations les plus utiles à vérifier. Cause : <code>output/markdown.py:34</code>. La fenêtre doit lire un JSON structuré, ou traiter la ligne suivant l'en-tête comme datée par lui.</p>
+
+        <div class="turn">
+          <div class="spk"><span class="spk-n s1">SPEAKER_01</span><span class="ts">08:30</span></div>
+          <div class="line"><span class="ts">08:30</span><span>Le bug qu'avait Gary, tu m'as dit qu'il faut voir avec lui si ça a été fixé ou pas demain, c'est ça ?</span></div>
+        </div>
+      </div>
+
+      <div class="inspector">
+        <p class="insp-h">Résumé</p>
+        <p class="insp-b">Discussion des aspects techniques du projet : HTML, architecture, sécurité, évaluation et processus de test.</p>
+
+        <p class="insp-h">Points clés</p>
+        <div class="insp-b"><ul>
+          <li>Partage d'un fichier HTML sur Zoom.</li>
+          <li>Architecture : image déployée sur <b>Lambda</b>, sécurité par <b>JWT</b>. <span class="prov">05:09 · 05:28 ↗</span></li>
+          <li>L'agent transmet le token <b>GWT</b> de l'utilisateur au tool. <span class="prov">05:37 · 16:06 ↗</span></li>
+          <li>Bug de <b>Gary</b> — à confirmer demain. <span class="prov">08:30 ↗</span></li>
+          <li>Documentation d'évaluation. <span class="badge b-amber">non ancré</span></li>
+        </ul></div>
+
+        <p class="insp-h">Actions</p>
+        <p class="insp-b none">Aucune mentionnée.</p>
+
+        <p class="insp-h">Pistes audio</p>
+        <div class="insp-b">
+          <div style="display:flex;justify-content:space-between"><span>system.wav</span><span style="color:var(--green)">17:30 ✓</span></div>
+          <div style="display:flex;justify-content:space-between"><span>mic.wav</span><span style="color:var(--green)">17:30 ✓</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap"><b>Ce que ça règle.</b> Chaque point clé porte les timestamps où ses termes rares apparaissent : Lambda→05:09, GWT→05:37, Gary→08:30. Un clic saute à la preuve. « Aucune mentionnée » est affiché tel quel : c'est le garde anti-hallucination, pas un vide. Les interventions courtes se replient — 15 des 74 répliques de ce call font 3 mots ou moins. « Non indexées » rend visibles les réunions que la recherche saute en silence.</p>
+<p class="rule-note"><b>Pourquoi l'ancrage et non un avertissement « invention détectée ».</b> Mesuré sur cette réunion : <code>find_ungrounded_names</code> signale <code>['Concerns', 'Discussion', 'Evaluation']</code> — <b>3 faux positifs, 0 vrai positif</b> (« Gary » <em>est</em> dans le transcript). Et la vérification par sous-chaîne ne peut pas fonctionner ici : le résumé est en anglais, le transcript en français — <b>0 des 7 points</b> se vérifie ainsi. L'ancrage par termes rares, lui, retrouve <b>6 des 7</b>. Afficher un badge « invention » aurait crié au loup trois fois sans rien attraper, et t'aurait appris à l'ignorer.</p>
+
+<!-- ===================== 2. MENU BAR ===================== -->
+<h2><span class="num">2</span>Pendant l'appel — le menu, sans fenêtre</h2>
+<p class="why">Neuf des dix-sept histoires bloquantes se déclenchent <em>pendant</em> un appel, souvent écran partagé. Là, ouvrir une fenêtre est inutile ou nuisible : tout doit se lire en une seconde depuis la barre de menus.</p>
+
+<div class="pair">
+  <div>
+    <div class="menubar">
+      <span class="mb-item">◔ 74%</span>
+      <span class="mb-item">⌘</span>
+      <span class="mb-item active">● 12:04</span>
+      <span class="mb-item">20:16</span>
+    </div>
+    <div class="popover">
+      <div class="pop-row hi"><span class="glyph" style="color:var(--red)">●</span> <b>Arrêter l'enregistrement</b> <span class="kbd">12:04</span></div>
+      <div class="meter-row">
+        <div class="meter-lab"><span>Toi — mic.wav</span><span>−18 dB</span></div>
+        <div class="meter"><i class="m-ok" style="width:42%"></i></div>
+      </div>
+      <div class="meter-row">
+        <div class="meter-lab"><span>Appel — system.wav</span><span>−12 dB</span></div>
+        <div class="meter"><i class="m-ok" style="width:64%"></i></div>
+      </div>
+      <div class="pop-sep"></div>
+      <div class="pop-row"><span class="glyph" style="color:var(--green)">✓</span> Micro coupé — <b>vérifié</b> <span class="kbd">⌘⇧M</span></div>
+      <div class="pop-row" style="font-size:var(--t-sub);color:var(--text-2);height:auto;padding-bottom:5px">AirPods Max — relecture confirmée</div>
+      <div class="pop-sep"></div>
+      <div class="pop-row"><span class="glyph">◳</span> Ouvrir MeetingScribe <span class="kbd">⌘0</span></div>
+      <div class="pop-row"><span class="glyph">⚙</span> Réglages… <span class="kbd">⌘,</span></div>
+    </div>
+    <p class="cap"><b>Nominal.</b> Le chrono vit dans la barre : plus besoin d'ouvrir quoi que ce soit pour savoir si ça enregistre. Les deux vumètres sont alimentés par le calcul de crête qui existe déjà dans <code>AudioLevels.swift</code> — un fichier qui n'a aujourd'hui aucune référence dans l'app.</p>
+  </div>
+
+  <div>
+    <div class="menubar">
+      <span class="mb-item">◔ 74%</span>
+      <span class="mb-item">⌘</span>
+      <span class="mb-item" style="color:var(--amber);font-weight:700">⚠ 12:04</span>
+      <span class="mb-item">20:16</span>
+    </div>
+    <div class="popover">
+      <div class="pop-row hi"><span class="glyph" style="color:var(--red)">●</span> <b>Arrêter l'enregistrement</b> <span class="kbd">12:04</span></div>
+      <div class="meter-row">
+        <div class="meter-lab"><span>Toi — mic.wav</span><span>−18 dB</span></div>
+        <div class="meter"><i class="m-ok" style="width:42%"></i></div>
+      </div>
+      <div class="meter-row">
+        <div class="meter-lab"><span style="color:var(--red)">Appel — aucun son depuis 8 s</span><span style="color:var(--red)">—</span></div>
+        <div class="meter"><i class="m-dead" style="width:2%"></i></div>
+      </div>
+      <div class="warn" style="margin:8px 4px 0">
+        <span>⚠</span>
+        <div>Aucune voix captée sur la piste d'appel. Vérifie que l'app de visio joue bien du son sur cette sortie.</div>
+      </div>
+      <div class="pop-sep"></div>
+      <div class="pop-row"><span class="glyph" style="color:var(--amber)">⚠</span> Coupure <b>non vérifiée</b> <span class="kbd">⌘⇧M</span></div>
+      <div class="pop-row" style="font-size:var(--t-sub);color:var(--amber);height:auto;padding-bottom:5px">Seul l'enregistrement est muet. L'appel t'entend peut-être encore — coupe aussi dans Zoom.</div>
+    </div>
+    <p class="cap"><b>Les deux pannes qui coûtent cher.</b> À gauche l'appel silencieux, détecté à la 8ᵉ seconde plutôt qu'après coup. À droite le mute non vérifié : aujourd'hui l'icône passe à <code>mic.slash</code> même quand le matériel a refusé — l'app affirme « muet » alors que Zoom t'entend.</p>
+  </div>
+</div>
+
+<div class="state-legend">
+  <div class="sl"><span class="dot" style="background:var(--text-2)"></span> repos</div>
+  <div class="sl"><span class="dot" style="background:var(--red)"></span> enregistre + chrono</div>
+  <div class="sl"><span class="dot" style="background:var(--green)"></span> coupure vérifiée</div>
+  <div class="sl"><span class="dot" style="background:var(--amber)"></span> coupure non vérifiée</div>
+  <div class="sl"><span class="dot" style="background:var(--accent)"></span> transcription en cours</div>
+</div>
+<p class="cap">Cinq états distincts contre deux aujourd'hui (<code>mic.slash</code> ou <code>waveform</code>). L'ambre est le seul ajout qui empêche l'app de mentir sur le mute.</p>
+
+<!-- ===================== 3. PROCESSING ===================== -->
+<h2><span class="num">3</span>Après l'arrêt — la transcription ne bloque plus rien</h2>
+<p class="why">HIG, <i>Progress indicators</i> : « <i>When possible, use a determinate progress indicator</i> », « <i>Keep progress indicators moving</i> » — un indicateur immobile se lit comme une app gelée — et « <i>Avoid vague terms like loading</i> ». Aujourd'hui l'app affiche une ligne sans échelle, et <em>surtout</em> elle n'offre plus de bouton Enregistrer : ton call suivant est perdu.</p>
+
+<div class="pair">
+  <div>
+    <div class="popover" style="margin-top:0">
+      <div class="pop-row hi"><span class="glyph" style="color:var(--red)">●</span> <b>Enregistrer</b> <span class="kbd">⌘⇧R</span></div>
+      <div class="pop-row" style="font-size:var(--t-sub);color:var(--text-2);height:auto;padding-bottom:6px">Prêt — la transcription tourne en tâche de fond</div>
+      <div class="pop-sep"></div>
+      <div style="padding:4px 8px 8px">
+        <div style="display:flex;justify-content:space-between;font-size:var(--t-callout)">
+          <span>Project technical review</span><span style="color:var(--text-2);font-variant-numeric:tabular-nums">4:12 / 17:30</span>
+        </div>
+        <div class="bar"><i style="width:24%"></i></div>
+        <div style="font-size:var(--t-sub);color:var(--text-2);margin-top:4px">Transcription — environ 6 min restantes</div>
+      </div>
+      <div class="pop-sep"></div>
+      <div class="pop-row"><span class="glyph" style="color:var(--green)">✓</span> Enregistré — 17:30, 2 pistes</div>
+    </div>
+    <p class="cap"><b>Ce que ça règle.</b> Le bouton Enregistrer survit à la transcription : deux appels d'affilée deviennent possibles. Le pipeline émet déjà ces fractions en NDJSON — l'app n'en montrait qu'une ligne. Et « Enregistré, 2 pistes » te confirme en une ligne qu'il y a bien du son des deux côtés, avant que tu partes.</p>
+  </div>
+
+  <div>
+    <div class="win">
+      <div class="titlebar" style="height:44px">
+        <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+        <div class="tb-title">Bienvenue</div>
+      </div>
+      <div class="empty">
+        <div class="g">◳</div>
+        <h3>Aucune réunion pour l'instant</h3>
+        <p>Deux autorisations restent à accorder avant le premier enregistrement.</p>
+        <div style="margin-top:18px;display:inline-flex;flex-direction:column;gap:7px;text-align:left">
+          <div style="display:flex;align-items:center;gap:9px;font-size:var(--t-callout)">
+            <span style="color:var(--green)">✓</span> Enregistrement audio du système
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:var(--t-callout)">
+            <span style="color:var(--amber)">⚠</span> Microphone <span class="tbtn" style="height:22px">Autoriser…</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:var(--t-callout)">
+            <span style="color:var(--amber)">⚠</span> Jeton HuggingFace <span class="tbtn" style="height:22px">Réglages…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap"><b>L'état vide honnête.</b> Aujourd'hui une permission manquante échoue <em>au moment d'enregistrer</em> — donc au pire moment. Ici l'app dit ce qui manque avant, avec le bouton qui le corrige.</p>
+  </div>
+</div>
+
+<!-- ===================== 4. SETTINGS ===================== -->
+<h2><span class="num">4</span>Réglages — ce qui n'existe qu'en TOML aujourd'hui</h2>
+<p class="why">La fenêtre de réglages actuelle fait 36 lignes de code et contient <em>un seul champ</em> : le jeton. Tout le reste — micro, arrêt automatique, diarisation, modèle, langue — n'existe que dans un fichier TOML édité à la main. Motif : la scène <code>Settings</code>, labels alignés à droite, comme les Réglages Système.</p>
+
+<div class="win">
+  <div class="titlebar" style="height:44px">
+    <div class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></div>
+    <div class="tb-title">Réglages</div>
+    <div class="tb-spacer"></div>
+    <span class="tbtn">Général</span>
+    <span class="tbtn primary">Enregistrement</span>
+    <span class="tbtn">Transcription</span>
+    <span class="tbtn">Voix</span>
+  </div>
+  <div style="padding:22px 26px 26px;background:var(--bg-content)">
+    <div class="form-row"><span class="form-lab">Enregistrer ma voix</span><span class="toggle"><i></i></span></div>
+    <p class="hint">Piste séparée (<code>mic.wav</code>), étiquetée « Owner », jamais soumise à la diarisation. Sans elle, l'app enregistre tout le monde sauf toi.</p>
+
+    <div class="form-row"><span class="form-lab">Microphone</span><span class="ctl">AirPods Max — Yanis ▾</span></div>
+
+    <div class="form-row"><span class="form-lab">Arrêt sur silence</span><span class="ctl">après 5 min ▾</span></div>
+    <p class="hint">Un avertissement s'affiche 1 minute avant, avec « Continuer l'enregistrement ».</p>
+
+    <div class="form-row"><span class="form-lab">Annulation d'écho</span><span class="ctl">désactivée ▾</span></div>
+    <p class="hint">À activer si tu es sur haut-parleurs : l'audio de l'appel revient sinon dans ta piste micro.</p>
+
+    <div class="form-row"><span class="form-lab">Séparation des locuteurs</span><span class="toggle"><i></i></span></div>
+    <p class="hint">Nécessite un jeton HuggingFace et l'acceptation de la licence du modèle. Actif — jeton présent dans le Trousseau.</p>
+
+    <div class="form-row"><span class="form-lab">Langue</span><span class="ctl">détection automatique ▾</span></div>
+    <p class="hint">Le français et l'anglais alternent dans tes appels ; la détection automatique verrouille la langue sur les 30 premières secondes.</p>
+  </div>
+</div>
+<p class="cap"><b>Ce que ça règle.</b> Le réglage « Enregistrer ma voix » est celui dont on vient de corriger le câblage : il existait, était inatteignable, et une valeur explicite <code>false</code> était ignorée. Il devient un interrupteur, avec la conséquence écrite en clair.</p>
+
+<p class="rule-note" style="margin-top:40px">
+<b>Ce que la maquette refuse volontairement.</b> Pas de lecteur audio avec forme d'onde (l'audio est conservé, mais le besoin réel est de <em>vérifier une citation</em>, ce que le timestamp cliquable suffit à couvrir) · pas d'édition libre du transcript (seul le renommage de locuteur a une valeur démontrée, et il doit survivre à une retranscription) · pas de tableau de bord ni de statistiques · pas de verre sur le contenu, conformément à la HIG. Ajouter tout ça produirait une app riche, pas une app Apple.
+</p>
+
+</div>
+</body>
+</html>
