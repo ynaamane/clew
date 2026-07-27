@@ -72,19 +72,43 @@ fi
 
 echo
 echo "Installing to $INSTALL_DIR..."
-if pgrep -f "$INSTALL_DIR/Contents/MacOS/" >/dev/null 2>&1; then
-  echo "Quitting the running instance first..."
-  pkill -f "$INSTALL_DIR/Contents/MacOS/" || true
-  sleep 1
+
+BUILT_BIN="$APP_DIR/Contents/MacOS/OwnscribeMenuBar"
+if [ ! -f "$BUILT_BIN" ] || [ ! -x "$BUILT_BIN" ]; then
+  echo "Error: built binary not found or not executable: $BUILT_BIN" >&2
+  exit 2
 fi
+
+MENUBAR_BIN="$INSTALL_DIR/Contents/MacOS/OwnscribeMenuBar"
+if pgrep -f "$MENUBAR_BIN" >/dev/null 2>&1; then
+  echo "Quitting the running instance first..."
+  pkill -f "$MENUBAR_BIN" || true
+  for i in {1..10}; do
+    if ! pgrep -f "$MENUBAR_BIN"; then
+      break
+    fi
+    sleep 0.2
+  done
+  if pgrep -fq "$MENUBAR_BIN"; then
+    echo "Warning: installed app still running after 2s" >&2
+  fi
+fi
+
 rm -rf "$INSTALL_DIR"
 cp -R "$APP_DIR" /Applications/
 codesign --verify --deep --strict "$INSTALL_DIR"
 
-INSTALLED_BIN=$(find "$INSTALL_DIR/Contents/MacOS" -type f -perm +111 -name '*MenuBar*' | head -1)
-BUILT_BIN=$(find "$APP_DIR/Contents/MacOS" -type f -perm +111 -name '*MenuBar*' | head -1)
+INSTALLED_BIN="$INSTALL_DIR/Contents/MacOS/OwnscribeMenuBar"
+if [ ! -f "$INSTALLED_BIN" ] || [ ! -x "$INSTALLED_BIN" ]; then
+  echo "Error: installed binary not found after copy: $INSTALLED_BIN" >&2
+  echo "The app was installed to $INSTALL_DIR but the binary is missing." >&2
+  exit 2
+fi
+
 if ! cmp -s "$INSTALLED_BIN" "$BUILT_BIN"; then
-  echo "Error: the installed binary differs from the one just built." >&2
+  echo "Error: installed binary content differs from built binary." >&2
+  echo "The app is installed at $INSTALL_DIR but may be stale." >&2
+  echo "Do NOT launch from $APP_DIR — use: open \"$INSTALL_DIR\"" >&2
   exit 1
 fi
 
