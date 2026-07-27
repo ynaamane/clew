@@ -8,23 +8,26 @@
 
 None. BUG0/1/2/3 + all review findings closed and independently audited.
 
-## YOUR TURN — 3 steps, nothing else blocks
+## YOUR TURN — 2 steps left (step 1 is DONE)
 
-### 1. Build the app (one time, ~2 min)
+### 1. Build the app — DONE 2026-07-27
+
+Cert `MeetingScribeDev` created (`C722A95A6314533F47284B33AD4A0B1D7876B1AC`) and `dist/MeetingScribe.app` built + signed.
+Verified: `codesign --verify --deep --strict` → "satisfies its Designated Requirement"; entitlement `device.audio-input` present; `LSUIElement`/`NSAudioCaptureUsageDescription`/`NSMicrophoneUsageDescription` all in `Contents/Info.plist`; the BUG0 fix confirmed in-binary (`strings Contents/MacOS/ownscribe-audio | grep NSAudioCaptureUsageDescription` → hit, and the helper is signed as `com.ownscribe.audio`).
+
+⚠️ **Never delete the cert** — a recreated cert = new identity = macOS resets every permission grant. See BUILD.md.
+
+To launch:
 
 ```bash
-cd ~/meeting-scribe
-bash scripts/setup-codesign-identity.sh   # creates the MeetingScribeDev cert in your login keychain
-bash swift/build-app.sh                   # → dist/MeetingScribe.app
-open dist/MeetingScribe.app               # launch via LaunchServices, NOT the inner binary
+open ~/meeting-scribe/dist/MeetingScribe.app   # via LaunchServices, NOT the inner binary
 ```
 
-⚠️ **Never delete the cert** once created — a recreated cert = new identity = macOS resets every permission grant. See BUILD.md.
-Status: cert not created yet, `dist/MeetingScribe.app` not built yet.
+Note: the app drives `~/meeting-scribe/.venv/bin/ownscribe` (present + executable), not a bundled Python — by design for v1. `OWNSCRIBE_BIN` / `OWNSCRIBE_REPO_ROOT` override it.
 
 ### 2. Hardware pass — `APP_TEST.md`
 
-The checks that structurally cannot run without your machine:
+The checks that structurally cannot run without your machine (GUI prompts, real devices, key injection):
 
 - [ ] First launch: permission prompts appear (System Audio Recording + Microphone), grant both
 - [ ] Grants SURVIVE a rebuild (re-run build-app.sh → permissions still there; this is what the stable cert is for)
