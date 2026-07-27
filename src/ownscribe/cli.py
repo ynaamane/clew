@@ -83,7 +83,11 @@ def cli(
     Run without a subcommand to record, transcribe, and summarize a meeting.
     """
     ctx.ensure_object(dict)
-    config = Config.load()
+    try:
+        config = Config.load()
+    except ValueError as e:
+        hint = f"Fix it in {CONFIG_DIR}/config.toml, or unset the key to use the default."
+        raise click.ClickException(f"{e}\n{hint}") from e
 
     # Apply CLI overrides
     if device is not None:

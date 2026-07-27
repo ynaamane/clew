@@ -428,3 +428,26 @@ class TestCleanup:
 
         assert result.exit_code == 0
         assert "not found, skipping" in result.output
+
+
+class TestInvalidConfigReporting:
+    def test_invalid_config_reports_the_problem_without_a_traceback(self):
+        runner = CliRunner()
+        with mock.patch(
+            "ownscribe.cli.Config.load",
+            side_effect=ValueError("cpu_threads must be a positive integer, got 'not_a_number'"),
+        ):
+            result = runner.invoke(cli, ["apps"])
+
+        assert result.exit_code != 0
+        assert "Traceback" not in result.output
+        assert "cpu_threads must be a positive integer" in result.output
+        assert "config.toml" in result.output
+
+    def test_invalid_config_does_not_leak_the_exception_type(self):
+        runner = CliRunner()
+        with mock.patch("ownscribe.cli.Config.load", side_effect=ValueError("bad value")):
+            result = runner.invoke(cli, ["apps"])
+
+        assert "ValueError" not in result.output
+        assert result.exception is None or not isinstance(result.exception, ValueError)
