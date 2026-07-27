@@ -1,13 +1,14 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
     name: "ownscribe-audio",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     targets: [
         .target(
             name: "OwnscribeCapture",
             path: "Sources/OwnscribeCapture",
+            swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AudioToolbox"),
@@ -18,6 +19,7 @@ let package = Package(
             dependencies: ["OwnscribeCapture"],
             path: "Sources",
             exclude: ["OwnscribeCapture", "OwnscribeMenuBar"],
+            swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AudioToolbox"),
@@ -32,15 +34,18 @@ let package = Package(
         .executableTarget(
             name: "OwnscribeMenuBar",
             dependencies: ["OwnscribeCapture"],
-            path: "Sources/OwnscribeMenuBar"
+            path: "Sources/OwnscribeMenuBar",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "OwnscribeCaptureTests",
-            dependencies: ["OwnscribeCapture"]
+            dependencies: ["OwnscribeCapture"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "OwnscribeMenuBarTests",
-            dependencies: ["OwnscribeMenuBar"]
+            dependencies: ["OwnscribeMenuBar"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]
 )
