@@ -1,4 +1,5 @@
 import XCTest
+@testable import OwnscribeCapture
 @testable import OwnscribeMenuBar
 
 private final class ConfigurableMuteDevice: AudioMuteDevice {
@@ -75,4 +76,48 @@ final class MuteIndicatorStateTests: XCTestCase {
 
         XCTAssertNotNil(state.muteWarning)
     }
+}
+
+@MainActor
+final class RecordingStateSurfaceTests: XCTestCase {
+    private var tempHome: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("recstate-\(UUID().uuidString)")
+    }
+
+    func testIsRecordingReflectsTheRecordingPhase() async throws {
+        let state = AppState(homeDir: tempHome, muteDevice: ConfigurableMuteDevice())
+        let fake = RecordingStateFakeCapture()
+        state.systemCaptureFactory = { _ in fake }
+        state.isMicCaptureEnabled = false
+
+        XCTAssertFalse(state.isRecording)
+
+        await state.toggleRecording()
+
+        XCTAssertTrue(
+            state.isRecording,
+            "The window's record button reads this; a constant false makes it say \"Enregistrer\" while a recording is live")
+    }
+
+    func testIsRecordingIsFalseOnceProcessingStarts() async throws {
+        let state = AppState(homeDir: tempHome, muteDevice: ConfigurableMuteDevice())
+        let fake = RecordingStateFakeCapture()
+        state.systemCaptureFactory = { _ in fake }
+        state.isMicCaptureEnabled = false
+
+        await state.toggleRecording()
+        await state.toggleRecording()
+
+        XCTAssertFalse(state.isRecording, "Processing is not recording; the button must not offer to stop a finished capture")
+    }
+}
+
+private final class RecordingStateFakeCapture: SystemAudioCapturing {
+    var silenceTimeout: TimeInterval = 0
+    var onSilenceTimeout: (() -> Void)?
+    var micCapture: MicCapture?
+    var startHostTime: UInt64 = 0
+
+    func start() async throws { startHostTime = mach_absolute_time() }
+    func stop() {}
 }

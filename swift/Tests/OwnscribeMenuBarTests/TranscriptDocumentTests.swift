@@ -93,3 +93,21 @@ final class TranscriptDocumentTests: XCTestCase {
         XCTAssertTrue(doc.speakers.isEmpty)
     }
 }
+
+extension TranscriptDocumentTests {
+    func testAStampedLineClearsTheInheritedHeaderTimestamp() throws {
+        let mixed = """
+        **SPEAKER_01** [00:12]
+        [00:30] Stamped line.
+        Bare line after a stamped one.
+        """
+
+        let doc = try TranscriptDocument(markdown: mixed)
+
+        XCTAssertEqual(
+            doc.utterances.count, 1,
+            "Once a timestamped line consumes the turn, a following bare line must not resurrect the header timestamp — that invents an utterance AND puts it out of chronological order")
+        XCTAssertEqual(doc.utterances[0].text, "Stamped line.")
+        XCTAssertEqual(doc.utterances[0].start, 30)
+    }
+}
