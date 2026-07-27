@@ -1,10 +1,10 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 770 tests green, HEAD `6bbf5d3`, everything pushed.
+## Status: the app has a window. 773 tests green, HEAD `e793000`, everything pushed.
 
-770 tests green (610 Python + 160 Swift). The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
+773 tests green (610 Python + 163 Swift). The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
-**⚠️ ONE THING NEEDS YOU: the window has never been seen.** It has 160 passing tests and zero visual verification — every `screencapture` came back black because the display was asleep, and the accessibility API reports no windows for one never opened. Open it with **⌘0** from the menu bar and say what you think. No audit can close this.
+**⚠️ ONE THING NEEDS YOU: the window has never been seen.** It has 163 passing tests and zero visual verification — every `screencapture` came back black because the display was asleep, and the accessibility API reports no windows for one never opened. Open it with **⌘0** from the menu bar and say what you think. No audit can close this.
 
 **The installed bundle is from before the window landed.** Re-run `bash swift/build-app.sh` to get it.
 

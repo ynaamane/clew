@@ -4,9 +4,9 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**Zéro bug ouvert. L'app a une fenêtre.** 770 tests verts (610 Python + 160 Swift), HEAD `6bbf5d3`, tout poussé.
+**Zéro bug ouvert. L'app a une fenêtre.** 773 tests verts (610 Python + 163 Swift), HEAD `e793000`, tout poussé.
 
-**⚠️ Une seule chose attend l'utilisateur : la fenêtre n'a jamais été vue.** Elle a 160 tests verts et zéro vérification visuelle — l'écran était en veille à chaque capture. `⌘0` depuis la barre de menus. Et le bundle installé date d'avant la fenêtre : relancer `bash swift/build-app.sh`.
+**⚠️ Une seule chose attend l'utilisateur : la fenêtre n'a jamais été vue.** Elle a 163 tests verts et zéro vérification visuelle — l'écran était en veille à chaque capture. `⌘0` depuis la barre de menus. Et le bundle installé date d'avant la fenêtre : relancer `bash swift/build-app.sh`.
 
 **Design retenu : Glass** (direction B de `design/directions.html`), choisie après trois maquettes construites sur l'apparence réelle de ce Mac (mode sombre, accent violet) et sur l'enveloppe RMS réelle du call du 27 juillet — pas des barres inventées. Cible de déploiement montée à macOS 26 pour que Liquid Glass soit natif ; les 5 targets sont épinglés en mode langage Swift 5, car passer les outils en 6.0 a sorti 3 erreurs de concurrence stricte dans le code CoreAudio (chantier séparé).
 
