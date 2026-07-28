@@ -188,7 +188,8 @@ final class MeetingOutputPathsCollisionTests: XCTestCase {
         let paths = MeetingOutputPaths(baseDir: base, now: fixedMoment)
         try paths.createDirectory()
 
-        let strippedPostRenameDir = base.appendingPathComponent("2024-01-28_1310_project-technical-review-2")
+        let strippedBase = paths.directory.lastPathComponent
+        let strippedPostRenameDir = base.appendingPathComponent("\(strippedBase)_project-technical-review-2")
         try FileManager.default.createDirectory(at: strippedPostRenameDir, withIntermediateDirectories: true)
 
         let summary = MeetingSummary(
