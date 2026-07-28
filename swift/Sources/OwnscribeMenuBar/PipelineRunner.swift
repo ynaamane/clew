@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 public protocol PipelineRunning {
@@ -24,7 +25,7 @@ public final class PipelineRunner: PipelineRunning {
         }
     }
 
-    private let binary: URL
+    internal let binary: URL
     private let tokenStore: TokenSource
     private var process: Process?
 
@@ -67,6 +68,9 @@ public final class PipelineRunner: PipelineRunning {
             }
         }
 
+        let subcommand = arguments.first ?? ""
+        AppLogger.pipeline.info("Launching pipeline process: \(self.binary.lastPathComponent, privacy: .public) \(subcommand, privacy: .public)")
+
         self.process = process
         try process.run()
 
@@ -77,6 +81,13 @@ public final class PipelineRunner: PipelineRunning {
 
         let status = process.terminationStatus
         self.process = nil
+
+        if status == 0 {
+            AppLogger.pipeline.info("Pipeline process exited successfully")
+        } else {
+            AppLogger.pipeline.error("Pipeline process exited with status \(status)")
+        }
+
         guard status == 0 else {
             throw RunError.processExitedNonZero(status)
         }
