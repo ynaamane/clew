@@ -11,6 +11,41 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
 - **Diarization: pyannote community-1 on CPU, never MPS.** The whole ASR path is CPU-bound anyway (CTranslate2 has no Metal backend), so forcing CPU costs nothing extra. MPS re-test deferred to the token pass.
 - **Naming reuses pyannote's own per-cluster embeddings** (DiarizationPipeline return_embeddings=True) — no separate ECAPA/SpeechBrain dependency.
 
+## Verification lessons (2026-07-28, the Glass batch — 5 builders, 4 reopened tasks)
+
+- **An intention recorded as a delivery is worse than an omission.** `TODO.md` said the Glass design
+  was delivered, on the strength of *"standard components carry Liquid Glass automatically"*. The
+  deployment target had indeed been raised; the reasoning was that Glass therefore arrived free. It
+  did not — Glass is a LAYOUT (avatars, envelope strip, type scale, glass on rails). The user opened
+  the app and saw stock SwiftUI in seconds. A missing feature gets rediscovered; a doc claiming it
+  exists stops anyone looking. **Write the OBSERVABLE, not the intention** — "3 glassEffect sites,
+  avatars render" is checkable, "the Glass direction" is not.
+- **Sabotage the production function, not the test.** Two builders reported COMPLETE on tests that
+  guarded nothing. Replacing `loadEnvelope()` with `return nil` — W0-5 completely dead — left all
+  SIX tests green, because they rebuilt `try? EnvelopeDocument(contentsOf:)` themselves and asserted
+  on their own local variable. Reading the diff would never show this. The question is not "does the
+  test pass" but "does the test fail when I break the thing it names".
+- **A survived mutation, reported, is worth more than a passed one.** `builder-badge` predicted its
+  call-site mutation would go red, ran it, got GREEN, and published that against its own prediction.
+  That single honest report was more useful than the two "COMPLETE" claims I had to sabotage myself.
+  The corollary: a builder that reports only green results has not run the mutation that would
+  embarrass it.
+- **A FALSE GREEN is as real as a false red, and rarer to suspect.** My first mutation of `BadgeText`
+  came back green. Wrong conclusion available: "the test is dead". Truth: an agent had rewritten the
+  file one second earlier, so the compiled binary held its restored code, not my mutation. Fix:
+  `stat -f "%Sm %N" -t "%H:%M:%S" <file>; date +%H:%M:%S`, wait for ~40s of quiet, re-verify the
+  mutation is ON DISK with `sed`, then measure. Without that I would have rejected a correct fix.
+- **Sixth phantom red, same cause.** A builder declared itself blocked by a compile error in
+  `SummaryDocument.swift`; `swift build` two minutes later: `Build complete! (0.16s)`. It had read a
+  file another agent was mid-write. It then EDITED that file, which is how the next phantom gets
+  manufactured. Sequencing rule that actually works: never let two agents own one file — block the
+  task instead. Task #4 was held behind #2/#3 for exactly this and produced no phantom.
+- **Also this batch:** a `Button` wired to an empty function body (fifth instance of "plumbed to a
+  consumer never assigned"); the Python half of the same absent-vs-zero defect the UI had, sitting
+  UPSTREAM where no reader could compensate; and `?? 0` at a render site silently defeating a
+  deliberate `Int?` three commits after it was chosen. **When a type encodes "unknown", grep every
+  render site for `??` before believing the guarantee holds.**
+
 ## Bugs caught by REAL runs (not synthetic tests) — the highest-value catches
 
 - **BUG0 (CRITICAL): the CoreAudio tap FROZE Zoom + no permission prompt fired.** First live-call test: starting the tap froze Zoom so hard the user couldn't join; Ctrl+C released it instantly. Root cause: the CLI binary had NO embedded Info.plist → no NSAudioCaptureUsageDescription → macOS had nothing to prompt with → the unauthorized tap stalled CoreAudio (~60s, per Chromium's documented behavior on the same API) which froze every audio client. Fix: embed the Info.plist via `-sectcreate __TEXT __info_plist` (verified present in the shipped binary via otool + strings) + a CGPreflightScreenCaptureAccess fail-loud guard before tap creation. On macOS 26.1+/27 the tap rides the existing Screen Recording grant, so no prompt fires on an already-granted machine (expected, not a bug). A synthetic tone test could NEVER have caught this — needed a real call with a real competing audio client.

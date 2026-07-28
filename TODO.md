@@ -1,6 +1,6 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window that no longer hides failures. 835 tests green, HEAD `4be4e08`, ten commits held for your review.
+## Status: the window now looks like the design you validated. 892 tests green (630 Python + 262 Swift, 4 skipped), HEAD `82ed390`, everything pushed through `532f363`.
 
 835 tests green (617 Python + 218 Swift, 4 skipped by design) plus 6 hardware tests that run on demand.
 
@@ -58,9 +58,25 @@ Both defects had the same shape: values plumbed to consumers that were never cal
 
 ## Open bugs
 
-One, found on 2026-07-28 by tracing values to their CONSUMER:
+**None of the W0 series.** W0-5 closed 2026-07-28 in `9d2ee15`.
 
-- **W0-5** — nothing in Swift reads `envelope.json`, so the timeline cannot be drawn.
+Deliberately unbuilt, not bugs:
+
+- **Scroll-to-evidence.** Clicking a timestamp should jump to that utterance. A `Button` wired to an
+  empty `scrollToTimestamp` was REMOVED (`a516cc7`) rather than left in: a control that looks live
+  and does nothing teaches you the evidence is unreachable, so you stop checking — worse than static
+  text on the one path meant to let you verify a claim. Needs a `ScrollViewReader` in
+  `MeetingDetailView` plus a selected-timestamp channel; `Utterance` already carries `timecode`.
+- **The badge call site is review-guarded, not test-guarded.** `.badge(BadgeText.badgeText(for:
+  item))` — adding `?? "0"` there survives the suite. Closing it needs a view-host test, which
+  deadlocked this project twice for 29 minutes with the SwiftPM lock held. One named line on a
+  cosmetic badge against that risk.
+- **`SpeakerAvatarStyle.color` maps `SPEAKER_00` and `SPEAKER_10` to the same colour**
+  (`hasSuffix("0")`). Unreachable on current data — every real transcript holds only `_00` and `_01`
+  — but a genuine collision at ten speakers, and two people sharing an avatar is the
+  "scrambled transcript that looks fine" failure.
+- **`AudioTracksPresence` checks existence only.** A zero-byte `mic.wav` would show a green
+  checkmark. BUG4 shipped 33.5s of silence past a green suite, so this is the shape to watch.
 
 W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
 investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
@@ -83,9 +99,18 @@ against the real RMS envelope of the 27 July call rather than invented bars.
 - **The app has a real window.** Three columns via `NavigationSplitView`: sidebar → meeting list →
   detail with an inspector. This was a HIG requirement, not taste: *"Avoid relying on the presence
   of menu bar extras"* and *"Avoid making a dynamic menu item the only way to accomplish a task"*.
-  Until now the dropdown WAS the entire interface. Standard components carry Liquid Glass
-  automatically, and none of it lands on the transcript — *"Don't use Liquid Glass in the content
-  layer"*, and a transcript is content made almost entirely of text.
+  Until now the dropdown WAS the entire interface.
+  **⚠️ CORRECTED 2026-07-28.** This section originally claimed *"standard components carry Liquid
+  Glass automatically"*, and that sentence is why the design looked done for a day while the user
+  saw stock SwiftUI on opening the app. Raising the deployment target was taken for the whole job.
+  It is not: what the mockup calls Glass is a LAYOUT — speaker avatars, the envelope strip, the HIG
+  type scale, glass on the rails — and none of it arrives with a target. What this batch delivered
+  was the three-column STRUCTURE; the appearance landed on 2026-07-28 in `82ed390`. The general
+  trap: an intention recorded as a delivery. Name the OBSERVABLE ("3 glassEffect sites, avatars
+  render") rather than the intention ("the Glass direction"), or the doc cannot be checked.
+  The content-layer rule still holds and is now enforced: glass on the sidebar and inspector only,
+  never on the transcript — *"Don't use Liquid Glass in the content layer"*, and a transcript is
+  content made almost entirely of text.
 - **Deployment target raised to macOS 26.** This Mac runs 27 while the package declared `.v14`, so
   the app was being rendered in the pre-26 visual language — the concrete reason it did not look
   like an Apple app here. `glassEffect()` now compiles with no availability guard. Note `.macOS(.v26)`

@@ -4,7 +4,17 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**L'app a une fenêtre qui ne cache plus les échecs. 835 tests verts** (617 Python + 218 Swift, 4 sautés volontairement) + 6 tests matériel à la demande, HEAD `4be4e08`.
+**La fenêtre ressemble enfin au design validé. 892 tests verts** (630 Python + 262 Swift, 4 sautés volontairement) + 6 tests matériel à la demande, HEAD `82ed390`.
+
+**⚠️ Le design Glass n'était PAS implémenté jusqu'au 2026-07-28**, alors que `TODO.md` l'enregistrait
+comme livré. La phrase fautive : « standard components carry Liquid Glass automatically ». La cible de
+déploiement avait bien été montée à macOS 26, et le raisonnement était que Glass arrivait donc
+gratuitement. Faux : ce que la maquette appelle Glass est une **mise en page** — avatars de locuteurs,
+bande d'enveloppe, échelle typo HIG, verre sur les rails. L'utilisateur a ouvert l'app et l'a vu en
+quelques secondes. Livré dans `82ed390` : 3 sites `glassEffect` (bannière, sidebar, inspecteur) et
+**jamais** sur le transcript — la HIG l'interdit dans la couche contenu, et c'est ce que tu relis le
+lendemain matin. Leçon générale : écris l'**observable**, pas l'intention. Une fonctionnalité absente
+se redécouvre ; un doc qui affirme qu'elle existe empêche de chercher.
 
 **⚠️ BUG5 était encore vivant jusqu'à aujourd'hui**, dans le binaire que le pipeline utilise réellement. Le correctif de juillet a atterri dans les sources Swift sans jamais atteindre la production : `coreaudio.py` préfère `bin/ownscribe-audio` à tout ce qui est dans `.build`, `bin/` est gitignored, et seul `swift/build.sh` y copie. Le binaire livré avait donc trois jours de retard sur le correctif et halvait toujours la vitesse de lecture. Mesuré sur une vraie capture double piste : `bin/` → **12,81 s @24000 Hz** depuis des sources à 48 kHz ; `.build/` → **5,52 s @48000 Hz**. La signature est dans tes réunions conservées — celles du 24 juillet sont à 24000 Hz. Corrigé dans `4be4e08` (rebuild + le test e2e résout le binaire via `_BINARY_CANDIDATES` et compare le taux fusionné à celui des sources + garde de péremption dans `check.sh`). **Tout enregistrement CLI d'avant aujourd'hui se lit à moitié vitesse — `./rec.sh redo <dir>` le refusionne correctement depuis les pistes conservées.** Leçon générale : demande quel artefact la production **charge**, pas celui que tu viens de construire.
 
