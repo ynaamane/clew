@@ -4,11 +4,13 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**L'app a une fenêtre. 802 tests verts** (616 Python + 186 Swift), HEAD `d626e72`.
+**L'app a une fenêtre. 802 tests verts** (616 Python + 186 Swift), HEAD `8b9775c`.
 
 **⚠️ `b0ce8db` est COMMITÉ MAIS PAS POUSSÉ, volontairement.** Il touche le mute système, et sa garantie centrale — l'app ne démute jamais un mute que tu as fait toi-même — n'est pas vérifiable sans matériel. Les deux tests qui décident sont dans `TODO.md` § « What W0-2/W0-3 changed ».
 
 **Quatre bugs ouverts, trouvés le 2026-07-28**, tous de la même forme : une valeur câblée jusqu'à un consommateur jamais atteint. La fenêtre n'affiche ni les échecs ni l'avertissement de mute non confirmé (donc l'avertissement AirPods « le call peut encore t'entendre » n'apparaît nulle part) ; on peut enregistrer une réunion entière avant d'apprendre que rien ne peut la transcrire ; les filtres « Avec actions » / « Non ancrées » sont morts en production ; rien en Swift ne lit `envelope.json`. Aucun n'est détectable par une suite verte — c'est exactement pour ça qu'ils ont survécu. La collision d'audio dans la même minute est corrigée (`d626e72`), et le blocage de l'app + la fuite du tap ont été **réfutés** sur le code livré : la garde d'identité de run de `b0ce8db` les avait fermés par effet de bord.
+
+**Leçon la plus coûteuse de la journée** (six tentatives sur un seul correctif) : quand plusieurs consommateurs lisent une même chaîne, le moins exigeant passe et c'est le plus exigeant qui décide. `MeetingSummary` dérive deux valeurs du nom de dossier — la date (`parts[1]` doit valoir exactement `HHmm`) et le titre (`parts[2]` = le slug). **Tous les noms candidats parsaient la date ; un seul préservait le titre**, donc chaque test aller-retour bâti sur la date passait sur toutes les mauvaises réponses. Avant de changer un format : énumérer ses consommateurs (`grep -rn lastPathComponent`), asserter sur la sortie de *chacun*, et sonder toute regex en cinq lignes — « ça parse » est nécessaire, jamais suffisant.
 
 **Piège de diagnostic à connaître** (un handoff d'une autre session s'y est fait prendre le 28/07) : cinq SIGTRAP `xctest` ont été attribués à `EnrolledSpeakerStore.names(in:)`, avec un correctif recommandé sur du code qui n'a **aucun** défaut — la fonction n'a jamais contenu d'`assertionFailure` de toute son histoire. `_assertionFailure` est le symbole de trap générique de Swift ; la frame au-dessus était `Array._checkSubscript`, donc un index hors limites. Et les cinq crashs tournaient depuis `/private/tmp/*/ownscribe-audioPackageTests` — des copies isolées d'agents de revue, pas le dépôt, dont la suite était verte pendant tout ce temps. Vérifier le chemin du bundle qui crashe avant de toucher la production.
 

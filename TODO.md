@@ -1,8 +1,8 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 802 tests green, HEAD `d626e72`, two commits held for your review.
+## Status: the app has a window. 802 tests green, HEAD `8b9775c`, two commits held for your review.
 
-802 tests green (616 Python + 186 Swift).
+802 tests green (616 Python + 186 Swift). `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
 
 **⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
@@ -209,7 +209,13 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
    the two hardware checks above.
 3. ~~**W0-3** — keep Start Recording alive during transcription.~~ **DONE** in `b0ce8db`.
 4. ~~**W0-6** — two recordings in the same minute overwrite each other's audio.~~ **DONE** in
-   `d626e72`. Swift adds a `_N` suffix; Python strips it before appending the title slug.
+   `d626e72` + `8b9775c`. Swift adds a `_N` suffix; Python strips it before appending the title slug.
+   Six attempts, because every candidate name parses the DATE and only one keeps the TITLE — the
+   discriminator was never `displayDate`. Worth reading the commit if you touch the directory format:
+   a `-2` inside the minute field blanks the date, a `_2` between timestamp and slug makes the title
+   read `2_project review`, and a greedy `^(.+)_\d+$` strip would have blanked the date on EVERY
+   meeting because `1234` is itself `\d+`. All measured through the real `MeetingSummary`, and each is
+   now a mutation the tests fail against.
 5. **W0-7 — surface `.failed` and the unverified-mute warning in the window.** Do this before the
    other UI work: the window is now the primary surface and it is currently silent about both. Needs
    a `dismissFailure()` on `AppState` (a retry is the only current exit and it re-fails), and the
