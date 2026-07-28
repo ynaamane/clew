@@ -24,6 +24,24 @@ run_step "pytest (skipping hardware)" uv run pytest -q -m "not hardware"
 run_step "swift build (debug)" swift build --package-path swift
 run_step "swift build (release, what ships)" swift build -c release --package-path swift
 run_step "swift test" swift test --package-path swift
+check_production_binary_is_current() {
+  local shipped="bin/ownscribe-audio"
+  if [[ ! -f "$shipped" ]]; then
+    printf '    bin/ownscribe-audio is missing; the pipeline will fall back to a download. Run swift/build.sh\n'
+    return 1
+  fi
+  local newer
+  newer="$(find swift/Sources -name '*.swift' -newer "$shipped" -print -quit)"
+  if [[ -n "$newer" ]]; then
+    printf '    bin/ownscribe-audio is OLDER than %s\n' "$newer"
+    printf '    The pipeline runs bin/, not .build/, so a Swift fix can pass every test and never\n'
+    printf '    reach production. BUG5 shipped this way for three days. Run: bash swift/build.sh\n'
+    return 1
+  fi
+  return 0
+}
+
+run_step "bin/ownscribe-audio is not stale" check_production_binary_is_current
 run_step "shellcheck rec.sh" bash -n rec.sh
 run_step "shellcheck swift/build-app.sh" bash -n swift/build-app.sh
 run_step "shellcheck swift/build.sh" bash -n swift/build.sh

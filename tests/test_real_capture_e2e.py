@@ -19,7 +19,26 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CAPTURE_BINARY = REPO_ROOT / "swift" / ".build" / "debug" / "ownscribe-audio"
+
+
+def _production_binary() -> Path:
+    """Resolve the binary the PIPELINE runs, not the one a dev just built.
+
+    coreaudio.py:_find_binary() prefers `bin/ownscribe-audio` over anything in
+    .build, and `bin/` is gitignored — so a fix can land in Swift, pass every
+    test against .build, and never reach production. That is exactly what
+    happened with BUG5: bin/ held a binary three days older than the fix and
+    still halved playback speed.
+    """
+    from ownscribe.audio.coreaudio import _BINARY_CANDIDATES
+
+    for candidate in _BINARY_CANDIDATES:
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / "swift" / ".build" / "debug" / "ownscribe-audio"
+
+
+CAPTURE_BINARY = _production_binary()
 
 
 CHIME = Path("/System/Library/Sounds/Submarine.aiff")
@@ -70,9 +89,7 @@ def _wav_frames(path: Path) -> tuple[int, int, float]:
 @pytest.mark.hardware
 class TestRealCaptureBinary:
     def test_binary_reports_its_capabilities(self):
-        result = subprocess.run(
-            [str(CAPTURE_BINARY), "--help"], capture_output=True, text=True, timeout=60
-        )
+        result = subprocess.run([str(CAPTURE_BINARY), "--help"], capture_output=True, text=True, timeout=60)
 
         assert result.returncode == 0, f"the shipped binary must at least run: {result.stderr}"
         usage = result.stdout + result.stderr
@@ -119,6 +136,43 @@ class TestRealCaptureBinary:
             f"6s of recording ({long_duration:.2f}s) must be longer than 2s ({short_duration:.2f}s). "
             f"Equal lengths mean the wav header is being written from a constant rather than from what "
             f"was captured — the BUG5 class, and invisible to any test that mocks the subprocess"
+        )
+
+
+@pytest.mark.hardware
+class TestDualTrackMergeOnRealAudio:
+    """--mic reaches mergeAudioFiles, the highest-risk path and the BUG5 code.
+
+    Without --mic the capture writes one track and never merges, so the merge is
+    the one thing the rest of this file cannot see.
+    """
+
+    def test_the_merged_file_keeps_the_sample_rate_of_its_sources(self, tmp_path):
+        output = tmp_path / "recording.wav"
+
+        stderr = _run_capture(output, 4.0, extra=["--mic"])
+
+        assert output.exists(), f"no merged file; stderr: {stderr}"
+        mic_track = tmp_path / "mic.wav"
+        system_track = tmp_path / "system.wav"
+        assert mic_track.exists() and system_track.exists(), (
+            f"--mic must retain both source tracks, since redo replays from them. stderr: {stderr}"
+        )
+
+        _, merged_rate, merged_duration = _wav_frames(output)
+        _, mic_rate, mic_duration = _wav_frames(mic_track)
+        _, system_rate, _ = _wav_frames(system_track)
+
+        assert merged_rate == mic_rate == system_rate, (
+            f"merged at {merged_rate}Hz from sources at {mic_rate}/{system_rate}Hz. THIS IS BUG5: the "
+            f"merge used a hardcoded 24000 while capture writes the hardware rate, so every recording "
+            f"played back at half speed with voices deep and slowed, and every logged duration was "
+            f"wrong by 2x. A duration bound cannot catch it — 2x of a short capture still looks "
+            f"plausible — so the rates must be compared directly"
+        )
+        assert merged_duration < mic_duration * 1.5, (
+            f"merged {merged_duration:.2f}s from a {mic_duration:.2f}s mic track. A merged file much "
+            f"longer than its own sources means the frame count was scaled by a rate mismatch"
         )
 
 
