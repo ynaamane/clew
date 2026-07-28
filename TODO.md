@@ -1,8 +1,10 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 810 tests green, HEAD `ae5b517`, five commits held for your review.
+## Status: the app has a window that no longer hides failures. 822 tests green, HEAD `7c02399`, eight commits held for your review.
 
-810 tests green (617 Python + 193 Swift, 4 skipped by design) plus 5 hardware tests that run on demand. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+822 tests green (617 Python + 205 Swift, 4 skipped by design) plus 5 hardware tests that run on demand.
+
+**The window now surfaces `.failed` and the unverified-mute warning** (`7c02399`, W0-7). A banner in the glass rail — never the content layer — with the decision in a pure `bannerState()`: an error outranks the mute warning, and the mute banner is deliberately **not dismissible**, because a warning that the call can still hear you must not be silenceable while it is true. `dismissFailure()` is what makes the error surface usable at all: `.failed` previously had no exit but a retry, and when the cause persists the retry re-fails. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
 
 **THE TWO MUTE CHECKS THAT GATED EVERYTHING ARE DONE — automated, not deferred to you.** With the AirPods disconnected the built-in mic became the default, which removed the one case the suite cannot assert against (the documented macOS Bluetooth mute bug), so both checks were written as real hardware tests and passed:
 
@@ -44,13 +46,10 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 ## Open bugs
 
-Four, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
-all the same shape — a value plumbed to a consumer that is never reached:
+Three, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
+all the same shape — a value plumbed to a consumer that is never reached (W0-7, the fourth, is closed
+in `7c02399`):
 
-- **W0-7** — the window renders neither `.failed` nor the unverified-mute warning. A failed recording
-  looks identical to idle, and the AirPods "the call may still hear you" warning appears nowhere in
-  the window. Scoped: no wiring gap (adding a read is sufficient), but `.failed` has no exit except a
-  retry that re-fails, so a `dismissFailure()` is in scope.
 - **W0-9** — you can record a whole meeting before learning nothing can transcribe it.
   `isCliAvailable` has zero consumers, so nothing checks the CLI before offering to record. The audio
   survives but the UI never says so. Costliest of the set: the unit of loss is a meeting.
@@ -240,12 +239,9 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
    read `2_project review`, and a greedy `^(.+)_\d+$` strip would have blanked the date on EVERY
    meeting because `1234` is itself `\d+`. All measured through the real `MeetingSummary`, and each is
    now a mutation the tests fail against.
-5. **W0-7 — surface `.failed` and the unverified-mute warning in the window.** Do this before the
-   other UI work: the window is now the primary surface and it is currently silent about both. Needs
-   a `dismissFailure()` on `AppState` (a retry is the only current exit and it re-fails), and the
-   recommendation is an inline banner in the glass rail — not the toolbar (height-constrained, and
-   truncating the AirPods warning to a glyph reproduces W0-1) and not an alert (9 of 17 blocking
-   personas fire mid-call, often screen-sharing).
+5. ~~**W0-7** — surface `.failed` and the unverified-mute warning in the window.~~ **DONE** in
+   `7c02399`. Reuse `bannerState()` for any further status surface rather than adding a second
+   mechanism.
 6. **W0-9 — pre-flight the CLI check.** Disable or warn on the record button when `isCliAvailable` is
    false, and when a recording ends that way, say the audio is retained and can be resumed.
 7. **W0-4 — wire the sidebar counts.** Parse `summary.md` for `actionItemCount`, read `anchors.json`

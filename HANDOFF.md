@@ -4,7 +4,9 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**L'app a une fenêtre. 810 tests verts** (617 Python + 193 Swift, 4 sautés volontairement) + 5 tests matériel à la demande, HEAD `ae5b517`.
+**L'app a une fenêtre qui ne cache plus les échecs. 822 tests verts** (617 Python + 205 Swift, 4 sautés volontairement) + 5 tests matériel à la demande, HEAD `7c02399`.
+
+**La fenêtre affiche enfin les échecs et l'avertissement de mute non confirmé** (`7c02399`). Bannière dans le rail en verre, jamais dans la couche contenu, avec la décision dans une fonction pure : une erreur passe devant l'avertissement de mute, et cet avertissement n'est **volontairement pas dismissible** — on ne doit pas pouvoir faire taire « le call peut encore t'entendre » pendant que c'est vrai. Leçon de méthode retenue au passage : la première version élargissait l'accès de `phase` pour permettre un test, ce qui est le motif interdit sous un autre nom, et trois de ses tests forçaient des états que la production ne peut pas produire. Après reprise, la mutation ne tue plus qu'**1** test sur 3 — c'est le chiffre honnête, pas un chiffre plus faible.
 
 **Les deux vérifications de mute qui bloquaient tout sont faites — automatisées, pas déléguées.** Dès que les AirPods se sont déconnectés, le micro intégré est devenu le défaut, ce qui a écarté le seul cas non assertable (le bug Bluetooth documenté de macOS). `OWNSCRIBE_TEST_REAL_MUTE=1 swift test --filter RealHardwareMuteTests` → 3 tests verts sur le vrai périphérique : un mute que *tu* as fait survit au quit, un mute fait par l'app est défait au quit, et basculer via l'app en prend possession. Mutation-vérifié : retirer la garde `appOwnsMute` rend le test rouge sur du vrai matériel, et le micro était quand même restauré ensuite — c'est ce qui prouve que le teardown tient aussi sur le chemin d'échec.
 
