@@ -147,3 +147,42 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
   rejected the signature (different from the normal "unidentified
   developer" warning, which just requires one confirmation). Re-run
   `swift/build-app.sh` and check the `codesign -dvvv` output for errors.
+
+## Design pass — the one no automated check can replace
+
+This section exists because it was missing, and its absence let the same
+mistake ship twice on 2026-07-28: the design was declared "matching the
+validated direction" on the strength of a green test suite, twice, with
+nobody having looked. Rejected on sight both times.
+
+**No test in this repo can verify appearance.** 276 green Swift tests, three
+`glassEffect` call sites and the right symbols in the binary all prove the
+code runs. They are silent on whether the window reads well. So this pass is
+a human looking, and there is no substitute.
+
+Open `⌘0` from the menu bar and judge against `design/direction-b-glass.png`
+and `design/mockup.html`:
+
+- [ ] Does the whole window read as one deliberate design, or as default
+      SwiftUI with effects applied on top?
+- [ ] **Transcript legibility first** — this is what gets reread the next
+      morning, and it is the reason the HIG forbids Liquid Glass in the
+      content layer. Line length, leading, contrast, and the speaker avatar
+      not competing with the text.
+- [ ] Type scale: does it read as the HIG scale (title2 17 / title3 15 /
+      body 13 / callout 12 / caption 10), or as arbitrary sizes?
+- [ ] Sidebar and inspector rails: does the glass sit behind the content or
+      fight it?
+- [ ] Density and spacing versus the mockup — the mockup's `:root` block
+      carries the intended values.
+- [ ] Speaker avatars: legible at 18pt, and do two speakers in one meeting
+      ever look alike?
+- [ ] The envelope strip: is it informative, or decoration?
+- [ ] Inspector states read correctly — `(pas encore vérifié)` reads as
+      "not checked yet", `—` reads as "no evidence found", and the two are
+      not confusable.
+
+**When the verdict is negative, get specifics before changing anything.**
+"Pas bon du tout" is a verdict on the whole; guessing at spacing or colour
+and iterating blind against an unseen target wastes both sides' time. Look at
+the window together and name the parts.

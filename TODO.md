@@ -1,8 +1,26 @@
 # TODO — meeting-scribe
 
-## Status: the window now looks like the design you validated. 892 tests green (630 Python + 262 Swift, 4 skipped), HEAD `82ed390`, everything pushed through `532f363`.
+## Status: 906 tests green (630 Python + 276 Swift, 4 skipped), HEAD `950799c`, pushed through `532f363` — 11 commits held locally.
 
-835 tests green (617 Python + 218 Swift, 4 skipped by design) plus 6 hardware tests that run on demand.
+**⚠️ THE DESIGN IS NOT GOOD. The user opened the built app on 2026-07-28 and rejected it.**
+
+And read how this line got here, because the mistake is worse than the design: earlier
+the same day this file claimed the Glass direction was delivered, on the reasoning that
+raising the deployment target to macOS 26 made standard components adopt Liquid Glass
+automatically. The user opened the app, saw stock SwiftUI, and said so. That was corrected,
+`glassEffect()` was applied to the sidebar and inspector, avatars and an envelope strip were
+built — and then **the exact same error was repeated**: this line was rewritten to say the
+window "now looks like the design you validated", again with **zero visual verification**.
+262 tests green is not a design check. It never was.
+
+**The rule, and it has now been broken twice in one day:** a claim about APPEARANCE requires
+LOOKING. Not a passing suite, not 3 `glassEffect` call sites, not a symbol present in the
+binary. Those prove the code runs; they say nothing about whether it reads well. If nobody
+has looked, the honest status line is "unverified", never "matches the design".
+
+**What is NOT yet known:** which part of the design is wrong. "Pas bon du tout" is a verdict
+on the whole, so the next step is to look at the window WITH the user rather than guess at
+spacing or colour and iterate blind against a target nobody has seen.
 
 **⚠️ BUG5 WAS STILL LIVE UNTIL TODAY, in the binary the pipeline actually runs.** The July fix landed in Swift and never reached production: `coreaudio.py` prefers `bin/ownscribe-audio` over anything in `.build`, `bin/` is gitignored, and only `swift/build.sh` copies into it — so the shipped binary sat three days older than the fix and still halved playback speed. Measured on one real dual-track capture: `bin/` gave `recording.wav` **12.81s @24000Hz** from 48 kHz sources; `.build/` gave **5.52s @48000Hz**. The signature is in your retained meetings — the two from July 24 are 24000Hz.
 
@@ -100,14 +118,18 @@ against the real RMS envelope of the 27 July call rather than invented bars.
   detail with an inspector. This was a HIG requirement, not taste: *"Avoid relying on the presence
   of menu bar extras"* and *"Avoid making a dynamic menu item the only way to accomplish a task"*.
   Until now the dropdown WAS the entire interface.
-  **⚠️ CORRECTED 2026-07-28.** This section originally claimed *"standard components carry Liquid
-  Glass automatically"*, and that sentence is why the design looked done for a day while the user
-  saw stock SwiftUI on opening the app. Raising the deployment target was taken for the whole job.
-  It is not: what the mockup calls Glass is a LAYOUT — speaker avatars, the envelope strip, the HIG
-  type scale, glass on the rails — and none of it arrives with a target. What this batch delivered
-  was the three-column STRUCTURE; the appearance landed on 2026-07-28 in `82ed390`. The general
-  trap: an intention recorded as a delivery. Name the OBSERVABLE ("3 glassEffect sites, avatars
-  render") rather than the intention ("the Glass direction"), or the doc cannot be checked.
+  **⚠️ CORRECTED TWICE ON 2026-07-28, and the second correction is the instructive one.**
+  This section originally claimed *"standard components carry Liquid Glass automatically"* — the
+  sentence that let the design look finished for a day while the user opened the app and saw stock
+  SwiftUI. Raising the deployment target had been taken for the whole job. It is not: what the
+  mockup calls Glass is a LAYOUT — speaker avatars, the envelope strip, the HIG type scale, glass
+  on the rails — and none of it arrives with a target.
+  So the appearance work was done in `82ed390`. Then the status line was rewritten to say the
+  window matched the validated design — **on the strength of a green suite, with nobody having
+  looked** — and the user rejected it on sight. Correcting a claim-without-evidence by writing a
+  different claim-without-evidence is not a correction.
+  Name the OBSERVABLE ("3 glassEffect sites, avatars render") rather than the intention ("the Glass
+  direction"), and for anything VISUAL the only observable that counts is a human looking at it.
   The content-layer rule still holds and is now enforced: glass on the sidebar and inspector only,
   never on the transcript — *"Don't use Liquid Glass in the content layer"*, and a transcript is
   content made almost entirely of text.

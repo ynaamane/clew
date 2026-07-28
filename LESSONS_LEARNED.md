@@ -13,13 +13,21 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
 
 ## Verification lessons (2026-07-28, the Glass batch — 5 builders, 4 reopened tasks)
 
-- **An intention recorded as a delivery is worse than an omission.** `TODO.md` said the Glass design
-  was delivered, on the strength of *"standard components carry Liquid Glass automatically"*. The
+- **A claim about APPEARANCE requires LOOKING. This was violated TWICE in one day, the second time
+  immediately after documenting the first.** Round one: `TODO.md` said the Glass design was
+  delivered, on the strength of *"standard components carry Liquid Glass automatically"*. The
   deployment target had indeed been raised; the reasoning was that Glass therefore arrived free. It
   did not — Glass is a LAYOUT (avatars, envelope strip, type scale, glass on rails). The user opened
-  the app and saw stock SwiftUI in seconds. A missing feature gets rediscovered; a doc claiming it
-  exists stops anyone looking. **Write the OBSERVABLE, not the intention** — "3 glassEffect sites,
-  avatars render" is checkable, "the Glass direction" is not.
+  the app and saw stock SwiftUI in seconds. Round two, hours later: the appearance work was done,
+  the suite was green at 262, and the status line was rewritten to *"the window now looks like the
+  design you validated"* — again with **nobody having looked**. The user rejected it on sight: "le
+  design est pas bon du tout, tu n'as pas fait de vérif de design réel."
+  The failure is not carelessness about a fact, it is **substituting an available proof for the
+  required one**. A green suite, 3 `glassEffect` call sites and a symbol present in the binary all
+  prove the code RUNS. None of them is evidence about how it READS. When the only honest answer is
+  "nobody has looked", write that — "unverified" costs one line; a false claim costs the user's
+  trust in every other line. Corollary: correcting a claim-without-evidence by writing a *different*
+  claim-without-evidence is not a correction, it is the same error with new wording.
 - **Sabotage the production function, not the test.** Two builders reported COMPLETE on tests that
   guarded nothing. Replacing `loadEnvelope()` with `return nil` — W0-5 completely dead — left all
   SIX tests green, because they rebuilt `try? EnvelopeDocument(contentsOf:)` themselves and asserted

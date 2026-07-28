@@ -4,17 +4,34 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**La fenêtre ressemble enfin au design validé. 892 tests verts** (630 Python + 262 Swift, 4 sautés volontairement) + 6 tests matériel à la demande, HEAD `82ed390`.
+**906 tests verts** (630 Python + 276 Swift, 4 sautés volontairement) + 6 tests matériel à la
+demande, HEAD `950799c`. 11 commits tenus en local depuis `532f363`.
 
-**⚠️ Le design Glass n'était PAS implémenté jusqu'au 2026-07-28**, alors que `TODO.md` l'enregistrait
-comme livré. La phrase fautive : « standard components carry Liquid Glass automatically ». La cible de
-déploiement avait bien été montée à macOS 26, et le raisonnement était que Glass arrivait donc
-gratuitement. Faux : ce que la maquette appelle Glass est une **mise en page** — avatars de locuteurs,
-bande d'enveloppe, échelle typo HIG, verre sur les rails. L'utilisateur a ouvert l'app et l'a vu en
-quelques secondes. Livré dans `82ed390` : 3 sites `glassEffect` (bannière, sidebar, inspecteur) et
-**jamais** sur le transcript — la HIG l'interdit dans la couche contenu, et c'est ce que tu relis le
-lendemain matin. Leçon générale : écris l'**observable**, pas l'intention. Une fonctionnalité absente
-se redécouvre ; un doc qui affirme qu'elle existe empêche de chercher.
+**⚠️ LE DESIGN N'EST PAS BON. Rejeté par l'utilisateur le 2026-07-28 après avoir ouvert l'app.**
+
+Et la manière dont cette ligne est arrivée là compte plus que le design lui-même, parce que
+**la même faute a été commise deux fois dans la même journée**.
+
+Round 1 : `TODO.md` affirmait le design Glass livré, sur la foi de « standard components carry
+Liquid Glass automatically ». La cible de déploiement avait bien été montée à macOS 26, et on en
+avait déduit que Glass arrivait gratuitement. Faux : ce que la maquette appelle Glass est une
+**mise en page** — avatars, bande d'enveloppe, échelle typo HIG, verre sur les rails. L'utilisateur
+a ouvert l'app et l'a vu en secondes.
+
+Round 2, quelques heures plus tard : le travail d'apparence était fait (`82ed390`, 3 sites
+`glassEffect`, jamais sur le transcript — la HIG l'interdit dans la couche contenu), la suite était
+verte à 262, et la ligne de statut a été réécrite en « la fenêtre ressemble enfin au design validé »
+— **sans que personne ait regardé**. Rejeté sur le champ.
+
+La faute n'est pas une négligence sur un fait, c'est d'avoir **substitué la preuve disponible à la
+preuve requise**. Une suite verte, 3 appels `glassEffect`, un symbole présent dans le binaire :
+tout ça prouve que le code TOURNE. Rien n'est une preuve sur la façon dont il se LIT. Quand la
+seule réponse honnête est « personne n'a regardé », il faut l'écrire. Et corriger une
+affirmation-sans-preuve par une *autre* affirmation-sans-preuve n'est pas une correction.
+
+**Ce qu'on ne sait PAS encore :** quelle partie du design est mauvaise. « Pas bon du tout » est un
+verdict global, donc l'étape suivante est de regarder la fenêtre AVEC l'utilisateur, pas de deviner
+un espacement ou une couleur et d'itérer à l'aveugle contre une cible que personne n'a vue.
 
 **⚠️ BUG5 était encore vivant jusqu'à aujourd'hui**, dans le binaire que le pipeline utilise réellement. Le correctif de juillet a atterri dans les sources Swift sans jamais atteindre la production : `coreaudio.py` préfère `bin/ownscribe-audio` à tout ce qui est dans `.build`, `bin/` est gitignored, et seul `swift/build.sh` y copie. Le binaire livré avait donc trois jours de retard sur le correctif et halvait toujours la vitesse de lecture. Mesuré sur une vraie capture double piste : `bin/` → **12,81 s @24000 Hz** depuis des sources à 48 kHz ; `.build/` → **5,52 s @48000 Hz**. La signature est dans tes réunions conservées — celles du 24 juillet sont à 24000 Hz. Corrigé dans `4be4e08` (rebuild + le test e2e résout le binaire via `_BINARY_CANDIDATES` et compare le taux fusionné à celui des sources + garde de péremption dans `check.sh`). **Tout enregistrement CLI d'avant aujourd'hui se lit à moitié vitesse — `./rec.sh redo <dir>` le refusionne correctement depuis les pistes conservées.** Leçon générale : demande quel artefact la production **charge**, pas celui que tu viens de construire.
 
