@@ -43,6 +43,12 @@ public final class RecordingController {
 
     var makeSystemCapture: ((String) -> SystemAudioCapturing)?
 
+    var makeMicCapture: (() -> MicCapture?) = { MicCapture() }
+
+    var startMicCapture: ((MicCapture, String, String?) throws -> Void) = { mic, path, deviceName in
+        try mic.start(outputPath: path, deviceName: deviceName, echoCancellation: "off")
+    }
+
     public init() {}
 
     public var isRecording: Bool {
@@ -100,9 +106,8 @@ public final class RecordingController {
             }
         }
 
-        if enableMic {
-            let mic = MicCapture()
-            try mic.start(outputPath: tempPaths.micPath, deviceName: micDeviceName, echoCancellation: "off")
+        if enableMic, let mic = makeMicCapture() {
+            try startMicCapture(mic, tempPaths.micPath, micDeviceName)
             micCapture = mic
             capture.micCapture = mic
         }

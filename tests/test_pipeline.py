@@ -495,7 +495,10 @@ class TestSlugify:
     def test_underscores_never_survive(self):
         from ownscribe.pipeline import _slugify
 
-        assert "_" not in _slugify("Sprint_2 review"), "_rename_output_dir's strip pattern ^(.+_.+)_\\d+$ assumes _slugify never produces underscores. If this test fails, the strip will start eating real slugs."
+        assert "_" not in _slugify("Sprint_2 review"), (
+            "_rename_output_dir's strip pattern assumes _slugify never produces underscores. "
+            "If this fails, the strip will start eating real slugs."
+        )
         assert "_" not in _slugify("Q3_2024 planning")
         assert "_" not in _slugify("a_b_c")
         assert "_" not in _slugify("sprint_2")
@@ -623,7 +626,9 @@ class TestRenameOutputDir:
         assert result == expected
         assert expected.exists()
         assert (expected / "transcript.md").read_text() == "normal recording"
-        assert not source.exists(), "The HHmm field must be preserved - this is the regression the wrong regex would have caused"
+        assert not source.exists(), (
+            "The HHmm field must be preserved - this is the regression the wrong regex would have caused"
+        )
 
     def test_strips_two_digit_suffix(self, tmp_path):
         from ownscribe.pipeline import _rename_output_dir
@@ -648,7 +653,10 @@ class TestRenameOutputDir:
         result = _rename_output_dir(source, "actual-slug")
 
         expected = tmp_path / "2026-01-01_1200_actual-slug"
-        assert result == expected, "A slug that is all digits (_2024) is indistinguishable from a collision marker and will be stripped. This is acceptable because _rename_output_dir is only called on un-renamed directories in the real call path."
+        assert result == expected, (
+            "A slug that is all digits (_2024) is indistinguishable from a collision marker and is "
+            "stripped. Acceptable because _rename_output_dir only ever sees un-renamed directories."
+        )
 
     def test_two_swift_collisions_normalize_to_same_slug(self, tmp_path):
         from ownscribe.pipeline import _rename_output_dir

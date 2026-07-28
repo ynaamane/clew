@@ -12,6 +12,7 @@ final class RecordingControllerSilenceTimeoutTests: XCTestCase {
         let state = AppState(homeDir: tempDir, muteDevice: StubMuteDevice())
         let fakeCapture = FakeSystemAudioCapture()
         state.systemCaptureFactory = { _ in fakeCapture }
+        state.isMicCaptureEnabled = false
 
         await state.toggleRecording()
 
@@ -36,6 +37,7 @@ final class RecordingControllerSilenceTimeoutTests: XCTestCase {
         let state = AppState(homeDir: tempDir, muteDevice: StubMuteDevice())
         let fakeCapture = FakeSystemAudioCapture()
         state.systemCaptureFactory = { _ in fakeCapture }
+        state.isMicCaptureEnabled = false
 
         await state.toggleRecording()
 
