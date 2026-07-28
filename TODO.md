@@ -1,8 +1,8 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window that no longer hides failures. 822 tests green, HEAD `4be4e08`, ten commits held for your review.
+## Status: the app has a window that no longer hides failures. 835 tests green, HEAD `4be4e08`, ten commits held for your review.
 
-822 tests green (617 Python + 205 Swift, 4 skipped by design) plus 6 hardware tests that run on demand.
+835 tests green (617 Python + 218 Swift, 4 skipped by design) plus 6 hardware tests that run on demand.
 
 **⚠️ BUG5 WAS STILL LIVE UNTIL TODAY, in the binary the pipeline actually runs.** The July fix landed in Swift and never reached production: `coreaudio.py` prefers `bin/ownscribe-audio` over anything in `.build`, `bin/` is gitignored, and only `swift/build.sh` copies into it — so the shipped binary sat three days older than the fix and still halved playback speed. Measured on one real dual-track capture: `bin/` gave `recording.wav` **12.81s @24000Hz** from 48 kHz sources; `.build/` gave **5.52s @48000Hz**. The signature is in your retained meetings — the two from July 24 are 24000Hz.
 
@@ -48,25 +48,23 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 **Transcription is 34% faster** since `c1e1f3d`: it now sizes CTranslate2 to the performance-core count instead of whisperx's `threads=4` default. Measured on a 90s slice of that call: 30.9s → 20.5s with a word-identical transcript.
 
+## What shipped (2026-07-28)
+
+**W0-9 — CLI availability pre-flight check** (8 tests): The app can now warn you BEFORE starting to record that the ownscribe CLI is missing, so you don't record an entire meeting then learn nothing can transcribe it. A banner appears when the CLI is unavailable: *"Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio."* The check runs before starting a recording and once when the window opens. Recording is ALLOWED (not disabled) because the meeting is irreplaceable — the audio survives for later `redo`. The check is cheap (env lookups + one `isExecutableFile`, no PATH walk) and respects the injected `pipelineRunnerFactory` seam. Banner precedence: `.failed` → mute warning → CLI warning → nil, so a real failure or an unverified-mute state always shows first. Tests pin the precedence and prove the factory is called.
+
+**W0-4 — Sidebar counts now populate** (implemented by `builder-counts` in parallel): The action and anchor filters' counts were always zero because no writer existed — they're now computed on every sidebar refresh (0.44 ms, no cache needed). The counts are `Int?` rather than `Int`, because zero of six meetings on disk have `anchors.json` — rendering an absent count as `0` would claim "all claims have evidence" for meetings that were never checked, which is the W0-1 anti-hallucination signal failure. Absence → nil → rendered as grayed-out text or a distinct UI state. The trap that can be generalized: when a count's source file may not exist (a late-added `anchors.json`, a deferred check), make it `Int?` so absence cannot masquerade as zero. Scoped as cheap, so no caching layer added.
+
+Both defects had the same shape: values plumbed to consumers that were never called. Neither was detectable by a green suite.
+
 ## Open bugs
 
-Three, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
-all the same shape — a value plumbed to a consumer that is never reached (W0-7, the fourth, is closed
-in `7c02399`):
+One, found on 2026-07-28 by tracing values to their CONSUMER:
 
-- **W0-9** — you can record a whole meeting before learning nothing can transcribe it.
-  `isCliAvailable` has zero consumers, so nothing checks the CLI before offering to record. The audio
-  survives but the UI never says so. Costliest of the set: the unit of loss is a meeting.
-- **W0-4** — the sidebar's action/anchor filters and the "non ancré" badge are dead in production (no
-  writer for either count field). Scoped: cost is negligible (0.44 ms/refresh, no cache needed), but
-  zero of six meetings on disk have `anchors.json`, so the counts must be `Int?` — rendering absent
-  as `0` claims "all claims have evidence" for meetings never checked, which is the W0-1 failure on
-  the anti-hallucination signal.
 - **W0-5** — nothing in Swift reads `envelope.json`, so the timeline cannot be drawn.
 
 W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
 investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
-effect; what remains is a latent note. BUG0/1/2/3/4/5 + all 11 review findings + W0-1/2/3/6 are
+effect; what remains is a latent note. BUG0/1/2/3/4/5 + all 11 review findings + W0-1/2/3/6/7 are
 closed, each verified by mutation. See LESSONS_LEARNED.md.
 
 Python-side follow-ups found while scoping W0-4, not yet filed as tasks: `_extract_rare_tokens`
