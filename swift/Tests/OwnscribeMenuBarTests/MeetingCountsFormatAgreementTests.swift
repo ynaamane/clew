@@ -98,6 +98,13 @@ final class MeetingCountsFormatAgreementTests: XCTestCase {
             fileManager: fileManager
         )
 
+        XCTAssertEqual(
+            OwnscribeConfigReader.parseOutputSettings(fromTOML: configToml).format,
+            "markdown",
+            "the single quotes must be stripped: this is the only assertion here that can SEE the parse, "
+                + "because summary.md is the fallback branch of `format == \"json\" ? ... : \"summary.md\"` "
+                + "and so is reached even when the parse returns the literal \"'markdown'\""
+        )
         XCTAssertEqual(counts.actionItemCount, 0, "Badge: 0 actions")
         XCTAssertNil(counts.unanchoredClaimCount, "Badge: nil (no anchors file)")
         XCTAssertEqual(keyPoints?.count, 1, "Inspector: 1 key point")

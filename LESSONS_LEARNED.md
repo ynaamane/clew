@@ -28,6 +28,39 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
   "nobody has looked", write that — "unverified" costs one line; a false claim costs the user's
   trust in every other line. Corollary: correcting a claim-without-evidence by writing a *different*
   claim-without-evidence is not a correction, it is the same error with new wording.
+- **"Another suite already covers it" is only true if that suite RUNS.** I waived 6
+  `TestComputeRMSEnvelope` tests as redundant-but-harmless, on the grounds that the real e2e suite
+  covers the same function on real data. An independent reviewer refuted it: that suite is
+  `@pytest.mark.hardware`, so `scripts/check.sh` **skips** it. On every normal run — which is every
+  run that gates a commit — those 6 tests are the *only* coverage `compute_rms_envelope` has. The
+  waiver was not merely wrong, it was inverted: I had classified the load-bearing tests as the
+  redundant ones. Before calling coverage redundant, check the *marker* on the suite you are
+  crediting and whether the gate you care about executes it.
+- **`tail` on a test run destroys the number you are trying to read, and inside a redirect it
+  destroys it permanently.** Reading the Swift total with `swift test | tail -8` shows only the
+  swift-testing block — 19 tests — because the XCTest bundle total is followed by hundreds of
+  per-test lines. Worse: `swift test > file 2>&1 | tail -8` writes the *truncated* text to disk, so
+  the real count is gone and cannot be recovered without re-running. I did this twice in one session
+  and briefly believed a 291-test suite was 19 tests. **This package prints TWO independent totals**
+  — an XCTest bundle line and a `Test run with N tests` line for swift-testing — so reading either
+  alone understates the suite. Every "276 Swift" in this file's history was XCTest-only; the real
+  figure is 291 passing + 4 skipped. Redirect the whole run to a file, then grep the file, and count
+  test *cases* rather than summing `Executed N tests` lines (per-suite and per-bundle lines both
+  match, so summing double-counts). Same family as the `timeout`-returns-127 trap: verify what the
+  command actually DID before quoting what it said.
+- **`pytest -k "Class::method"` silently selects NOTHING, and reports it as success.** `CLAUDE.md`
+  documented `-k "TestRankMeetings::test_speaker_boost"` as the way to run a single test; measured, it
+  gives `636 deselected in 0.23s` and **exit 0**. `-k` takes a boolean expression over names, so `::`
+  matches no test — but a run that selected zero tests looks exactly like a run that passed, which is
+  how it survived in the docs. The working forms are the path (`tests/test_search.py::TestRankMeetings::test_speaker_boost`)
+  or `-k "TestRankMeetings and test_speaker_boost"`. Same family as the `timeout`-returns-127 trap:
+  **check that the command DID the work before reading its exit code as a result** — for pytest, that
+  means reading the selected/deselected counts, not just the green.
+- **A stale number propagates through every reader, including auditors.** `TODO.md` and `HANDOFF.md`
+  both carried "630 Python + 276 Swift" for long enough that a reviewer sent to audit the docs
+  re-measured Python (catching 635) but *accepted* 276 from the document it was auditing — so the
+  audit confirmed a wrong number as correct. An inherited figure is not evidence; re-derive each one
+  in the turn you cite it.
 - **Sabotage the production function, not the test.** Two builders reported COMPLETE on tests that
   guarded nothing. Replacing `loadEnvelope()` with `return nil` — W0-5 completely dead — left all
   SIX tests green, because they rebuilt `try? EnvelopeDocument(contentsOf:)` themselves and asserted

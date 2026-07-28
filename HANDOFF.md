@@ -4,8 +4,14 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**906 tests verts** (630 Python + 276 Swift, 4 sautés volontairement) + 6 tests matériel à la
-demande, HEAD `950799c`. 11 commits tenus en local depuis `532f363`.
+**926 tests verts** (635 Python + 291 Swift), 4 Swift sautés volontairement + 1 Python désélectionné,
+plus 6 tests matériel à la demande. HEAD `178b05d`. 12 commits tenus en local depuis `532f363`.
+
+Mesuré le 2026-07-28, pas recopié. Le compte Swift demande d'additionner **deux** frameworks :
+`swift test` imprime un total XCTest (276, dont 4 sautés) *et* une ligne séparée
+`Test run with 19 tests` pour swift-testing → 291 qui passent. Tout « 276 Swift » plus haut dans
+l'historique de ce fichier ne comptait que XCTest. Et ne lis jamais le total via `tail` : ça tronque
+le résumé, et dans une redirection `> fichier` ça détruit le chiffre sur le disque.
 
 **⚠️ LE DESIGN N'EST PAS BON. Rejeté par l'utilisateur le 2026-07-28 après avoir ouvert l'app.**
 
@@ -18,7 +24,7 @@ avait déduit que Glass arrivait gratuitement. Faux : ce que la maquette appelle
 **mise en page** — avatars, bande d'enveloppe, échelle typo HIG, verre sur les rails. L'utilisateur
 a ouvert l'app et l'a vu en secondes.
 
-Round 2, quelques heures plus tard : le travail d'apparence était fait (`82ed390`, 3 sites
+Round 2, le 2026-07-28 en fin de journée : le travail d'apparence était fait (`82ed390`, 3 sites
 `glassEffect`, jamais sur le transcript — la HIG l'interdit dans la couche contenu), la suite était
 verte à 262, et la ligne de statut a été réécrite en « la fenêtre ressemble enfin au design validé »
 — **sans que personne ait regardé**. Rejeté sur le champ.
@@ -33,7 +39,7 @@ affirmation-sans-preuve par une *autre* affirmation-sans-preuve n'est pas une co
 verdict global, donc l'étape suivante est de regarder la fenêtre AVEC l'utilisateur, pas de deviner
 un espacement ou une couleur et d'itérer à l'aveugle contre une cible que personne n'a vue.
 
-**⚠️ BUG5 était encore vivant jusqu'à aujourd'hui**, dans le binaire que le pipeline utilise réellement. Le correctif de juillet a atterri dans les sources Swift sans jamais atteindre la production : `coreaudio.py` préfère `bin/ownscribe-audio` à tout ce qui est dans `.build`, `bin/` est gitignored, et seul `swift/build.sh` y copie. Le binaire livré avait donc trois jours de retard sur le correctif et halvait toujours la vitesse de lecture. Mesuré sur une vraie capture double piste : `bin/` → **12,81 s @24000 Hz** depuis des sources à 48 kHz ; `.build/` → **5,52 s @48000 Hz**. La signature est dans tes réunions conservées — celles du 24 juillet sont à 24000 Hz. Corrigé dans `4be4e08` (rebuild + le test e2e résout le binaire via `_BINARY_CANDIDATES` et compare le taux fusionné à celui des sources + garde de péremption dans `check.sh`). **Tout enregistrement CLI d'avant aujourd'hui se lit à moitié vitesse — `./rec.sh redo <dir>` le refusionne correctement depuis les pistes conservées.** Leçon générale : demande quel artefact la production **charge**, pas celui que tu viens de construire.
+**⚠️ BUG5 était encore vivant jusqu'au 2026-07-28**, dans le binaire que le pipeline utilise réellement. Le correctif de juillet a atterri dans les sources Swift sans jamais atteindre la production : `coreaudio.py` préfère `bin/ownscribe-audio` à tout ce qui est dans `.build`, `bin/` est gitignored, et seul `swift/build.sh` y copie. Le binaire livré avait donc trois jours de retard sur le correctif et halvait toujours la vitesse de lecture. Mesuré sur une vraie capture double piste : `bin/` → **12,81 s @24000 Hz** depuis des sources à 48 kHz ; `.build/` → **5,52 s @48000 Hz**. La signature est dans tes réunions conservées — celles du 24 juillet sont à 24000 Hz. Corrigé dans `4be4e08` (rebuild + le test e2e résout le binaire via `_BINARY_CANDIDATES` et compare le taux fusionné à celui des sources + garde de péremption dans `check.sh`). **Tout enregistrement CLI d'avant le 2026-07-28 se lit à moitié vitesse — `./rec.sh redo <dir>` le refusionne correctement depuis les pistes conservées.** Leçon générale : demande quel artefact la production **charge**, pas celui que tu viens de construire.
 
 **La fenêtre affiche enfin les échecs et l'avertissement de mute non confirmé** (`7c02399`). Bannière dans le rail en verre, jamais dans la couche contenu, avec la décision dans une fonction pure : une erreur passe devant l'avertissement de mute, et cet avertissement n'est **volontairement pas dismissible** — on ne doit pas pouvoir faire taire « le call peut encore t'entendre » pendant que c'est vrai. Leçon de méthode retenue au passage : la première version élargissait l'accès de `phase` pour permettre un test, ce qui est le motif interdit sous un autre nom, et trois de ses tests forçaient des états que la production ne peut pas produire. Après reprise, la mutation ne tue plus qu'**1** test sur 3 — c'est le chiffre honnête, pas un chiffre plus faible.
 

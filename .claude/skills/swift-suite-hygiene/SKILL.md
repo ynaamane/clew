@@ -1,0 +1,153 @@
+---
+name: swift-suite-hygiene
+description: How to run, trust and mutation-check this repo's Swift suite without producing a false green, a false red, or a 23-minute deadlock that holds the SwiftPM lock. Read BEFORE running `swift test`, before writing any Swift test, and before believing any Swift test result — yours or an agent's. Every item cost a real failure on this machine.
+paths:
+  - "swift/**"
+  - "**/*.swift"
+---
+
+# The Swift suite — how to trust a result
+
+The suite is fast (~40s) and green. That is exactly why the failures here are all
+**epistemic**: a number that was never measured, a red that isn't a defect, a green from a
+command that never ran. Do not re-derive these.
+
+## Reading the totals — the trap I fell into twice in one session
+
+`swift test` prints **two** independent summaries, because this package uses both frameworks:
+
+- XCTest → one `Executed N tests, with 0 failures` line **per suite**, then a bundle total.
+- swift-testing → one `✔ Test run with N tests in M suites` line.
+
+The real total is the sum of the two frameworks. Summing every `Executed N tests` line
+double-counts, because per-suite and per-bundle lines both match.
+
+```bash
+cd swift && swift test > /tmp/swifttest.log 2>&1; echo "exit=$?"
+python3 -c "
+import re, collections
+log = open('/tmp/swifttest.log').read()
+cases = re.findall(r\"Test Case '-\[(\S+) (\S+)\]' (passed|failed)\", log)
+print('XCTest:', len(cases), collections.Counter(c[2] for c in cases))
+print('swift-testing:', re.findall(r'Test run with (\d+) tests', log))
+"
+```
+
+**Never pipe the run through `tail -N`.** The XCTest bundle total is followed by hundreds of
+lines of per-test output, so `tail -8` shows only the swift-testing block — 19 tests — and a
+`tail` inside a `> file` redirect writes the *truncated* text to disk, destroying the number
+permanently. I did this twice in one session and briefly believed the suite was 19 tests.
+Redirect the whole run to a file, then grep the file.
+
+## `timeout` does not exist on this machine
+
+`timeout 300 swift test` exits **127** — the binary is absent — and the harness reports
+"completed (exit code 0)". That is a green from a command that never ran, and it is the
+single most dangerous line you can type here. There is no `gtimeout` either. Background the
+run and poll instead.
+
+## A run past ~90 seconds is HUNG, not slow
+
+The whole suite is ~40s. Past 90s, attach and read the reason rather than waiting:
+
+```bash
+lldb -p <pid> --batch -o "thread backtrace all"
+```
+
+**@MainActor view-host tests deadlock this project.** `AppState`, the fake runners and the
+`XCTestCase` body are all `@MainActor` while XCTest pumps a CFRunLoop on that same thread, so
+a test needing a specific three-way interleaving cannot force it with `Task.yield()` — the
+continuation is never resumed and the test hangs forever instead of failing. Two attempts
+cost 23 minutes and 6 minutes, each holding the SwiftPM `.build` lock and blocking two other
+agents.
+
+A deadlocking test is **worse than a failing one** — it cannot report, and it blocks every
+build on the machine. Delete it, do not skip it. Extract the DECISION into a pure function
+(`terminalPhase(after:completedWith:)` is the precedent: same claim, 7 tests, 0.001s, and it
+mutation-checks cleanly) rather than choreographing the actors.
+
+Never instantiate a SwiftUI `View` body in a test.
+
+## Never touch real audio hardware
+
+A test reaching `RecordingController.start()` must inject **both** `makeSystemCapture` and
+`makeMicCapture`. A start-time seam is not enough: `MicCapture` holds
+`private let engine = AVAudioEngine()` as a **stored property**, so the input device is
+claimed when the object is *constructed*.
+
+Three suites hijacked the mic this way. Measured: **0** CoreAudio `PauseIO/ResumeIO` cycles in
+the 20s before a run, **7920** after, with the AirPods input forced to 24 kHz (the HFP
+phone-call profile) instead of 48 kHz — which dulls playback in every app until macOS
+renegotiates. The user noticed the degraded audio before any of us did.
+
+```bash
+/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'   # absolute path: a zsh function shadows `log`
+```
+
+A missing config file means mic **ON** (`mic ?? true`), so pointing a test at a temp
+`homeDir` is a silent opt-in. Assert the default your tests inherit.
+
+Genuine hardware needs go behind `OWNSCRIBE_TEST_REAL_MIC=1` / `OWNSCRIBE_TEST_REAL_MUTE=1`,
+and keep a hardware-free test for the same guarantee rather than losing the coverage.
+
+## Compile traps that cost a build cycle each
+
+- **`XCTAssertTrue(await f())` does not compile** — `'async' call in an autoclosure`. Hoist
+  into a `let` first. Two separate agents lost a cycle to this.
+- **Subscripting an array in a test traps instead of failing.** `doc.utterances[2]` on a short
+  array kills the whole `xctest` process and takes the run's results with it — five SIGTRAPs
+  in one session came from agents' throwaway tests, not from production. Assert
+  `XCTAssertEqual(doc.utterances.count, n)` first, or use `.dropFirst().first`.
+- `.macOS(.v26)` does not exist in this toolchain's `PackageDescription` — the target is the
+  string `"26.0"`. All five targets are pinned `.swiftLanguageMode(.v5)`; raising
+  `swift-tools-version` to 6.0 surfaces 3 real strict-concurrency errors in the CoreAudio path.
+
+## Mutation-checking: how to not fool yourself
+
+A red→green transition proves nothing. Break the thing the test names and confirm it goes
+red. Three tests in one batch passed against the code they claimed to guard.
+
+**Sabotage the production function, not the test.** The highest-yield question is *does this
+test INVOKE production, or does it rebuild production's input and assert on its own local
+variable?* Stubbing `loadEnvelope()` to `return nil` — the feature completely dead — left all
+**six** of its tests green, because they each re-implemented
+`try? EnvelopeDocument(contentsOf:)` inline. Reading the diff would never show this.
+
+Four false-result modes, all observed here:
+
+| Symptom | Real cause | Guard |
+|---|---|---|
+| Mutation survives (false green) | Another agent rewrote the file seconds earlier; the build used its version | `stat -f "%Sm %N" <file>; date`, wait for ~40s of quiet, re-verify with `sed -n` that your edit is on disk |
+| Instant reds in a `git worktree` (false red) | `bin/` and `.build` are gitignored, so the built binary is absent | The tell is the clock: 0.4s where a real capture takes 16s. Run `bash swift/build.sh` |
+| Reds while auditing a live tree (phantom) | You read a file another agent was mid-write | Check mtime before believing a failure. Five phantoms in one evening, incl. a whole-module error that self-resolved in 35s |
+| Mutation "took" but nothing changed | Restoring with `cp` refreshed the mtime, so a staleness gate saw a fresh file | Verify the mutation landed on the property actually read — mtime, size, a symbol |
+
+Shell cwd persists between calls. Use absolute paths — a relative `cp` after a `cd swift`
+silently voided a mutation.
+
+**A survived mutation, reported, is worth more than a passed one.** One agent predicted its
+call-site mutation would go red, ran it, got green, and published that against its own
+prediction. That honest report was worth more than two "COMPLETE" claims I had to sabotage
+myself. An agent that reports only green results has not run the mutation that would
+embarrass it.
+
+## Tested helper, untested call site
+
+`BadgeText.badgeText(for:)` is well covered, but `grep -rn "LibraryWindow" swift/Tests/` is
+**empty** — so reintroducing `?? "0"` at the render site survives the entire suite. That
+render-site `?? 0` is what silently defeated a deliberate `Int?` three commits after it was
+chosen.
+
+When a type encodes "unknown", **grep every render site for `??`** before believing the
+guarantee holds. Closing these needs a view-host test, which is the deadlock above — so some
+are accepted as review-guarded and NAMED in `TODO.md` rather than pretended closed.
+
+## Never run `swift/build-app.sh` from an agent
+
+It `rm -rf`s `/Applications/MeetingScribe.app`, which holds live TCC permission grants keyed
+to a signing cert that **must never be recreated** (a new cert = new identity = macOS resets
+every grant). Destructive and irreversible. `swift/build.sh` (builds `bin/ownscribe-audio`) is
+safe.
+
+`strings` does not surface accented or non-ASCII Swift literals — it produced a false "stale
+bundle" alarm on a bundle that was current. Use `nm -a` on the symbol table.

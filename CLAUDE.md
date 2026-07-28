@@ -36,7 +36,8 @@ bash scripts/check.sh                # everything at once: lint, format, both su
 uv run pytest                        # run all tests
 uv run pytest -v                     # verbose
 uv run pytest -v -k test_search      # run a specific test module
-uv run pytest -v -k "TestRankMeetings::test_speaker_boost"  # single test
+uv run pytest tests/test_search.py::TestRankMeetings::test_speaker_boost   # single test (path form)
+uv run pytest -v -k "TestRankMeetings and test_speaker_boost"              # or -k, which needs `and`, NOT `::`
 uv run ruff check src/ tests/        # lint
 uv run ruff format src/ tests/       # auto-format
 
@@ -90,6 +91,10 @@ Each stage has a base class in its subpackage and one or more implementations:
 
 - **`PipelineProgress`** (in `progress.py`) is the live checklist TUI that shows transcription, diarization sub-steps, and summarization with animated spinners/progress bars. It should not be replaced or simplified.
 - **`README.md`** should be kept in sync when CLI commands are added or changed.
+- **Four project skills hold the traps that cost real failures. Read the relevant one BEFORE working, not after a green run:**
+  - `.claude/skills/swift-suite-hygiene/SKILL.md` — how to run and trust the Swift suite. Two frameworks print two separate totals; `tail` destroys the number; a run past 90s is a deadlock, not a slow build; `timeout` does not exist here and returns a green from a command that never ran.
+  - `.claude/skills/ownscribe-pipeline-traps/SKILL.md` — which binary production actually loads, why absent must never render as zero, the dependency dead-ends with no config-only fix, and which fixtures are real user data.
+  - `~/.claude/skills/test-sabotage-audit/SKILL.md` (user scope) — the audit that finds tests guarding nothing. Sabotage the production function, not the test.
 - **Before touching anything under `swift/`, the capture backend or the mute path, read `.claude/skills/macos-audio-capture/SKILL.md`.** It holds the macOS facts that cost real failures: why the CoreAudio tap beats ScreenCaptureKit on permissions, why the embedded Info.plist is load-bearing (its absence froze Zoom), the verify-after-set mute guard for the documented AirPods bug, why restore-unmute must cover every exit path, and why the signing cert must never be recreated.
 - **Transcription threads**: whisperx defaults to `threads=4`; this project sizes CTranslate2 to the performance-core count instead (`transcription.cpu_threads` to override). Do not raise it to `os.cpu_count()` — including the efficiency cores measurably slows the batch.
 

@@ -1,11 +1,18 @@
 # TODO — meeting-scribe
 
-## Status: 906 tests green (630 Python + 276 Swift, 4 skipped), HEAD `950799c`, pushed through `532f363` — 11 commits held locally.
+## Status: 926 tests green (635 Python + 291 Swift), 4 Swift skipped + 1 Python deselected, HEAD `178b05d`, pushed through `532f363` — 12 commits held locally.
+
+Measured 2026-07-28, not quoted: `uv run pytest -q` → 635 passed, 1 deselected. Swift needs both
+frameworks counted — `swift test` prints an XCTest total (276, of which 4 skipped) AND a separate
+`Test run with 19 tests` for swift-testing, so the real figure is 291 passing. Every earlier "276
+Swift" in this file's history was XCTest-only. Do not pipe the run through `tail` to read the
+total: it truncates the summary away, and inside a `> file` redirect it destroys the number on
+disk. `bash scripts/check.sh` → all 10 gates green including the release build.
 
 **⚠️ THE DESIGN IS NOT GOOD. The user opened the built app on 2026-07-28 and rejected it.**
 
 And read how this line got here, because the mistake is worse than the design: earlier
-the same day this file claimed the Glass direction was delivered, on the reasoning that
+on 2026-07-28 this file claimed the Glass direction was delivered, on the reasoning that
 raising the deployment target to macOS 26 made standard components adopt Liquid Glass
 automatically. The user opened the app, saw stock SwiftUI, and said so. That was corrected,
 `glassEffect()` was applied to the sidebar and inspector, avatars and an envelope strip were
@@ -54,9 +61,9 @@ One test is deliberately skipped: the merge-failure path only runs with a live `
 
 **⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
-**⚠️ ONE THING NEEDS YOU: the window has never been seen.** It has 163 passing tests and zero visual verification — every `screencapture` came back black because the display was asleep, and the accessibility API reports no windows for one never opened. Open it with **⌘0** from the menu bar and say what you think. No audit can close this.
+**⚠️ ONE THING NEEDS YOU: which part of the design is wrong.** The window HAS now been seen — twice on 2026-07-28, and rejected both times (see the top of this file). What has never happened is a *specific* reading: "pas bon du tout" is a verdict on the whole, and nobody has named a part. So this is not "open it and say what you think" any more; it is "open ⌘0 and tell me which of the eight checks in `APP_TEST.md` § Design pass fails, and how". No audit can close this, and no amount of guessing at spacing can either.
 
-**The installed bundle is from before the window landed.** Re-run `bash swift/build-app.sh` to get it.
+**The installed bundle predates `950799c` and `178b05d`.** Re-run `bash swift/build-app.sh` before judging appearance — otherwise you are looking at older code. (Never let an agent run it: it `rm -rf`s the installed bundle and its TCC grants.)
 
 **A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
 
@@ -64,7 +71,7 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
-**Transcription is 34% faster** since `c1e1f3d`: it now sizes CTranslate2 to the performance-core count instead of whisperx's `threads=4` default. Measured on a 90s slice of that call: 30.9s → 20.5s with a word-identical transcript.
+**Transcription is 34% faster** since `c1e1f3d`: it now sizes CTranslate2 to the performance-core count instead of whisperx's `threads=4` default. Measured on a 90s slice of that call: 30.9s → 20.5s with a word-identical transcript. ⚠️ **NOT REPRODUCIBLE as recorded** — neither the slice file nor the command was kept, so this number cannot be re-derived today. It is reported as a historical measurement, not a live claim; re-measure before relying on it, and keep the input and the command next time.
 
 ## What shipped (2026-07-28)
 
@@ -95,6 +102,16 @@ Deliberately unbuilt, not bugs:
   "scrambled transcript that looks fine" failure.
 - **`AudioTracksPresence` checks existence only.** A zero-byte `mic.wav` would show a green
   checkmark. BUG4 shipped 33.5s of silence past a green suite, so this is the shape to watch.
+  *(Now closed in `71de1ee` — it reads real frames and excludes zero-byte files. An independent
+  mutation confirmed it: replacing the frame check with `duration > 0` turns the real-silent-file
+  test RED against the actual BUG4 artifact.)*
+- **`SpeakerAvatarStyle`'s and `BadgeText`'s call sites in the views are untested**, confirmed by
+  grep: `MeetingDetailView` and `LibraryWindow` appear nowhere under `swift/Tests/`. So reverting
+  the avatar label to `split("_").last` (which rendered `Léa_B` as `B`), or the colour to the
+  per-process `hashValue`, or the badge to `?? 0`, survives all 291 tests. The helpers are
+  well covered; their consumption is review-guarded only. Closing this needs a view-host test —
+  the thing that deadlocked this project twice for 29 minutes holding the SwiftPM lock — so it
+  stays open as a NAMED gap rather than a pretended pass.
 
 W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
 investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
@@ -169,7 +186,7 @@ The rest:
 
 **Three of the fixes' own tests could not fail** and were caught by mutation: a bare `XCTAssert(true)`, a spy asserted instead of the child process, and a `phase == .recording(startedAt: Date())` comparison that is false in every state. A green suite is not evidence — breaking the thing a test defends and watching it go red is.
 
-## YOUR TURN — 2 steps left (step 1 is DONE)
+## YOUR TURN — step 1 is DONE, steps 2 and 3 remain
 
 ### 1. Build the app — DONE 2026-07-27
 
