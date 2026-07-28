@@ -94,6 +94,7 @@ class TestComputeRMSEnvelope:
             pytest.skip("Reference recording not available on this machine")
 
         envelope = generate_envelope_from_file(audio_path, n_buckets=170)
+        assert envelope is not None, "real recording file must produce an envelope, not None"
 
         # Reference measurements
         assert len(envelope) == 170
@@ -122,6 +123,7 @@ class TestGenerateEnvelopeFromFile:
         sf.write(audio_path, audio, 48000)
 
         envelope = generate_envelope_from_file(audio_path, n_buckets=10)
+        assert envelope is not None, "valid audio file must produce an envelope, not None"
 
         assert len(envelope) == 10
         assert envelope.dtype == np.float32
@@ -138,6 +140,7 @@ class TestGenerateEnvelopeFromFile:
         sf.write(audio_path, audio, 48000)
 
         envelope = generate_envelope_from_file(audio_path, n_buckets=10)
+        assert envelope is not None, "valid audio file must produce an envelope, not None"
 
         assert len(envelope) == 10
         assert envelope.dtype == np.float32
@@ -162,6 +165,7 @@ class TestGenerateEnvelopeFromFile:
         sf.write(audio_path, audio, 48000)
 
         envelope = generate_envelope_from_file(audio_path, n_buckets=10)
+        assert envelope is not None, "real silent file must produce an envelope, not None"
 
         assert len(envelope) == 10
         assert np.all(envelope == 0.0)
@@ -178,6 +182,7 @@ def test_envelope_json_format_is_compact(tmp_path):
     sf.write(audio_path, audio, 48000)
 
     envelope = generate_envelope_from_file(audio_path, n_buckets=500)
+    assert envelope is not None, "valid audio file must produce an envelope, not None"
 
     json_path = tmp_path / "envelope.json"
     json_path.write_text(json.dumps({"envelope": envelope.tolist()}))

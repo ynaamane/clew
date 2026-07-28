@@ -186,6 +186,7 @@ class TestEnvelopeOnRealAudio:
 
         envelope = generate_envelope_from_file(output, n_buckets=500)
 
+        assert envelope is not None, "successful capture must produce an envelope, not None"
         assert len(envelope) == 500, (
             f"got {len(envelope)} buckets; the window's timeline assumes exactly the count it asked for"
         )
@@ -201,6 +202,7 @@ class TestEnvelopeOnRealAudio:
         _run_capture(output, 2.0)
 
         envelope = generate_envelope_from_file(output, n_buckets=500)
+        assert envelope is not None, "successful capture must produce an envelope, not None"
         envelope_path = tmp_path / "envelope.json"
         envelope_path.write_text(json.dumps({"envelope": envelope.tolist()}))
 
