@@ -11,11 +11,11 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        XCTAssertFalse(keyPoint.anchors.isEmpty, "Key point should have anchors")
-        XCTAssertEqual(keyPoint.anchors.count, 1)
-        XCTAssertNotNil(keyPoint.anchors["Gary"])
+        XCTAssertNotNil(keyPoint.anchors, "Key point should have anchors")
+        XCTAssertEqual(keyPoint.anchors?.count, 1)
+        XCTAssertNotNil(keyPoint.anchors?["Gary"])
 
-        let firstAnchor = keyPoint.anchors["Gary"]?.first
+        let firstAnchor = keyPoint.anchors?["Gary"]?.first
         XCTAssertEqual(firstAnchor?.timestamp, "08:30")
     }
 
@@ -31,13 +31,13 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(keyPoint.anchors.count, 2, "Should have two anchored tokens")
+        XCTAssertEqual(keyPoint.anchors?.count, 2, "Should have two anchored tokens")
 
-        let jwtAnchors = keyPoint.anchors["JWT"]
+        let jwtAnchors = keyPoint.anchors?["JWT"]
         XCTAssertEqual(jwtAnchors?.count, 2, "JWT should have two timestamps")
         XCTAssertEqual(jwtAnchors?.first?.timestamp, "05:28")
 
-        let lambdaAnchors = keyPoint.anchors["Lambda"]
+        let lambdaAnchors = keyPoint.anchors?["Lambda"]
         XCTAssertEqual(lambdaAnchors?.count, 1)
         XCTAssertEqual(lambdaAnchors?.first?.timestamp, "05:09")
     }
@@ -48,7 +48,8 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             anchors: [:]
         )
 
-        XCTAssertTrue(keyPoint.anchors.isEmpty, "Key point should have no anchors")
+        XCTAssertNotNil(keyPoint.anchors, "Anchors should be non-nil empty dict")
+        XCTAssertTrue(keyPoint.anchors?.isEmpty == true, "Key point should have no anchors")
     }
 
     func testAnchorTimestampFormat() {
@@ -69,7 +70,7 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        let jwtAnchors = keyPoint.anchors["JWT"]
+        let jwtAnchors = keyPoint.anchors?["JWT"]
         XCTAssertEqual(jwtAnchors?.count, 2, "Both anchors are stored")
 
         let firstTimestamp = jwtAnchors?.first?.timestamp
@@ -86,7 +87,16 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        let sortedKeys = Array(keyPoint.anchors.keys.sorted())
+        let sortedKeys = Array(keyPoint.anchors?.keys.sorted() ?? [])
         XCTAssertEqual(sortedKeys, ["Gary", "JWT", "Zoom"], "Keys should be alphabetically sorted")
+    }
+
+    func testKeyPointWithNilAnchorsShowsNotYetVerified() {
+        let keyPoint = KeyPointWithAnchors(
+            text: "Some claim without anchoring",
+            anchors: nil
+        )
+
+        XCTAssertNil(keyPoint.anchors, "Anchors should be nil when file is absent")
     }
 }

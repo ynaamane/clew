@@ -2,9 +2,9 @@ import Foundation
 
 public struct KeyPointWithAnchors: Equatable {
     public let text: String
-    public let anchors: [String: [TokenAnchor]]
+    public let anchors: [String: [TokenAnchor]]?
 
-    public init(text: String, anchors: [String: [TokenAnchor]]) {
+    public init(text: String, anchors: [String: [TokenAnchor]]?) {
         self.text = text
         self.anchors = anchors
     }
@@ -35,11 +35,15 @@ public struct MeetingInspectorState {
         }
 
         let anchorsURL = directory.appendingPathComponent("anchors.json")
-        let allAnchors = AnchorsReader.loadAnchors(from: anchorsURL, fileManager: fileManager) ?? [:]
+        let allAnchors = AnchorsReader.loadAnchors(from: anchorsURL, fileManager: fileManager)
 
         return summary.keyPoints.map { keyPoint in
-            let matchingAnchors = AnchorsReader.findAnchorsForText(keyPoint, in: allAnchors)
-            return KeyPointWithAnchors(text: keyPoint, anchors: matchingAnchors)
+            if let allAnchors {
+                let matchingAnchors = AnchorsReader.findAnchorsForText(keyPoint, in: allAnchors)
+                return KeyPointWithAnchors(text: keyPoint, anchors: matchingAnchors)
+            } else {
+                return KeyPointWithAnchors(text: keyPoint, anchors: nil)
+            }
         }
     }
 

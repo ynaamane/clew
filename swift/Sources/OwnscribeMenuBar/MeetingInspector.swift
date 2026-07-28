@@ -21,20 +21,27 @@ struct MeetingInspector: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(keyPoint.text)
                                     .font(.callout)
-                                if keyPoint.anchors.isEmpty {
-                                    Text("—")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    HStack(spacing: 8) {
-                                        ForEach(Array(keyPoint.anchors.keys.sorted()), id: \.self) { token in
-                                            if let anchors = keyPoint.anchors[token], let first = anchors.first {
-                                                Text("\(token)→\(first.timestamp)")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
+                                if let anchors = keyPoint.anchors {
+                                    if anchors.isEmpty {
+                                        Text("—")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        HStack(spacing: 8) {
+                                            ForEach(Array(anchors.keys.sorted()), id: \.self) { token in
+                                                if let tokenAnchors = anchors[token], let first = tokenAnchors.first {
+                                                    Text("\(token)→\(first.timestamp)")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
                                             }
                                         }
                                     }
+                                } else {
+                                    Text("(pas encore vérifié)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                        .italic()
                                 }
                             }
                         }
@@ -76,15 +83,9 @@ struct MeetingInspector: View {
                         Text(track.filename)
                             .font(.callout)
                         Spacer()
-                        if track.isPresent {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.green)
-                                .font(.caption)
-                        } else {
-                            Text("—")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                        }
+                        Text(track.displayStatus)
+                            .foregroundStyle(track.hasContent ? .green : .secondary)
+                            .font(.caption)
                     }
                 }
             }

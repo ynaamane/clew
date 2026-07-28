@@ -3,18 +3,29 @@ import Foundation
 public struct MeetingCounts {
     public static func compute(
         summaryDirectory: URL,
+        configURL: URL? = nil,
         fileManager: FileManager = .default
     ) -> (actionItemCount: Int?, unanchoredClaimCount: Int?) {
-        let summaryURL = summaryDirectory.appendingPathComponent("summary.md")
-        let anchorsURL = summaryDirectory.appendingPathComponent("anchors.json")
+        let resolvedConfigURL: URL
+        if let configURL {
+            resolvedConfigURL = configURL
+        } else {
+            let homeDir = fileManager.homeDirectoryForCurrentUser
+            resolvedConfigURL = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        }
 
-        guard fileManager.fileExists(atPath: summaryURL.path) else {
+        guard let summary = MeetingInspectorState.loadSummary(
+            from: summaryDirectory,
+            configURL: resolvedConfigURL,
+            fileManager: fileManager
+        ) else {
             return (nil, nil)
         }
 
-        let actionCount = countActionItems(summaryURL: summaryURL)
+        let anchorsURL = summaryDirectory.appendingPathComponent("anchors.json")
+        let actionCount = summary.actionItems.count
         let unanchoredCount = countUnanchoredClaims(
-            summaryURL: summaryURL,
+            summary: summary,
             anchorsURL: anchorsURL,
             fileManager: fileManager
         )
@@ -22,20 +33,12 @@ public struct MeetingCounts {
         return (actionCount, unanchoredCount)
     }
 
-    private static func countActionItems(summaryURL: URL) -> Int? {
-        guard let summary = try? SummaryDocument(contentsOf: summaryURL) else {
-            return nil
-        }
-        return summary.actionItems.count
-    }
-
     private static func countUnanchoredClaims(
-        summaryURL: URL,
+        summary: SummaryDocument,
         anchorsURL: URL,
         fileManager: FileManager
     ) -> Int? {
-        guard let summary = try? SummaryDocument(contentsOf: summaryURL),
-              let anchors = AnchorsReader.loadAnchors(from: anchorsURL, fileManager: fileManager) else {
+        guard let anchors = AnchorsReader.loadAnchors(from: anchorsURL, fileManager: fileManager) else {
             return nil
         }
 

@@ -70,17 +70,17 @@ final class MeetingInspectorKeyPointAnchorsTests: XCTestCase {
 
         let firstPoint = result?[0]
         XCTAssertEqual(firstPoint?.text, "Gary discussed a bug that needs checking")
-        XCTAssertEqual(firstPoint?.anchors.count, 1, "First point has one anchor")
-        XCTAssertEqual(firstPoint?.anchors["Gary"]?.first?.timestamp, "08:30")
+        XCTAssertEqual(firstPoint?.anchors?.count, 1, "First point has one anchor")
+        XCTAssertEqual(firstPoint?.anchors?["Gary"]?.first?.timestamp, "08:30")
 
         let secondPoint = result?[1]
         XCTAssertEqual(secondPoint?.text, "JWT authentication setup was reviewed")
-        XCTAssertEqual(secondPoint?.anchors.count, 1, "Second point has JWT")
-        XCTAssertEqual(secondPoint?.anchors["JWT"]?.count, 2, "JWT has two timestamps")
+        XCTAssertEqual(secondPoint?.anchors?.count, 1, "Second point has JWT")
+        XCTAssertEqual(secondPoint?.anchors?["JWT"]?.count, 2, "JWT has two timestamps")
 
         let fourthPoint = result?[3]
         XCTAssertEqual(fourthPoint?.text, "The possibility of using a fictitious user for testing was considered")
-        XCTAssertTrue(fourthPoint?.anchors.isEmpty == true, "Fourth point has no anchors")
+        XCTAssertTrue(fourthPoint?.anchors?.isEmpty == true, "Fourth point has no anchors")
     }
 
     func testLoadKeyPointsWithNoAnchorsFile() {
@@ -105,8 +105,8 @@ final class MeetingInspectorKeyPointAnchorsTests: XCTestCase {
 
         XCTAssertNotNil(result, "Should still load key points without anchors file")
         XCTAssertEqual(result?.count, 2, "Two key points")
-        XCTAssertTrue(result?[0].anchors.isEmpty == true, "No anchors")
-        XCTAssertTrue(result?[1].anchors.isEmpty == true, "No anchors")
+        XCTAssertNil(result?[0].anchors, "No anchors file means nil")
+        XCTAssertNil(result?[1].anchors, "No anchors file means nil")
     }
 
     func testLoadKeyPointsWithNoSummaryFile() {
@@ -151,8 +151,8 @@ final class MeetingInspectorKeyPointAnchorsTests: XCTestCase {
 
         XCTAssertEqual(result?.count, 1)
         let point = result?[0]
-        XCTAssertEqual(point?.anchors.count, 2, "Case-insensitive match finds both tokens")
-        XCTAssertNotNil(point?.anchors["Gary"])
-        XCTAssertNotNil(point?.anchors["JWT"])
+        XCTAssertEqual(point?.anchors?.count, 2, "Case-insensitive match finds both tokens")
+        XCTAssertNotNil(point?.anchors?["Gary"])
+        XCTAssertNotNil(point?.anchors?["JWT"])
     }
 }

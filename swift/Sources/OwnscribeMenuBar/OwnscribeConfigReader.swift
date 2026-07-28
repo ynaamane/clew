@@ -80,7 +80,7 @@ public struct OwnscribeConfigReader {
         if let hashIndex = value.firstIndex(of: "#") {
             value = String(value[..<hashIndex]).trimmingCharacters(in: .whitespaces)
         }
-        return value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        return value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
     }
 
     public static func parseOutputSettings(fromTOML text: String?) -> OutputSettings {
