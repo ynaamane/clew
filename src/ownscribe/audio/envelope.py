@@ -46,7 +46,7 @@ def compute_rms_envelope(audio: np.ndarray, n_buckets: int) -> np.ndarray:
     return envelope / peak if peak > 0 else envelope
 
 
-def generate_envelope_from_file(audio_path: Path, n_buckets: int) -> np.ndarray:
+def generate_envelope_from_file(audio_path: Path, n_buckets: int) -> np.ndarray | None:
     """
     Generate RMS envelope from an audio file.
 
@@ -57,7 +57,7 @@ def generate_envelope_from_file(audio_path: Path, n_buckets: int) -> np.ndarray:
         n_buckets: Number of buckets to divide the audio into
 
     Returns:
-        1D array of length n_buckets, normalized to [0, 1]
+        1D array of length n_buckets, normalized to [0, 1], or None if file cannot be read
     """
     try:
         import soundfile as sf
@@ -68,4 +68,4 @@ def generate_envelope_from_file(audio_path: Path, n_buckets: int) -> np.ndarray:
         return compute_rms_envelope(audio_mono, n_buckets)
 
     except (FileNotFoundError, RuntimeError):
-        return np.zeros(n_buckets, dtype=np.float32)
+        return None

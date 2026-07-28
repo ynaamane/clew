@@ -399,6 +399,8 @@ def _generate_and_save_envelope(audio_path: Path, out_dir: Path) -> None:
     from ownscribe.audio.envelope import generate_envelope_from_file
 
     envelope = generate_envelope_from_file(audio_path, n_buckets=500)
+    if envelope is None:
+        return
     envelope_path = out_dir / "envelope.json"
     envelope_path.write_text(json.dumps({"envelope": envelope.tolist()}))
 

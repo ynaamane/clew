@@ -146,13 +146,12 @@ class TestGenerateEnvelopeFromFile:
         assert envelope[0] == pytest.approx(envelope[9], rel=0.1)
 
     def test_handles_missing_file_gracefully(self, tmp_path):
-        """Missing audio file should return all zeros without crashing."""
+        """Missing audio file should return None without crashing."""
         audio_path = tmp_path / "nonexistent.wav"
 
         envelope = generate_envelope_from_file(audio_path, n_buckets=10)
 
-        assert len(envelope) == 10
-        assert np.all(envelope == 0.0)
+        assert envelope is None
 
     def test_handles_silent_file(self, tmp_path):
         """Completely silent file should return all zeros."""
