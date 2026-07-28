@@ -174,6 +174,11 @@ public final class AppState {
         set { recordingController.makeSystemCapture = newValue }
     }
 
+    var micCaptureFactory: (() -> MicCapture?) {
+        get { recordingController.makeMicCapture }
+        set { recordingController.makeMicCapture = newValue }
+    }
+
     var pipelineRunnerFactory: (() -> PipelineRunning?)? {
         didSet {
             if let factory = pipelineRunnerFactory {
@@ -188,6 +193,11 @@ public final class AppState {
 
     public func refreshRecentMeetings() {
         recentMeetings = RecentTranscriptsStore.recentMeetings(in: outputDir)
+    }
+
+    public func dismissFailure() {
+        guard case .failed = phase else { return }
+        phase = .idle
     }
 
     public func toggleRecording() async {

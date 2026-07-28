@@ -6,6 +6,7 @@ struct LibraryWindow: View {
     @Environment(AppState.self) private var appState
     @State private var selectedFilter: LibraryFilter = .all
     @State private var selectedMeeting: MeetingSummary?
+    @State private var showBannerDetail = false
 
     private var sections: [LibrarySidebarSection] {
         LibrarySidebar.sections(for: appState.recentMeetings, enrolledSpeakers: appState.enrolledSpeakers)
@@ -17,18 +18,31 @@ struct LibraryWindow: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedFilter) {
-                ForEach(sections) { section in
-                    Section(section.title) {
-                        ForEach(section.items) { item in
-                            Label(item.title, systemImage: item.filter.symbolName)
-                                .badge(item.count ?? 0)
-                                .tag(item.filter)
+            ZStack(alignment: .top) {
+                List(selection: $selectedFilter) {
+                    ForEach(sections) { section in
+                        Section(section.title) {
+                            ForEach(section.items) { item in
+                                Label(item.title, systemImage: item.filter.symbolName)
+                                    .badge(item.count ?? 0)
+                                    .tag(item.filter)
+                            }
                         }
                     }
                 }
+                .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
+
+                if let banner = currentBanner, showBannerDetail || banner.severity == .warning {
+                    VStack {
+                        InlineBanner(state: banner) {
+                            appState.dismissFailure()
+                            showBannerDetail = false
+                        }
+                        .padding(12)
+                        Spacer()
+                    }
+                }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
         } content: {
             MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 292, max: 380)
@@ -46,6 +60,14 @@ struct LibraryWindow: View {
                     Label(step, systemImage: "circle.lefthalf.filled")
                         .foregroundStyle(.orange)
                 }
+                if case .failed = appState.phase {
+                    Button {
+                        showBannerDetail.toggle()
+                    } label: {
+                        Label("Error", systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                }
                 Button {
                     Task { await appState.toggleRecording() }
                 } label: {
@@ -54,6 +76,19 @@ struct LibraryWindow: View {
             }
         }
         .task { appState.refreshRecentMeetings() }
+        .onChange(of: appState.phase) { _, newPhase in
+            if case .failed = newPhase {
+                showBannerDetail = true
+            }
+        }
+    }
+
+    private var currentBanner: BannerState? {
+        BannerState.bannerState(
+            phase: appState.phase,
+            muteWarning: appState.muteWarning,
+            muteIndicator: appState.muteIndicator
+        )
     }
 }
 
