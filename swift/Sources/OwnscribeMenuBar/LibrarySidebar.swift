@@ -13,9 +13,9 @@ public enum LibraryFilter: Hashable {
         case .all, .enroll:
             return meetings
         case .withActions:
-            return meetings.filter { $0.actionItemCount > 0 }
+            return meetings.filter { ($0.actionItemCount ?? 0) > 0 }
         case .unanchored:
-            return meetings.filter { $0.unanchoredClaimCount > 0 }
+            return meetings.filter { ($0.unanchoredClaimCount ?? 0) > 0 }
         case .notIndexed:
             return meetings.filter { !$0.hasSummary }
         case .speaker:

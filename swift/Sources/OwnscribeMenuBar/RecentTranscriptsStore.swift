@@ -5,15 +5,15 @@ public struct MeetingSummary: Identifiable, Hashable {
     public let directory: URL
     public let hasTranscript: Bool
     public let hasSummary: Bool
-    public let actionItemCount: Int
-    public let unanchoredClaimCount: Int
+    public let actionItemCount: Int?
+    public let unanchoredClaimCount: Int?
 
     public init(
         directory: URL,
         hasTranscript: Bool,
         hasSummary: Bool,
-        actionItemCount: Int = 0,
-        unanchoredClaimCount: Int = 0
+        actionItemCount: Int? = nil,
+        unanchoredClaimCount: Int? = nil
     ) {
         self.id = directory.path
         self.directory = directory
@@ -77,10 +77,17 @@ public struct RecentTranscriptsStore {
         }
 
         let summaries = directories.map { dir in
-            MeetingSummary(
+            let counts = MeetingCounts.compute(
+                summaryDirectory: dir,
+                fileManager: fileManager
+            )
+
+            return MeetingSummary(
                 directory: dir,
                 hasTranscript: hasAny(named: "transcript", in: dir, fileManager: fileManager),
-                hasSummary: hasAny(named: "summary", in: dir, fileManager: fileManager)
+                hasSummary: hasAny(named: "summary", in: dir, fileManager: fileManager),
+                actionItemCount: counts.actionItemCount,
+                unanchoredClaimCount: counts.unanchoredClaimCount
             )
         }
 
