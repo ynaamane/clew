@@ -27,8 +27,9 @@ struct MeetingDetailView: View {
         }
         .navigationTitle(meeting.displayTitle)
         .task(id: meeting.id) {
-            transcript = loadTranscript()
-            envelope = loadEnvelope()
+            let assets = loadMeetingAssets(from: meeting)
+            transcript = assets.transcript
+            envelope = assets.envelope
         }
     }
 
@@ -81,14 +82,6 @@ struct MeetingDetailView: View {
         return showBackchannel ? transcript.utterances : transcript.utterances.filter { !$0.isBackchannel }
     }
 
-    private func loadTranscript() -> TranscriptDocument? {
-        let path = meeting.directory.appendingPathComponent("transcript.md")
-        return try? TranscriptDocument(contentsOf: path)
-    }
-
-    private func loadEnvelope() -> EnvelopeDocument? {
-        EnvelopeDocument.load(from: meeting.directory)
-    }
 
     static func durationText(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())

@@ -177,6 +177,6 @@ final class MeetingInspectorConfigFormatTests: XCTestCase {
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.count, 2)
         XCTAssertEqual(result?[0].text, "Gary discussed a bug")
-        XCTAssertEqual(result?[0].anchors.count, 1)
+        XCTAssertEqual(result?[0].anchors?.count, 1)
     }
 }
