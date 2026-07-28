@@ -1,8 +1,10 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 773 tests green, HEAD `e793000`, everything pushed.
+## Status: the app has a window. 787 tests green, HEAD `b0ce8db`, commit held for your review.
 
-773 tests green (610 Python + 163 Swift). The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
+787 tests green (610 Python + 177 Swift).
+
+**⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
 **⚠️ ONE THING NEEDS YOU: the window has never been seen.** It has 163 passing tests and zero visual verification — every `screencapture` came back black because the display was asleep, and the accessibility API reports no windows for one never opened. Open it with **⌘0** from the menu bar and say what you think. No audit can close this.
 
@@ -18,7 +20,17 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 ## Open bugs
 
-None. BUG0/1/2/3/4/5 + all 11 review findings closed, each verified by mutation rather than by a green suite. See LESSONS_LEARNED.md.
+Three, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
+all the same shape — a value plumbed to a consumer that is never reached:
+
+- **W0-6** — two recordings in the same minute overwrite each other's audio (PROVEN with a compiled
+  probe; data loss; reachable because of W0-3).
+- **W0-4** — the sidebar's action/anchor filters and the "non ancré" badge are dead in production
+  (no writer for either count field).
+- **W0-5** — nothing in Swift reads `envelope.json`, so the timeline cannot be drawn.
+
+None of the three can be caught by a green suite, which is how all three survived. BUG0/1/2/3/4/5 +
+all 11 review findings + W0-1/2/3 are closed, each verified by mutation. See LESSONS_LEARNED.md.
 
 ## The Glass batch — what the app gained (2026-07-27, evening)
 
@@ -140,22 +152,68 @@ unverified state, same class as the mute-icon bug) and the parser's double-count
 stamped line → bare line invents an utterance and puts it out of chronological order). A property
 with a single consumer is the shape that escapes coverage.
 
+## What W0-2/W0-3 changed (2026-07-28) — commit `b0ce8db`, needs 2 hardware checks
+
+Two ways the app asserted state it had never checked. Both mutation-verified in a `git worktree`
+(not a copied tree — a copied `swift/.build` fails to compile on a path-pinned module cache, which
+reads exactly like a discriminating test).
+
+- **The menu bar reported the mic as live on every launch.** `isMuted` was hardcoded `false` and
+  `readInputMute()` was never called although the device implemented it. A mic left muted by a
+  crash, a force-quit or another app read as "Mute" — meaning NOT muted — so you would join a call
+  believing you were heard. It is now seeded from the hardware.
+- **But seeding alone would have been worse**, which is the part worth remembering. `restoreUnmutedOnQuit`
+  fires on every exit path, so a mute *you* made in System Settings would have been silently undone
+  when the app quit. The state now separates a mute this app PERFORMED from one it merely OBSERVED:
+  ownership is taken only when a set is confirmed by read-back, and an observed mute is displayed
+  truthfully and never touched.
+- **Stopping a call bricked the next one.** A click during `.processing` was swallowed and the menu
+  rendered no start button at all. Allowing it exposed a second defect: `runPipeline` assigned
+  `.done`/`.failed` unconditionally, so the finishing pipeline clobbered the live recording — the
+  menu would claim "last meeting saved" mid-recording and that recording could not be stopped from
+  the UI. Both terminal transitions now go through a helper that declines once the phase has moved on.
+
+Mutations: success guard dropped → 4 of 7 red · failure guard dropped → 1 of 7 (guarded
+independently) · ownership check reverted → 2 red · hardware seeding reverted → 8 red.
+
+**The two checks that decide whether `b0ce8db` gets pushed** (rebuild first — `bash swift/build-app.sh`):
+
+- [ ] Mute yourself in **System Settings → Sound → Input**, launch the app, confirm the menu shows
+      "Unmute" (not "Mute"), then quit with ⌘Q and confirm **the mic is STILL muted**. If the app
+      unmuted it, the ownership logic is wrong and the commit must not ship.
+- [ ] Mute *through the app*, quit with ⌘Q, confirm the mic **is** unmuted. This is the existing
+      guarantee and must not have regressed.
+
 ## What comes next, in order
 
 1. **Look at the window** (⌘0). Everything below is cheaper to do once you have said whether the
    Glass direction reads right in practice.
-2. **W0-2 — seed the mute state from the hardware at launch.** `AppState.swift` hardcodes
-   `isMuted = false` and never calls `readInputMute()`, even though the device implements it. If the
-   mic was left muted by a crash, a force-quit or another app, the menu reads "Mute" — meaning NOT
-   muted — and you join a call believing you are live.
-3. **W0-3 — keep Start Recording alive during transcription.** `toggleRecording` has
-   `case .processing: break`, so the click is swallowed, and the dropdown renders no Start button at
-   all. Stop a 17-minute call, have the next one dial in, and call two is never recorded.
-4. **Swift side of the envelope strip and the per-speaker lanes.** The Python half ships the data;
-   the window does not draw it yet. This is what makes a silent recording visible at a glance.
-5. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
-   evidence. The anchors exist on disk; nothing reads them in Swift yet.
-6. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
+2. ~~**W0-2** — seed the mute state from the hardware at launch.~~ **DONE** in `b0ce8db`, pending
+   the two hardware checks above.
+3. ~~**W0-3** — keep Start Recording alive during transcription.~~ **DONE** in `b0ce8db`.
+4. **W0-6 — two recordings in the same minute overwrite each other's audio.** PROVEN with a compiled
+   probe, and W0-3 is what makes it reachable: `MeetingOutputPaths` formats the directory as
+   `yyyy-MM-dd_HHmm` with no uniquifier, and `createDirectory` passes
+   `withIntermediateDirectories: true`, which succeeds silently on an existing directory — so the
+   second capture overwrites the first meeting's `recording.wav`. Audio retention is a documented
+   guarantee here (`./rec.sh redo`), so this is data loss. Narrow window: the Python pipeline renames
+   a finished meeting with a title slug, so only a sub-minute back-to-back pair collides — which is
+   exactly the case W0-3 just enabled. Do not change the name FORMAT casually:
+   `RecentTranscriptsStore` parses it for `displayDate` and splits on `_` for `displayTitle`, and a
+   failed parse silently yields "".
+5. **W0-4 — the sidebar's "Avec actions" and "Non ancrées" filters are dead in production.**
+   `RecentTranscriptsStore.recentMeetings` never writes `actionItemCount` / `unanchoredClaimCount`;
+   the only non-zero source in the repo is a test that hand-builds them. Both badges read 0 on every
+   real run and the "N non ancré" warning can never appear — and that badge is the anti-hallucination
+   signal. The data is on disk (`summary.md`, `anchors.json`); nothing in Swift reads `anchors.json`.
+6. **W0-5 — the envelope strip and per-speaker lanes.** `pipeline.py` writes `envelope.json`
+   (500 buckets) and NO Swift file reads it — verified by grep. This is what makes an abnormal
+   silence visible without opening a 400 MB wav. Note the only real meeting on disk has neither
+   `envelope.json` nor `anchors.json` (it predates both), so the absent-file path is the default
+   case, not the edge case.
+7. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
+   evidence. Depends on W0-4's reader.
+8. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
    output dir all live only in TOML.
 
 ## Performance — what is settled and what is open

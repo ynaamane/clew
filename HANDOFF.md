@@ -4,7 +4,11 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**Zéro bug ouvert. L'app a une fenêtre.** 773 tests verts (610 Python + 163 Swift), HEAD `e793000`, tout poussé.
+**L'app a une fenêtre. 787 tests verts** (610 Python + 177 Swift), HEAD `b0ce8db`.
+
+**⚠️ `b0ce8db` est COMMITÉ MAIS PAS POUSSÉ, volontairement.** Il touche le mute système, et sa garantie centrale — l'app ne démute jamais un mute que tu as fait toi-même — n'est pas vérifiable sans matériel. Les deux tests qui décident sont dans `TODO.md` § « What W0-2/W0-3 changed ».
+
+**Trois bugs ouverts, trouvés le 2026-07-28**, tous de la même forme : une valeur câblée jusqu'à un consommateur jamais atteint. Deux enregistrements dans la même minute écrasent leur audio (prouvé par sonde compilée — perte de données, et c'est W0-3 qui le rend atteignable) ; les filtres « Avec actions » / « Non ancrées » de la barre latérale sont morts en production (aucun écrivain pour les deux compteurs) ; rien en Swift ne lit `envelope.json`. Aucun des trois n'est détectable par une suite verte — c'est exactement pour ça qu'ils ont survécu.
 
 **⚠️ Une seule chose attend l'utilisateur : la fenêtre n'a jamais été vue.** Elle a 163 tests verts et zéro vérification visuelle — l'écran était en veille à chaque capture. `⌘0` depuis la barre de menus. Et le bundle installé date d'avant la fenêtre : relancer `bash swift/build-app.sh`.
 
@@ -15,6 +19,8 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 **Il n'y a plus de CI.** GitHub Actions n'a jamais réussi une seule fois (29 `startup_failure` à 0 s, repo privé, runner macOS facturé 10x). Remplacé par `bash scripts/check.sh` : 9 contrôles locaux dont la compile release.
 
 **Une revue de code complète (2026-07-27) a fermé 11 findings réels sur 14.** Quatre relectures indépendantes ont tourné sur le même diff, et **chacune a trouvé ce que les trois autres avaient manqué**. La pire trouvaille est arrivée deux heures après que tout le monde ait déclaré le lot terminé : `silence_timeout` était câblé jusqu'au tap mais le callback n'atteignait personne — l'app ne s'arrêtait donc toujours jamais. Détail dans `TODO.md` § What the review changed.
+
+**Deux leçons du 28 juillet, qui coûtent du temps si on les redécouvre.** (1) Un test qui exige un entrelacement précis sur un acteur sérialisé est le mauvais outil : vérifier que le pipeline qui se termine n'écrase pas l'enregistrement en cours a produit **deux blocages** de 23 min et 6 min, verrou SwiftPM tenu, deux autres agents bloqués — `AppState`, le faux runner et le corps XCTest sont tous `@MainActor` pendant que XCTest fait tourner une runloop sur ce thread. La sortie est d'extraire la DÉCISION de la chorégraphie : une fonction pure, 7 tests, 0,001 s. Un test qui se bloque est pire qu'un test qui échoue — il ne rapporte rien et bloque la machine : on le supprime, on ne le désactive pas. Repère utile : la suite entière tourne en ~38 s, donc au-delà de ~90 s ça bloque, et `lldb -p <pid> --batch -o "thread backtrace all"` nomme la cause en une commande. (2) Corriger un indicateur menteur peut créer un mensonge pire — semer `isMuted` depuis le matériel aurait fait démuter silencieusement au quit un mute fait dans Réglages Système.
 
 Leçon de méthode qui vaut pour la suite : **trois des tests écrits pour ces corrections ne pouvaient pas échouer** (un `XCTAssert(true)` nu, un espion asserté au lieu du processus enfant, une comparaison `phase == .recording(startedAt: Date())` fausse dans tous les cas). Une suite verte n'est pas une preuve. Casser ce qu'un test défend et le voir rougir, si.
 
