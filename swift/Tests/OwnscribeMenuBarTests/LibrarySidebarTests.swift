@@ -93,4 +93,41 @@ final class LibrarySidebarTests: XCTestCase {
 
         XCTAssertEqual(shown.map(\.directory.lastPathComponent), ["five"])
     }
+
+    func testBadgeForSpeakerItemIsNil() {
+        let sections = LibrarySidebar.sections(for: [], enrolledSpeakers: ["Sam"])
+        let speakerItem = sections.flatMap(\.items).first { $0.speakerName == "Sam" }!
+
+        let badge = BadgeText.badgeText(for: speakerItem)
+
+        XCTAssertNil(badge, "Speaker items have no count and must show no badge")
+    }
+
+    func testBadgeForEnrollItemIsNil() {
+        let sections = LibrarySidebar.sections(for: [], enrolledSpeakers: [])
+        let enrollItem = sections.flatMap(\.items).first { $0.filter == .enroll }!
+
+        let badge = BadgeText.badgeText(for: enrollItem)
+
+        XCTAssertNil(badge, "Enroll action has no count and must show no badge")
+    }
+
+    func testBadgeForZeroCountShowsZero() {
+        let sections = LibrarySidebar.sections(for: [], enrolledSpeakers: [])
+        let allItem = sections.flatMap(\.items).first { $0.filter == .all }!
+
+        let badge = BadgeText.badgeText(for: allItem)
+
+        XCTAssertEqual(badge, "0", "A real zero count renders as '0'")
+    }
+
+    func testBadgeForPositiveCountShowsNumber() {
+        let meetings = [meeting("one"), meeting("two"), meeting("three")]
+        let sections = LibrarySidebar.sections(for: meetings, enrolledSpeakers: [])
+        let allItem = sections.flatMap(\.items).first { $0.filter == .all }!
+
+        let badge = BadgeText.badgeText(for: allItem)
+
+        XCTAssertEqual(badge, "3")
+    }
 }

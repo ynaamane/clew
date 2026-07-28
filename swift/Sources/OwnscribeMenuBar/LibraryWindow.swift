@@ -24,13 +24,14 @@ struct LibraryWindow: View {
                         Section(section.title) {
                             ForEach(section.items) { item in
                                 Label(item.title, systemImage: item.filter.symbolName)
-                                    .badge(item.count ?? 0)
+                                    .badge(BadgeText.badgeText(for: item))
                                     .tag(item.filter)
                             }
                         }
                     }
                 }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
+                .glassEffect()
 
                 if let banner = currentBanner, showBannerDetail || banner.severity == .warning {
                     VStack {
