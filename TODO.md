@@ -1,8 +1,12 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 802 tests green, HEAD `8b9775c`, two commits held for your review.
+## Status: the app has a window. 807 tests green, HEAD `e51000f`, three commits held for your review.
 
-802 tests green (616 Python + 186 Swift). `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+807 tests green (617 Python + 190 Swift, 1 skipped by design). `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+
+**The test suite no longer touches your microphone.** Running `swift test` used to degrade the machine's audio: 0 CoreAudio PauseIO/ResumeIO cycles before a run, **7920 after**, with the AirPods Max input dropped to 24 kHz (the HFP phone-call profile) instead of 48 kHz — which dulls playback in every app until macOS renegotiates. Three suites reached the real input device. Fixed in `e51000f`; a full run now measures **0 cycles**. If you ever see the mic sitting at 24 kHz again, that is the symptom, and `/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'` is the meter (use the absolute path — a zsh function shadows `log`).
+
+One test is deliberately skipped: the merge-failure path only runs with a live `MicCapture`, so it needs `OWNSCRIBE_TEST_REAL_MIC=1` and built-in hardware. A hardware-free test covers the same guarantee.
 
 **⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 

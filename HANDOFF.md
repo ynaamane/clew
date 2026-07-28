@@ -4,7 +4,9 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**L'app a une fenêtre. 802 tests verts** (616 Python + 186 Swift), HEAD `8b9775c`.
+**L'app a une fenêtre. 807 tests verts** (617 Python + 190 Swift, 1 sauté volontairement), HEAD `e51000f`.
+
+**La suite de tests ne touche plus ton micro.** `swift test` dégradait l'audio de la machine : 0 cycle CoreAudio `PauseIO/ResumeIO` avant un run, **7920 après**, et l'entrée des AirPods Max bloquée à 24 kHz (profil HFP « téléphone ») au lieu de 48 kHz — ce qui étouffe le son de toutes les apps jusqu'à renégociation. Trois suites atteignaient le vrai périphérique d'entrée. Corrigé dans `e51000f`, un run complet mesure désormais **0 cycle**. La cause profonde vaut d'être retenue : injecter un point d'entrée sur `start()` ne suffisait pas, car `MicCapture` détient `AVAudioEngine` en propriété stockée — le périphérique est réservé à la **construction** de l'objet, pas à son démarrage. Le meter : `/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'` (chemin absolu obligatoire, une fonction zsh masque `log`).
 
 **⚠️ `b0ce8db` est COMMITÉ MAIS PAS POUSSÉ, volontairement.** Il touche le mute système, et sa garantie centrale — l'app ne démute jamais un mute que tu as fait toi-même — n'est pas vérifiable sans matériel. Les deux tests qui décident sont dans `TODO.md` § « What W0-2/W0-3 changed ».
 
