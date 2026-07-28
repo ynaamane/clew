@@ -20,12 +20,13 @@ public final class AppState {
     public private(set) var muteIndicator: MuteIndicator = .notMuted
 
     var unmuteOnQuitAttempts = 3
+    private var appOwnsMute = false
 
     private let recordingController = RecordingController()
     private let muteDevice: AudioMuteDevice
     private let hotKeyRegistration = GlobalHotKeyRegistration()
     private let homeDir: URL
-    private var pipelineRunner: PipelineRunner?
+    private var pipelineRunner: PipelineRunning?
 
     public init(
         homeDir: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -34,11 +35,25 @@ public final class AppState {
         self.homeDir = homeDir
         self.muteDevice = muteDevice
         self.pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
+        seedMuteStateFromHardware()
         applyConfigSettings()
         refreshRecentMeetings()
         registerMuteHotKey()
         registerTerminationObserver()
         registerTerminationSignalHandlers()
+    }
+
+    private func seedMuteStateFromHardware() {
+        guard let hardwareMuted = muteDevice.readInputMute() else {
+            isMuted = false
+            muteIndicator = .notMuted
+            appOwnsMute = false
+            return
+        }
+
+        isMuted = hardwareMuted
+        muteIndicator = hardwareMuted ? .mutedVerified : .notMuted
+        appOwnsMute = false
     }
 
     private func applyConfigSettings() {
@@ -101,6 +116,9 @@ public final class AppState {
         isMuted = outcome.displayMuted
         muteWarning = outcome.warning
         muteIndicator = indicator(for: outcome)
+        if !outcome.usedLocalFallback {
+            appOwnsMute = true
+        }
     }
 
     private func indicator(for outcome: MasterMuteOutcome) -> MuteIndicator {
@@ -109,7 +127,7 @@ public final class AppState {
     }
 
     public func restoreUnmutedOnQuit() {
-        guard isMuted else { return }
+        guard isMuted, appOwnsMute else { return }
 
         for _ in 0..<unmuteOnQuitAttempts {
             let outcome = applyMasterMute(false, device: muteDevice) { [weak self] muted in
@@ -156,6 +174,14 @@ public final class AppState {
         set { recordingController.makeSystemCapture = newValue }
     }
 
+    var pipelineRunnerFactory: (() -> PipelineRunning?)? {
+        didSet {
+            if let factory = pipelineRunnerFactory {
+                pipelineRunner = factory()
+            }
+        }
+    }
+
     public var recordingControllerSilenceTimeout: TimeInterval {
         recordingController.silenceTimeout
     }
@@ -166,12 +192,10 @@ public final class AppState {
 
     public func toggleRecording() async {
         switch phase {
-        case .idle, .done, .failed:
+        case .idle, .done, .failed, .processing:
             await startRecording()
         case .recording:
             await stopRecordingAndProcess()
-        case .processing:
-            break
         }
     }
 
@@ -195,6 +219,16 @@ public final class AppState {
         }
     }
 
+    static func terminalPhase(after currentPhase: Phase, completedWith directory: URL) -> Phase? {
+        guard case .processing = currentPhase else { return nil }
+        return .done(directory: directory)
+    }
+
+    static func terminalPhase(after currentPhase: Phase, failedWith error: String) -> Phase? {
+        guard case .processing = currentPhase else { return nil }
+        return .failed(error)
+    }
+
     private func runPipeline(on recordingURL: URL) async {
         guard let pipelineRunner else {
             phase = .failed(PipelineRunner.RunError.binaryNotFound.description)
@@ -209,10 +243,14 @@ public final class AppState {
                     self?.handle(event)
                 }
             }
-            phase = .done(directory: directory)
-            refreshRecentMeetings()
+            if let nextPhase = Self.terminalPhase(after: phase, completedWith: directory) {
+                phase = nextPhase
+                refreshRecentMeetings()
+            }
         } catch {
-            phase = .failed(String(describing: error))
+            if let nextPhase = Self.terminalPhase(after: phase, failedWith: String(describing: error)) {
+                phase = nextPhase
+            }
         }
     }
 

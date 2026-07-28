@@ -1,7 +1,15 @@
 import Foundation
 
 @MainActor
-public final class PipelineRunner {
+public protocol PipelineRunning {
+    func run(
+        arguments: [String],
+        onEvent: @escaping @Sendable (ProgressEvent) -> Void
+    ) async throws
+}
+
+@MainActor
+public final class PipelineRunner: PipelineRunning {
     public enum RunError: Error, CustomStringConvertible {
         case binaryNotFound
         case processExitedNonZero(Int32)

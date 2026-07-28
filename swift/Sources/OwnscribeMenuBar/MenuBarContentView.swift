@@ -76,6 +76,9 @@ struct MenuBarContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .processing(let step, let fraction):
+            Button(startButtonTitle) {
+                Task { await appState.toggleRecording() }
+            }
             HStack {
                 ProgressView(value: fraction)
                 Text(step)
@@ -102,6 +105,7 @@ struct MenuBarContentView: View {
 
     private var startButtonTitle: String {
         if case .done = appState.phase { return "Start Recording (last meeting saved)" }
+        if case .processing = appState.phase { return "Start Next Recording" }
         return "Start Recording"
     }
 
