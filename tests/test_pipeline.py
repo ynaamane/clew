@@ -492,6 +492,14 @@ class TestSlugify:
 
         assert _slugify("Meeting: Budget Review") == "meeting-budget-review"
 
+    def test_underscores_never_survive(self):
+        from ownscribe.pipeline import _slugify
+
+        assert "_" not in _slugify("Sprint_2 review"), "_rename_output_dir's strip pattern ^(.+_.+)_\\d+$ assumes _slugify never produces underscores. If this test fails, the strip will start eating real slugs."
+        assert "_" not in _slugify("Q3_2024 planning")
+        assert "_" not in _slugify("a_b_c")
+        assert "_" not in _slugify("sprint_2")
+
 
 class TestGenerateTitleSlug:
     def test_returns_slug(self):
@@ -534,24 +542,7 @@ class TestRenameOutputDir:
         assert expected.exists()
         assert not source.exists()
 
-    def test_skips_cleanly_when_target_exists_with_content(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
-
-        source = tmp_path / "2026-01-01_1200"
-        source.mkdir()
-        (source / "transcript.md").write_text("hi")
-
-        target = tmp_path / "2026-01-01_1200_budget-review"
-        target.mkdir()
-        (target / "unrelated.txt").write_text("already here")
-
-        result = _rename_output_dir(source, "budget-review")
-
-        assert result == source
-        assert source.exists()
-        assert (target / "unrelated.txt").read_text() == "already here"
-
-    def test_renames_when_target_exists_but_is_empty(self, tmp_path):
+    def test_renames_to_empty_target_when_it_exists(self, tmp_path):
         from ownscribe.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
@@ -565,6 +556,120 @@ class TestRenameOutputDir:
 
         assert result == target
         assert (target / "transcript.md").read_text() == "hi"
+        assert not source.exists()
+
+    def test_appends_suffix_when_target_exists_with_content(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200"
+        source.mkdir()
+        (source / "transcript.md").write_text("second meeting")
+
+        first_target = tmp_path / "2026-01-01_1200_budget-review"
+        first_target.mkdir()
+        (first_target / "audio.wav").write_text("first meeting audio")
+
+        result = _rename_output_dir(source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review-2"
+        assert result == expected
+        assert expected.exists()
+        assert (expected / "transcript.md").read_text() == "second meeting"
+        assert (first_target / "audio.wav").read_text() == "first meeting audio"
+
+    def test_appends_higher_suffix_when_multiple_collisions(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200"
+        source.mkdir()
+        (source / "transcript.md").write_text("third meeting")
+
+        for suffix in ["", "-2"]:
+            target = tmp_path / f"2026-01-01_1200_budget-review{suffix}"
+            target.mkdir()
+            (target / "file.txt").write_text(f"meeting{suffix}")
+
+        result = _rename_output_dir(source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review-3"
+        assert result == expected
+        assert (expected / "transcript.md").read_text() == "third meeting"
+
+    def test_strips_swift_collision_marker_before_appending_slug(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200_2"
+        source.mkdir()
+        (source / "transcript.md").write_text("collided recording")
+
+        result = _rename_output_dir(source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review"
+        assert result == expected
+        assert expected.exists()
+        assert (expected / "transcript.md").read_text() == "collided recording"
+        assert not source.exists()
+
+    def test_preserves_directory_name_without_trailing_digits(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200"
+        source.mkdir()
+        (source / "transcript.md").write_text("normal recording")
+
+        result = _rename_output_dir(source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review"
+        assert result == expected
+        assert expected.exists()
+        assert (expected / "transcript.md").read_text() == "normal recording"
+        assert not source.exists(), "The HHmm field must be preserved - this is the regression the wrong regex would have caused"
+
+    def test_strips_two_digit_suffix(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200_10"
+        source.mkdir()
+        (source / "transcript.md").write_text("tenth collision")
+
+        result = _rename_output_dir(source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review"
+        assert result == expected
+        assert (expected / "transcript.md").read_text() == "tenth collision"
+
+    def test_all_digit_slug_strips_like_collision_marker(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        source = tmp_path / "2026-01-01_1200_2024"
+        source.mkdir()
+        (source / "file.txt").write_text("year title")
+
+        result = _rename_output_dir(source, "actual-slug")
+
+        expected = tmp_path / "2026-01-01_1200_actual-slug"
+        assert result == expected, "A slug that is all digits (_2024) is indistinguishable from a collision marker and will be stripped. This is acceptable because _rename_output_dir is only called on un-renamed directories in the real call path."
+
+    def test_two_swift_collisions_normalize_to_same_slug(self, tmp_path):
+        from ownscribe.pipeline import _rename_output_dir
+
+        first_source = tmp_path / "2026-01-01_1200_2"
+        first_source.mkdir()
+        (first_source / "audio1.wav").write_text("first collision")
+
+        first_result = _rename_output_dir(first_source, "budget-review")
+        assert first_result == tmp_path / "2026-01-01_1200_budget-review"
+
+        second_source = tmp_path / "2026-01-01_1200_3"
+        second_source.mkdir()
+        (second_source / "audio2.wav").write_text("second collision")
+
+        second_result = _rename_output_dir(second_source, "budget-review")
+
+        expected = tmp_path / "2026-01-01_1200_budget-review-2"
+        assert second_result == expected
+        assert (expected / "audio2.wav").read_text() == "second collision"
+        assert (first_result / "audio1.wav").read_text() == "first collision"
 
     def test_returns_original_on_unexpected_os_error(self, tmp_path):
         from pathlib import Path

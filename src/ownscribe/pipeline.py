@@ -137,9 +137,14 @@ def _rename_output_dir(directory: Path, title_slug: str) -> Path:
     """Append title slug to directory name. Returns the new path, or the
     original if renaming isn't safely possible (e.g. the target already
     exists with content, or the directory lives outside a renamable tree)."""
-    new_dir = directory.parent / f"{directory.name}_{title_slug}"
-    if new_dir.exists() and any(new_dir.iterdir()):
-        return directory
+    base_name = directory.name
+    if match := re.match(r'^(\d{4}-\d{2}-\d{2}_\d{4})_\d+$', base_name):
+        base_name = match.group(1)
+    new_dir = directory.parent / f"{base_name}_{title_slug}"
+    suffix = 2
+    while new_dir.exists() and any(new_dir.iterdir()):
+        new_dir = directory.parent / f"{base_name}_{title_slug}-{suffix}"
+        suffix += 1
     try:
         directory.rename(new_dir)
         return new_dir
