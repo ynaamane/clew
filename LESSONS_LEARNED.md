@@ -28,6 +28,19 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
   "nobody has looked", write that — "unverified" costs one line; a false claim costs the user's
   trust in every other line. Corollary: correcting a claim-without-evidence by writing a *different*
   claim-without-evidence is not a correction, it is the same error with new wording.
+- **A test surviving a mutation only means something if it COULD have failed it.** A reviewer
+  reported 5 `MeetingInspectorConfigFormatTests` as false greens because breaking *single*-quote
+  TOML stripping left them all green. But those tests write `format = "markdown"` / `"json"` with
+  **double** quotes — `grep -c "'"` on the file returns **0** — so the mutation changed a branch none
+  of them reach. That is an **irrelevant mutation**, the opposite of a false green: a false green is
+  "I broke what it guards and it did not notice", this was "I broke something else and the tests
+  correctly did not care". The mutation that actually targeted their claim — `let filename =
+  "summary.md"`, ignoring the parsed format — turned the suite **red with 7 failures**, with the
+  two JSON tests firing and the three markdown ones correctly still green because they *assert*
+  markdown. So the suite genuinely guards format resolution. One grep for the input that reaches
+  the mutated line settles this in seconds, and the trap is strongest **immediately after a true
+  finding**: the same reviewer's previous finding was real, and pattern-matching it onto a file with
+  different inputs is how a good finding manufactures a false one.
 - **"Another suite already covers it" is only true if that suite RUNS.** I waived 6
   `TestComputeRMSEnvelope` tests as redundant-but-harmless, on the grounds that the real e2e suite
   covers the same function on real data. An independent reviewer refuted it: that suite is
