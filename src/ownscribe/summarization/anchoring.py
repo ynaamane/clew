@@ -119,6 +119,26 @@ def _is_sentence_start(text: str, position: int) -> bool:
     return before[-1] == "\n"
 
 
+def _center_context_on_token(text: str, token: str, window_size: int = 100) -> str:
+    """Center a context window on the first occurrence of token in text."""
+    match = re.search(r"\b" + re.escape(token) + r"\b", text, re.IGNORECASE)
+    if not match:
+        return text[:window_size]
+
+    token_start = match.start()
+    token_end = match.end()
+    token_mid = (token_start + token_end) // 2
+
+    half_window = window_size // 2
+    start = max(0, token_mid - half_window)
+    end = min(len(text), start + window_size)
+
+    if end == len(text):
+        start = max(0, end - window_size)
+
+    return text[start:end]
+
+
 def _find_token_in_transcript(token: str, transcript: str) -> list[dict[str, str]]:
     """Find all occurrences of a token in the transcript with timestamps."""
     anchors = []
@@ -147,6 +167,7 @@ def _find_token_in_transcript(token: str, transcript: str) -> list[dict[str, str
                 context = line[inline_match.end() :].strip()
 
             if context and any(c.isalnum() for c in context):
-                anchors.append({"timestamp": current_timestamp, "context": context[:100]})
+                centered_context = _center_context_on_token(context, token, window_size=100)
+                anchors.append({"timestamp": current_timestamp, "context": centered_context})
 
     return anchors
