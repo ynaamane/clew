@@ -375,7 +375,7 @@
       <div class="pop-row"><span class="glyph">◳</span> Ouvrir MeetingScribe <span class="kbd">⌘0</span></div>
       <div class="pop-row"><span class="glyph">⚙</span> Réglages… <span class="kbd">⌘,</span></div>
     </div>
-    <p class="cap"><b>Nominal.</b> Le chrono vit dans la barre : plus besoin d'ouvrir quoi que ce soit pour savoir si ça enregistre. Les deux vumètres sont alimentés par le calcul de crête qui existe déjà dans <code>AudioLevels.swift</code> — un fichier qui n'a aujourd'hui aucune référence dans l'app.</p>
+    <p class="cap"><b>Nominal.</b> Le chrono vit dans la barre : plus besoin d'ouvrir quoi que ce soit pour savoir si ça enregistre. Les deux vumètres sont alimentés par le calcul de crête qui existe déjà dans <code>AudioLevels.swift</code> : <code>computePeakLevel</code> est appelé depuis <code>CoreAudioTapCapture</code>, <code>MicCapture</code> et <code>main.swift</code>, et <code>kSystemLoudThreshold</code> pilote le détecteur de silence. Le niveau est donc calculé en continu — il ne va simplement nulle part dans l'interface : il part sur <code>stderr</code> en <code>[SILENCE_WARNING]</code>. Ce n'est pas un fichier mort à réveiller, c'est un affichage à brancher.</p>
   </div>
 
   <div>
