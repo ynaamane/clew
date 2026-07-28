@@ -1,8 +1,28 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 807 tests green, HEAD `e51000f`, three commits held for your review.
+## Status: the app has a window. 810 tests green, HEAD `ae5b517`, five commits held for your review.
 
-807 tests green (617 Python + 190 Swift, 1 skipped by design). `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+810 tests green (617 Python + 193 Swift, 4 skipped by design) plus 5 hardware tests that run on demand. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+
+**THE TWO MUTE CHECKS THAT GATED EVERYTHING ARE DONE — automated, not deferred to you.** With the AirPods disconnected the built-in mic became the default, which removed the one case the suite cannot assert against (the documented macOS Bluetooth mute bug), so both checks were written as real hardware tests and passed:
+
+```bash
+OWNSCRIBE_TEST_REAL_MUTE=1 swift test --filter RealHardwareMuteTests   # 3 tests, 0 failures
+```
+
+- A mute you made yourself in System Settings **survives quitting the app** — the app does not silently undo it.
+- A mute the app made **is undone on quit** — the mic is not left muted for other apps.
+- Toggling through the app takes ownership even when the mute started as pre-existing.
+
+Verified on the real device (mic `not-muted` before, three green, `not-muted` after) and mutation-checked: removing the `appOwnsMute` guard turns the pre-existing-mute test RED against real hardware, and the mic was still restored afterwards, which proves the teardown holds on the failing path too. `setUp` records the state it found, `tearDown` restores it and ASSERTS the restore, and the suite skips itself if the default input is Bluetooth.
+
+**Real end-to-end tests now exist, not only unit tests.** `tests/test_real_capture_e2e.py` drives the shipped `ownscribe-audio` binary (5 tests, `@pytest.mark.hardware`, so `check.sh` skips them):
+
+```bash
+uv run pytest tests/test_real_capture_e2e.py -m hardware    # 5 passed
+```
+
+Writing them corrected three assumptions about the binary, which is the argument for having them: it has no `--duration` flag (it records until SIGINT, so the tests stop it the way `rec.sh` does), it prints usage on **stderr**, and it writes **IEEE float32** — which Python's stdlib `wave` refuses outright, so the tests read via `soundfile`, the same float32 `envelope.py` depends on. They also PLAY sound while capturing, which is load-bearing: the tap records what the machine OUTPUTS, so on a muted system it correctly produces a valid 48 kHz stereo float header with **zero frames**. My first version captured that silence and blamed the binary. Mutation: replacing `afplay` with a sleep turns 2 of 5 red.
 
 **The test suite no longer touches your microphone.** Running `swift test` used to degrade the machine's audio: 0 CoreAudio PauseIO/ResumeIO cycles before a run, **7920 after**, with the AirPods Max input dropped to 24 kHz (the HFP phone-call profile) instead of 48 kHz — which dulls playback in every app until macOS renegotiates. Three suites reached the real input device. Fixed in `e51000f`; a full run now measures **0 cycles**. If you ever see the mic sitting at 24 kHz again, that is the symptom, and `/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'` is the meter (use the absolute path — a zsh function shadows `log`).
 
@@ -120,16 +140,16 @@ Note: the app drives `~/meeting-scribe/.venv/bin/ownscribe` (present + executabl
 
 ### 2. Hardware pass — `APP_TEST.md`
 
-The checks that structurally cannot run without your machine (GUI prompts, real devices, key injection):
+Two of these were closed by automation on 2026-07-28 rather than waiting for you — see the mute tests at the top of this file. The rest are checks that structurally cannot run without your machine (GUI prompts, key injection, a worn Bluetooth device, visual appearance). The ones marked `[x]` note precisely what the automation does and does NOT prove, so nobody reads a green test as broader than it is.
 
 - [x] First launch: permission prompts appear (System Audio Recording + Microphone) and were granted — the 17.5-min call recorded through them
 - [ ] Grants SURVIVE a rebuild (re-run build-app.sh → permissions still there; this is what the stable cert is for)
 - [ ] **A call recorded with the CURRENT bundle produces `mic.wav` + `system.wav` and labels your voice `Owner`** ← the BUG4 fix; the 17.5-min call predates it, so it captured only the other participants
 - [ ] **Auto-stop on silence**: start a recording, leave it silent, confirm it stops on its own after 5 minutes AND that the meeting is transcribed (not merely cut). This never worked before `eec7be4` — the value was plumbed but the callback reached nothing. Note the app must be rebuilt+reinstalled first: the installed bundle predates the fix.
-- [ ] Master mute on the **built-in mic** → verify Zoom/others actually stop hearing you
-- [ ] Master mute on **AirPods Max 2 / Pro 3** → the fragile case (documented macOS Bluetooth mute bug); if the fail-loud warning fires, that's the guard working, not a break
+- [x] **Master mute on the built-in mic — AUTOMATED 2026-07-28.** `OWNSCRIBE_TEST_REAL_MUTE=1 swift test --filter RealHardwareMuteTests` mutes and reads back the real device, and mutation-verified that removing the ownership guard turns it RED. What it still does NOT prove is that a *third-party app* (Zoom) observes the mute — the test asserts the CoreAudio property, not what Zoom's meter shows. That last mile is a genuine you-only check, and cheap: mute from the menu bar during any call and watch their side.
+- [ ] Master mute on **AirPods Max 2 / Pro 3** → the fragile case (documented macOS Bluetooth mute bug); if the fail-loud warning fires, that's the guard working, not a break. The automated suite deliberately SKIPS itself when the default input is Bluetooth, because a red there would not distinguish our logic from the platform fault — so this one is irreducibly manual.
 - [ ] Global hotkey ⌘⇧M while **Zoom has focus** (only one dev-time positive so far; display-sleep blocked re-verification)
-- [ ] **Mute → quit with Cmd+Q (NOT the menu button) → confirm mic is unmuted afterward** ← the critical fix
+- [x] **Mute → quit → mic is unmuted — AUTOMATED 2026-07-28**, both directions: an app-owned mute is undone on quit, and a mute you made yourself in System Settings is NOT. Note the automated test calls `restoreUnmutedOnQuit()` directly, so it proves the LOGIC; that ⌘Q actually reaches it was established separately by grep (⌘Q, force-quit and logout all route through `willTerminateNotification`) plus the SIGTERM/SIGINT sources.
 - [ ] Same via `killall OwnscribeMenuBar` (raw SIGTERM path; note: process name ≠ bundle name)
 - [ ] End-to-end recording from the app + Keychain token round-trip
 
