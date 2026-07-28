@@ -31,8 +31,24 @@ public struct SummaryDocument: Equatable {
         actionItemsPlaceholder = actionItems.isEmpty ? actionLines.first ?? "" : ""
     }
 
+    public init(json data: Data) throws {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(domain: "SummaryDocument", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])
+        }
+
+        prose = json["summary"] as? String ?? ""
+        keyPoints = json["key_points"] as? [String] ?? []
+        let actionItemsArray = json["action_items"] as? [String] ?? []
+        actionItems = actionItemsArray
+        actionItemsPlaceholder = actionItemsArray.isEmpty ? "None mentioned." : ""
+    }
+
     public init(contentsOf url: URL) throws {
-        try self.init(markdown: String(contentsOf: url, encoding: .utf8))
+        if url.pathExtension == "json" {
+            try self.init(json: try Data(contentsOf: url))
+        } else {
+            try self.init(markdown: String(contentsOf: url, encoding: .utf8))
+        }
     }
 
     private static func bullets(in lines: [String]) -> [String] {

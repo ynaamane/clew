@@ -34,38 +34,18 @@ public struct MeetingCounts {
         anchorsURL: URL,
         fileManager: FileManager
     ) -> Int? {
-        guard fileManager.fileExists(atPath: anchorsURL.path) else {
-            return nil
-        }
-
         guard let summary = try? SummaryDocument(contentsOf: summaryURL),
-              let anchorsData = try? Data(contentsOf: anchorsURL),
-              let json = try? JSONSerialization.jsonObject(with: anchorsData) as? [String: Any],
-              let anchorsDict = json["anchors"] as? [String: [[String: Any]]] else {
+              let anchors = AnchorsReader.loadAnchors(from: anchorsURL, fileManager: fileManager) else {
             return nil
         }
-
-        let anchoredTokens = Set(anchorsDict.keys)
 
         var unanchoredCount = 0
         for keyPoint in summary.keyPoints {
-            if !hasAnchoredToken(in: keyPoint, anchoredTokens: anchoredTokens) {
+            if !AnchorsReader.hasAnchoredToken(in: keyPoint, anchors: anchors) {
                 unanchoredCount += 1
             }
         }
 
         return unanchoredCount
-    }
-
-    private static func hasAnchoredToken(in text: String, anchoredTokens: Set<String>) -> Bool {
-        let lowercaseAnchors = Set(anchoredTokens.map { $0.lowercased() })
-        let words = text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-        for word in words {
-            let normalized = String(word).lowercased()
-            if lowercaseAnchors.contains(normalized) {
-                return true
-            }
-        }
-        return false
     }
 }

@@ -5,6 +5,10 @@ public struct AudioSettings {
     public var silenceTimeout: TimeInterval
 }
 
+public struct OutputSettings {
+    public var format: String
+}
+
 public struct OwnscribeConfigReader {
     public static let defaultOutputDirName = "ownscribe"
 
@@ -77,6 +81,33 @@ public struct OwnscribeConfigReader {
             value = String(value[..<hashIndex]).trimmingCharacters(in: .whitespaces)
         }
         return value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+    }
+
+    public static func parseOutputSettings(fromTOML text: String?) -> OutputSettings {
+        guard let text else {
+            return OutputSettings(format: "markdown")
+        }
+
+        var format: String?
+        var inOutputSection = false
+
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inOutputSection = line == "[output]"
+                continue
+            }
+            guard inOutputSection, let eqIndex = line.firstIndex(of: "=") else { continue }
+            let key = line[line.startIndex..<eqIndex].trimmingCharacters(in: .whitespaces)
+
+            if key == "format" {
+                if let value = valueAfterEquals(in: line) {
+                    format = value
+                }
+            }
+        }
+
+        return OutputSettings(format: format ?? "markdown")
     }
 
     public static func expand(path: String, homeDir: URL) -> URL {

@@ -5,6 +5,8 @@ struct MeetingInspector: View {
     let transcript: TranscriptDocument?
 
     @State private var summary: SummaryDocument?
+    @State private var keyPointsWithAnchors: [KeyPointWithAnchors]?
+    @State private var tracks: [AudioTrackPresence] = []
 
     var body: some View {
         Form {
@@ -13,11 +15,28 @@ struct MeetingInspector: View {
                     Text(summary.prose)
                         .font(.callout)
                 }
-                if !summary.keyPoints.isEmpty {
+                if let keyPoints = keyPointsWithAnchors, !keyPoints.isEmpty {
                     Section("Points clés") {
-                        ForEach(Array(summary.keyPoints.enumerated()), id: \.offset) { _, point in
-                            Text(point)
-                                .font(.callout)
+                        ForEach(Array(keyPoints.enumerated()), id: \.offset) { _, keyPoint in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(keyPoint.text)
+                                    .font(.callout)
+                                if keyPoint.anchors.isEmpty {
+                                    Text("—")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    HStack(spacing: 8) {
+                                        ForEach(Array(keyPoint.anchors.keys.sorted()), id: \.self) { token in
+                                            if let anchors = keyPoint.anchors[token], let first = anchors.first {
+                                                Text("\(token)→\(first.timestamp)")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -50,13 +69,42 @@ struct MeetingInspector: View {
                     }
                 }
             }
+
+            Section("Pistes audio") {
+                ForEach(tracks, id: \.filename) { track in
+                    HStack {
+                        Text(track.filename)
+                            .font(.callout)
+                        Spacer()
+                        if track.isPresent {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                        } else {
+                            Text("—")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
-        .task(id: meeting.id) { summary = loadSummary() }
+        .glassEffect()
+        .task(id: meeting.id) {
+            summary = loadSummary()
+            keyPointsWithAnchors = MeetingInspectorState.loadKeyPointsWithAnchors(from: meeting.directory)
+            tracks = AudioTracksPresence.checkTracks(in: meeting.directory)
+        }
     }
 
     private func loadSummary() -> SummaryDocument? {
-        let path = meeting.directory.appendingPathComponent("summary.md")
-        return try? SummaryDocument(contentsOf: path)
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let configURL = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        return MeetingInspectorState.loadSummary(
+            from: meeting.directory,
+            configURL: configURL,
+            fileManager: FileManager.default
+        )
     }
 }
