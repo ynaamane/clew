@@ -1,8 +1,8 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window. 787 tests green, HEAD `b0ce8db`, commit held for your review.
+## Status: the app has a window. 802 tests green, HEAD `d626e72`, two commits held for your review.
 
-787 tests green (610 Python + 177 Swift).
+802 tests green (616 Python + 186 Swift).
 
 **⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
@@ -20,17 +20,34 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 ## Open bugs
 
-Three, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
+Four, all found on 2026-07-28 by tracing each value to its CONSUMER rather than reading diffs, and
 all the same shape — a value plumbed to a consumer that is never reached:
 
-- **W0-6** — two recordings in the same minute overwrite each other's audio (PROVEN with a compiled
-  probe; data loss; reachable because of W0-3).
-- **W0-4** — the sidebar's action/anchor filters and the "non ancré" badge are dead in production
-  (no writer for either count field).
+- **W0-7** — the window renders neither `.failed` nor the unverified-mute warning. A failed recording
+  looks identical to idle, and the AirPods "the call may still hear you" warning appears nowhere in
+  the window. Scoped: no wiring gap (adding a read is sufficient), but `.failed` has no exit except a
+  retry that re-fails, so a `dismissFailure()` is in scope.
+- **W0-9** — you can record a whole meeting before learning nothing can transcribe it.
+  `isCliAvailable` has zero consumers, so nothing checks the CLI before offering to record. The audio
+  survives but the UI never says so. Costliest of the set: the unit of loss is a meeting.
+- **W0-4** — the sidebar's action/anchor filters and the "non ancré" badge are dead in production (no
+  writer for either count field). Scoped: cost is negligible (0.44 ms/refresh, no cache needed), but
+  zero of six meetings on disk have `anchors.json`, so the counts must be `Int?` — rendering absent
+  as `0` claims "all claims have evidence" for meetings never checked, which is the W0-1 failure on
+  the anti-hallucination signal.
 - **W0-5** — nothing in Swift reads `envelope.json`, so the timeline cannot be drawn.
 
-None of the three can be caught by a green suite, which is how all three survived. BUG0/1/2/3/4/5 +
-all 11 review findings + W0-1/2/3 are closed, each verified by mutation. See LESSONS_LEARNED.md.
+W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
+investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
+effect; what remains is a latent note. BUG0/1/2/3/4/5 + all 11 review findings + W0-1/2/3/6 are
+closed, each verified by mutation. See LESSONS_LEARNED.md.
+
+Python-side follow-ups found while scoping W0-4, not yet filed as tasks: `_extract_rare_tokens`
+extracts the markdown headings `Summary`, `Points`, `Items` as rare tokens (harmless only because
+`anchoring.py:34`'s `if token_anchors:` drops unanchored tokens — anyone "fixing" that drop surfaces
+three heading artefacts as evidence), and the FR/EN mismatch caps anchoring at 6 of 7 key points on
+the real meeting (an English summary word like "fictitious" cannot anchor to a French "fictif"), so
+`unanchored=1` there is correct and not fixable in Swift.
 
 ## The Glass batch — what the app gained (2026-07-27, evening)
 
@@ -191,30 +208,30 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
 2. ~~**W0-2** — seed the mute state from the hardware at launch.~~ **DONE** in `b0ce8db`, pending
    the two hardware checks above.
 3. ~~**W0-3** — keep Start Recording alive during transcription.~~ **DONE** in `b0ce8db`.
-4. **W0-6 — two recordings in the same minute overwrite each other's audio.** PROVEN with a compiled
-   probe, and W0-3 is what makes it reachable: `MeetingOutputPaths` formats the directory as
-   `yyyy-MM-dd_HHmm` with no uniquifier, and `createDirectory` passes
-   `withIntermediateDirectories: true`, which succeeds silently on an existing directory — so the
-   second capture overwrites the first meeting's `recording.wav`. Audio retention is a documented
-   guarantee here (`./rec.sh redo`), so this is data loss. Narrow window: the Python pipeline renames
-   a finished meeting with a title slug, so only a sub-minute back-to-back pair collides — which is
-   exactly the case W0-3 just enabled. Do not change the name FORMAT casually:
-   `RecentTranscriptsStore` parses it for `displayDate` and splits on `_` for `displayTitle`, and a
-   failed parse silently yields "".
-5. **W0-4 — the sidebar's "Avec actions" and "Non ancrées" filters are dead in production.**
-   `RecentTranscriptsStore.recentMeetings` never writes `actionItemCount` / `unanchoredClaimCount`;
-   the only non-zero source in the repo is a test that hand-builds them. Both badges read 0 on every
-   real run and the "N non ancré" warning can never appear — and that badge is the anti-hallucination
-   signal. The data is on disk (`summary.md`, `anchors.json`); nothing in Swift reads `anchors.json`.
-6. **W0-5 — the envelope strip and per-speaker lanes.** `pipeline.py` writes `envelope.json`
-   (500 buckets) and NO Swift file reads it — verified by grep. This is what makes an abnormal
-   silence visible without opening a 400 MB wav. Note the only real meeting on disk has neither
-   `envelope.json` nor `anchors.json` (it predates both), so the absent-file path is the default
-   case, not the edge case.
-7. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
+4. ~~**W0-6** — two recordings in the same minute overwrite each other's audio.~~ **DONE** in
+   `d626e72`. Swift adds a `_N` suffix; Python strips it before appending the title slug.
+5. **W0-7 — surface `.failed` and the unverified-mute warning in the window.** Do this before the
+   other UI work: the window is now the primary surface and it is currently silent about both. Needs
+   a `dismissFailure()` on `AppState` (a retry is the only current exit and it re-fails), and the
+   recommendation is an inline banner in the glass rail — not the toolbar (height-constrained, and
+   truncating the AirPods warning to a glyph reproduces W0-1) and not an alert (9 of 17 blocking
+   personas fire mid-call, often screen-sharing).
+6. **W0-9 — pre-flight the CLI check.** Disable or warn on the record button when `isCliAvailable` is
+   false, and when a recording ends that way, say the audio is retained and can be resumed.
+7. **W0-4 — wire the sidebar counts.** Parse `summary.md` for `actionItemCount`, read `anchors.json`
+   and word-boundary match key points for `unanchoredClaimCount`. Both `Int?`; `nil` means unknown and
+   must not be filtered into "Non ancrées" nor rendered as 0. Parse inline — measured at 0.44 ms per
+   refresh for 10 meetings, so a cache would only add invalidation bugs.
+8. **W0-5 — the envelope strip and per-speaker lanes.** `pipeline.py` writes `envelope.json`
+   (500 buckets) and NO Swift file reads it. This is what makes an abnormal silence visible without
+   opening a 400 MB wav. Zero of six meetings on disk have the file, so absent-means-unknown applies
+   here too. Note `AudioLevels.computePeakLevel` is already live (called from `CoreAudioTapCapture`,
+   `MicCapture` and `main.swift`) — the level exists and only goes to `stderr`, so the live vumeters
+   are a display to wire up, not a computation to write.
+9. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
    evidence. Depends on W0-4's reader.
-8. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
-   output dir all live only in TOML.
+10. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
+    output dir all live only in TOML.
 
 ## Performance — what is settled and what is open
 

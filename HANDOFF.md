@@ -4,11 +4,13 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**L'app a une fenêtre. 787 tests verts** (610 Python + 177 Swift), HEAD `b0ce8db`.
+**L'app a une fenêtre. 802 tests verts** (616 Python + 186 Swift), HEAD `d626e72`.
 
 **⚠️ `b0ce8db` est COMMITÉ MAIS PAS POUSSÉ, volontairement.** Il touche le mute système, et sa garantie centrale — l'app ne démute jamais un mute que tu as fait toi-même — n'est pas vérifiable sans matériel. Les deux tests qui décident sont dans `TODO.md` § « What W0-2/W0-3 changed ».
 
-**Trois bugs ouverts, trouvés le 2026-07-28**, tous de la même forme : une valeur câblée jusqu'à un consommateur jamais atteint. Deux enregistrements dans la même minute écrasent leur audio (prouvé par sonde compilée — perte de données, et c'est W0-3 qui le rend atteignable) ; les filtres « Avec actions » / « Non ancrées » de la barre latérale sont morts en production (aucun écrivain pour les deux compteurs) ; rien en Swift ne lit `envelope.json`. Aucun des trois n'est détectable par une suite verte — c'est exactement pour ça qu'ils ont survécu.
+**Quatre bugs ouverts, trouvés le 2026-07-28**, tous de la même forme : une valeur câblée jusqu'à un consommateur jamais atteint. La fenêtre n'affiche ni les échecs ni l'avertissement de mute non confirmé (donc l'avertissement AirPods « le call peut encore t'entendre » n'apparaît nulle part) ; on peut enregistrer une réunion entière avant d'apprendre que rien ne peut la transcrire ; les filtres « Avec actions » / « Non ancrées » sont morts en production ; rien en Swift ne lit `envelope.json`. Aucun n'est détectable par une suite verte — c'est exactement pour ça qu'ils ont survécu. La collision d'audio dans la même minute est corrigée (`d626e72`), et le blocage de l'app + la fuite du tap ont été **réfutés** sur le code livré : la garde d'identité de run de `b0ce8db` les avait fermés par effet de bord.
+
+**Piège de diagnostic à connaître** (un handoff d'une autre session s'y est fait prendre le 28/07) : cinq SIGTRAP `xctest` ont été attribués à `EnrolledSpeakerStore.names(in:)`, avec un correctif recommandé sur du code qui n'a **aucun** défaut — la fonction n'a jamais contenu d'`assertionFailure` de toute son histoire. `_assertionFailure` est le symbole de trap générique de Swift ; la frame au-dessus était `Array._checkSubscript`, donc un index hors limites. Et les cinq crashs tournaient depuis `/private/tmp/*/ownscribe-audioPackageTests` — des copies isolées d'agents de revue, pas le dépôt, dont la suite était verte pendant tout ce temps. Vérifier le chemin du bundle qui crashe avant de toucher la production.
 
 **⚠️ Une seule chose attend l'utilisateur : la fenêtre n'a jamais été vue.** Elle a 163 tests verts et zéro vérification visuelle — l'écran était en veille à chaque capture. `⌘0` depuis la barre de menus. Et le bundle installé date d'avant la fenêtre : relancer `bash swift/build-app.sh`.
 
