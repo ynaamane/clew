@@ -4,12 +4,18 @@ struct MeetingDetailView: View {
     let meeting: MeetingSummary
 
     @State private var transcript: TranscriptDocument?
+    @State private var envelope: EnvelopeDocument?
     @State private var showBackchannel = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
+                if let envelope {
+                    EnvelopeStrip(buckets: envelope.buckets)
+                        .padding(.horizontal, 26)
+                        .padding(.bottom, 14)
+                }
                 transcriptBody
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -20,7 +26,10 @@ struct MeetingDetailView: View {
                 .inspectorColumnWidth(min: 240, ideal: 286, max: 360)
         }
         .navigationTitle(meeting.displayTitle)
-        .task(id: meeting.id) { transcript = loadTranscript() }
+        .task(id: meeting.id) {
+            transcript = loadTranscript()
+            envelope = loadEnvelope()
+        }
     }
 
     private var header: some View {
@@ -77,6 +86,10 @@ struct MeetingDetailView: View {
         return try? TranscriptDocument(contentsOf: path)
     }
 
+    private func loadEnvelope() -> EnvelopeDocument? {
+        EnvelopeDocument.load(from: meeting.directory)
+    }
+
     static func durationText(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())
         return String(format: "%d:%02d", total / 60, total % 60)
@@ -93,9 +106,12 @@ private struct UtteranceRow: View {
                 .foregroundStyle(.tertiary)
                 .frame(width: 40, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
-                Text(utterance.speaker)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Self.color(for: utterance.speaker))
+                HStack(spacing: 6) {
+                    speakerAvatar
+                    Text(utterance.speaker)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(SpeakerAvatarStyle.color(for: utterance.speaker))
+                }
                 Text(utterance.text)
                     .font(.body)
                     .textSelection(.enabled)
@@ -103,11 +119,14 @@ private struct UtteranceRow: View {
         }
     }
 
-    static func color(for speaker: String) -> Color {
-        switch speaker {
-        case "Owner": return .green
-        case "Unknown": return .secondary
-        default: return speaker.hasSuffix("0") ? .blue : .purple
+    private var speakerAvatar: some View {
+        ZStack {
+            Circle()
+                .fill(SpeakerAvatarStyle.color(for: utterance.speaker))
+                .frame(width: 18, height: 18)
+            Text(SpeakerAvatarStyle.displayLabel(for: utterance.speaker))
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
         }
     }
 }
