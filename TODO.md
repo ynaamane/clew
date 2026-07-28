@@ -1,8 +1,12 @@
 # TODO — meeting-scribe
 
-## Status: the app has a window that no longer hides failures. 822 tests green, HEAD `7c02399`, eight commits held for your review.
+## Status: the app has a window that no longer hides failures. 822 tests green, HEAD `4be4e08`, ten commits held for your review.
 
-822 tests green (617 Python + 205 Swift, 4 skipped by design) plus 5 hardware tests that run on demand.
+822 tests green (617 Python + 205 Swift, 4 skipped by design) plus 6 hardware tests that run on demand.
+
+**⚠️ BUG5 WAS STILL LIVE UNTIL TODAY, in the binary the pipeline actually runs.** The July fix landed in Swift and never reached production: `coreaudio.py` prefers `bin/ownscribe-audio` over anything in `.build`, `bin/` is gitignored, and only `swift/build.sh` copies into it — so the shipped binary sat three days older than the fix and still halved playback speed. Measured on one real dual-track capture: `bin/` gave `recording.wav` **12.81s @24000Hz** from 48 kHz sources; `.build/` gave **5.52s @48000Hz**. The signature is in your retained meetings — the two from July 24 are 24000Hz.
+
+Fixed in `4be4e08`: `bin/` rebuilt, the e2e test now resolves the binary through production's own `_BINARY_CANDIDATES` and asserts the merged sample rate **equals** its sources', and `check.sh` gained a staleness gate that names the newer Swift file. **Any recording made before today from the CLI plays back at half speed — `./rec.sh redo <dir>` re-merges it correctly from the retained tracks.**
 
 **The window now surfaces `.failed` and the unverified-mute warning** (`7c02399`, W0-7). A banner in the glass rail — never the content layer — with the decision in a pure `bannerState()`: an error outranks the mute warning, and the mute banner is deliberately **not dismissible**, because a warning that the call can still hear you must not be silenceable while it is true. `dismissFailure()` is what makes the error surface usable at all: `.failed` previously had no exit but a retry, and when the cause persists the retry re-fails. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
 
