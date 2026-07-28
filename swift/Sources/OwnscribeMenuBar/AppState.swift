@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OSLog
 import OwnscribeCapture
 
 @MainActor
@@ -13,7 +14,15 @@ public final class AppState {
         case failed(String)
     }
 
-    public private(set) var phase: Phase = .idle
+    public private(set) var phase: Phase = .idle {
+        didSet {
+            guard phase != oldValue else { return }
+            AppLogger.recording.info("Phase transition: \(oldValue.logDescription()) -> \(self.phase.logDescription())")
+            if case .failed(let message) = phase {
+                AppLogger.recording.error("Recording failed: \(message)")
+            }
+        }
+    }
     public private(set) var recentMeetings: [MeetingSummary] = []
     public private(set) var isMuted: Bool = false
     public private(set) var muteWarning: String?
@@ -110,14 +119,22 @@ public final class AppState {
     }
 
     public func toggleMasterMute() {
-        let outcome = applyMasterMute(!isMuted, device: muteDevice) { [weak self] muted in
+        let requestedMuted = !isMuted
+        AppLogger.mute.info("Mute toggle requested: \(requestedMuted)")
+
+        let outcome = applyMasterMute(requestedMuted, device: muteDevice) { [weak self] muted in
             self?.recordingController.setLocalMicMute(muted)
         }
+
+        let verified = !outcome.usedLocalFallback
+        AppLogger.mute.info("Mute outcome: requested=\(requestedMuted), display=\(outcome.displayMuted), verified=\(verified)")
+
         isMuted = outcome.displayMuted
         muteWarning = outcome.warning
         muteIndicator = indicator(for: outcome)
-        if !outcome.usedLocalFallback {
+        if verified {
             appOwnsMute = true
+            AppLogger.mute.info("App took mute ownership")
         }
     }
 
@@ -127,22 +144,30 @@ public final class AppState {
     }
 
     public func restoreUnmutedOnQuit() {
-        guard isMuted, appOwnsMute else { return }
+        guard isMuted, appOwnsMute else {
+            AppLogger.mute.info("restoreUnmutedOnQuit: skipped (isMuted=\(self.isMuted), appOwnsMute=\(self.appOwnsMute))")
+            return
+        }
 
-        for _ in 0..<unmuteOnQuitAttempts {
+        AppLogger.mute.info("restoreUnmutedOnQuit: attempting unmute with \(self.unmuteOnQuitAttempts) attempts")
+
+        for attempt in 1...unmuteOnQuitAttempts {
             let outcome = applyMasterMute(false, device: muteDevice) { [weak self] muted in
                 self?.recordingController.setLocalMicMute(muted)
             }
             if !outcome.usedLocalFallback {
                 isMuted = false
                 muteWarning = nil
+                AppLogger.mute.info("restoreUnmutedOnQuit: succeeded on attempt \(attempt)")
                 return
             }
+            AppLogger.mute.warning("restoreUnmutedOnQuit: attempt \(attempt) failed")
             muteWarning = outcome.warning
         }
 
-        FileHandle.standardError.write(Data(
-            "[MUTE_NOT_RESTORED] Quitting with the microphone still muted system-wide — unmute it in System Settings > Sound > Input.\n".utf8))
+        let failureMessage = "[MUTE_NOT_RESTORED] Quitting with the microphone still muted system-wide — unmute it in System Settings > Sound > Input.\n"
+        AppLogger.mute.fault("restoreUnmutedOnQuit: FAILED after all attempts")
+        FileHandle.standardError.write(Data(failureMessage.utf8))
     }
 
     public var outputDir: URL {
@@ -192,7 +217,25 @@ public final class AppState {
     }
 
     public func refreshRecentMeetings() {
-        recentMeetings = RecentTranscriptsStore.recentMeetings(in: outputDir)
+        let meetings = RecentTranscriptsStore.recentMeetings(in: outputDir)
+        AppLogger.library.info("Refreshed recent meetings: found \(meetings.count) meetings")
+        recentMeetings = meetings
+    }
+
+    public func refreshCliAvailability() {
+        if let factory = pipelineRunnerFactory {
+            pipelineRunner = factory()
+        } else {
+            pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
+        }
+
+        if let runner = pipelineRunner as? PipelineRunner {
+            AppLogger.pipeline.info("CLI binary found at: \(runner.binary.path, privacy: .public)")
+        } else if pipelineRunner != nil {
+            AppLogger.pipeline.info("CLI available via factory")
+        } else {
+            AppLogger.pipeline.warning("CLI binary not found")
+        }
     }
 
     public func dismissFailure() {
@@ -203,6 +246,7 @@ public final class AppState {
     public func toggleRecording() async {
         switch phase {
         case .idle, .done, .failed, .processing:
+            refreshCliAvailability()
             await startRecording()
         case .recording:
             await stopRecordingAndProcess()
@@ -211,6 +255,12 @@ public final class AppState {
 
     private func startRecording() async {
         let paths = MeetingOutputPaths(baseDir: outputDir)
+        let micEnabled = recordingController.enableMic
+        let silenceTimeout = recordingController.silenceTimeout
+
+        let timestamp = AppLogger.timestampPrefix(from: paths.directory.lastPathComponent)
+        AppLogger.recording.info("Starting recording: directory=\(timestamp, privacy: .public), micEnabled=\(micEnabled), silenceTimeout=\(silenceTimeout)s")
+
         do {
             try paths.createDirectory()
             try await recordingController.start(outputPath: paths.recordingPath.path)
@@ -247,6 +297,9 @@ public final class AppState {
         phase = .processing(step: "starting", fraction: nil)
 
         let directory = recordingURL.deletingLastPathComponent()
+        let timestamp = AppLogger.timestampPrefix(from: directory.lastPathComponent)
+        AppLogger.pipeline.info("Pipeline started: directory=\(timestamp, privacy: .public)")
+
         do {
             try await pipelineRunner.run(arguments: ["resume", directory.path]) { [weak self] event in
                 Task { @MainActor [weak self] in
@@ -256,16 +309,21 @@ public final class AppState {
             if let nextPhase = Self.terminalPhase(after: phase, completedWith: directory) {
                 phase = nextPhase
                 refreshRecentMeetings()
+                AppLogger.pipeline.info("Pipeline completed: directory=\(timestamp, privacy: .public)")
             }
         } catch {
             if let nextPhase = Self.terminalPhase(after: phase, failedWith: String(describing: error)) {
                 phase = nextPhase
+                AppLogger.pipeline.error("Pipeline failed: \(String(describing: error))")
             }
         }
     }
 
     private func handle(_ event: ProgressEvent) {
         guard case .processing = phase else { return }
+
+        AppLogger.pipeline.debug("Pipeline progress: event=\(event.event.rawValue, privacy: .public), step=\(event.step, privacy: .public)")
+
         switch event.event {
         case .begin, .update:
             phase = .processing(step: event.step, fraction: event.fraction)

@@ -75,7 +75,10 @@ struct LibraryWindow: View {
                 }
             }
         }
-        .task { appState.refreshRecentMeetings() }
+        .task {
+            appState.refreshRecentMeetings()
+            appState.refreshCliAvailability()
+        }
         .onChange(of: appState.phase) { _, newPhase in
             if case .failed = newPhase {
                 showBannerDetail = true
@@ -87,7 +90,8 @@ struct LibraryWindow: View {
         BannerState.bannerState(
             phase: appState.phase,
             muteWarning: appState.muteWarning,
-            muteIndicator: appState.muteIndicator
+            muteIndicator: appState.muteIndicator,
+            isCliAvailable: appState.isCliAvailable
         )
     }
 }
@@ -115,8 +119,8 @@ private struct MeetingRow: View {
                 .lineLimit(1)
             HStack(spacing: 6) {
                 Text(meeting.displayDate)
-                if meeting.unanchoredClaimCount > 0 {
-                    Text("^[\(meeting.unanchoredClaimCount) non ancré](inflect: true)")
+                if let count = meeting.unanchoredClaimCount, count > 0 {
+                    Text("^[\(count) non ancré](inflect: true)")
                         .foregroundStyle(.orange)
                 }
                 if !meeting.hasSummary {

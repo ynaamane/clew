@@ -7,7 +7,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .failed("Capture permission denied"),
             muteWarning: nil,
-            muteIndicator: .notMuted
+            muteIndicator: .notMuted,
+            isCliAvailable: true
         )
 
         XCTAssertEqual(result?.message, "Capture permission denied")
@@ -19,7 +20,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .idle,
             muteWarning: "The call may still hear you",
-            muteIndicator: .mutedUnverified
+            muteIndicator: .mutedUnverified,
+            isCliAvailable: true
         )
 
         XCTAssertEqual(result?.message, "The call may still hear you")
@@ -31,7 +33,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .idle,
             muteWarning: nil,
-            muteIndicator: .notMuted
+            muteIndicator: .notMuted,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result)
@@ -41,7 +44,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .recording(startedAt: Date()),
             muteWarning: nil,
-            muteIndicator: .notMuted
+            muteIndicator: .notMuted,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result)
@@ -51,7 +55,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .processing(step: "transcribing", fraction: 0.5),
             muteWarning: nil,
-            muteIndicator: .notMuted
+            muteIndicator: .notMuted,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result)
@@ -62,7 +67,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .done(directory: directory),
             muteWarning: nil,
-            muteIndicator: .notMuted
+            muteIndicator: .notMuted,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result)
@@ -72,7 +78,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .idle,
             muteWarning: "Some warning",
-            muteIndicator: .mutedVerified
+            muteIndicator: .mutedVerified,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result, "Verified mute should not produce a banner even if warning text exists")
@@ -82,7 +89,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .idle,
             muteWarning: nil,
-            muteIndicator: .mutedUnverified
+            muteIndicator: .mutedUnverified,
+            isCliAvailable: true
         )
 
         XCTAssertNil(result, "Unverified mute without warning text should not produce a banner")
@@ -92,7 +100,8 @@ final class BannerStateTests: XCTestCase {
         let result = BannerState.bannerState(
             phase: .failed("Recording failed"),
             muteWarning: "The call may still hear you",
-            muteIndicator: .mutedUnverified
+            muteIndicator: .mutedUnverified,
+            isCliAvailable: true
         )
 
         XCTAssertEqual(result?.message, "Recording failed")

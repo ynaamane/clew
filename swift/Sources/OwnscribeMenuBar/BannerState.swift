@@ -19,7 +19,8 @@ public struct BannerState: Equatable {
     public static func bannerState(
         phase: AppState.Phase,
         muteWarning: String?,
-        muteIndicator: MuteIndicator
+        muteIndicator: MuteIndicator,
+        isCliAvailable: Bool
     ) -> BannerState? {
         if case .failed(let message) = phase {
             return BannerState(
@@ -32,6 +33,14 @@ public struct BannerState: Equatable {
         if muteIndicator == .mutedUnverified, let warning = muteWarning {
             return BannerState(
                 message: warning,
+                severity: .warning,
+                isDismissible: false
+            )
+        }
+
+        if !isCliAvailable {
+            return BannerState(
+                message: "Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio.",
                 severity: .warning,
                 isDismissible: false
             )
