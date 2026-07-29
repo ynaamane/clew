@@ -3,6 +3,7 @@ import SwiftUI
 struct MeetingInspector: View {
     let meeting: MeetingSummary
     let transcript: TranscriptDocument?
+    let onScrollToAnchor: (String) -> Void
 
     @State private var summary: SummaryDocument?
     @State private var keyPointsWithAnchors: [KeyPointWithAnchors]?
@@ -21,28 +22,7 @@ struct MeetingInspector: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(keyPoint.text)
                                     .font(.callout)
-                                if let anchors = keyPoint.anchors {
-                                    if anchors.isEmpty {
-                                        Text("—")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    } else {
-                                        HStack(spacing: 8) {
-                                            ForEach(Array(anchors.keys.sorted()), id: \.self) { token in
-                                                if let tokenAnchors = anchors[token], let first = tokenAnchors.first {
-                                                    Text("\(token)→\(first.timestamp)")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Text("(pas encore vérifié)")
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                        .italic()
-                                }
+                                evidenceRow(for: keyPoint)
                             }
                         }
                     }
@@ -96,6 +76,43 @@ struct MeetingInspector: View {
             summary = loadSummary()
             keyPointsWithAnchors = MeetingInspectorState.loadKeyPointsWithAnchors(from: meeting.directory)
             tracks = AudioTracksPresence.checkTracks(in: meeting.directory)
+        }
+    }
+
+    @ViewBuilder
+    private func evidenceRow(for keyPoint: KeyPointWithAnchors) -> some View {
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+        switch display {
+        case .notYetVerified:
+            Text(display.placeholderText ?? "")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .italic()
+        case .noEvidenceFound:
+            Text(display.placeholderText ?? "")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        case .evidence(let chips):
+            HStack(spacing: 8) {
+                ForEach(chips, id: \.label) { chip in
+                    evidenceChip(chip)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func evidenceChip(_ chip: AnchorEvidenceChip) -> some View {
+        let utterances = transcript?.utterances ?? []
+        switch AnchorScrollTargeting.interactivity(forAnchorTimestamp: chip.timestamp, in: utterances) {
+        case .scrollButton:
+            Button(chip.label) { onScrollToAnchor(chip.timestamp) }
+                .buttonStyle(.link)
+                .font(.caption2)
+        case .staticText:
+            Text(chip.label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
