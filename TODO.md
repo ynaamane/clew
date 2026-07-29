@@ -1,15 +1,23 @@
 # TODO — meeting-scribe
 
-## Status: 629 Python + 297 Swift green, HEAD `5a9639d`, pushed through `7f20a0b` — 2 commits held locally.
+## Status: 629 Python + 322 Swift green, all 10 gates green, pushed through `7f20a0b` — the rest held locally.
 
-Measured 2026-07-29, not quoted. `bash scripts/check.sh` → `BASELINE_EXIT=0`, all 10 gates
-including the release build; Python inside it → **629 passed, 7 deselected**. Swift measured
-separately after the avatar fix → **274 XCTest + 23 swift-testing = 297**, exit 0. Both frameworks
-must be counted: `swift test` prints an XCTest total AND a separate `Test run with N tests` line for
-swift-testing, so every "276 Swift" in this file's history was XCTest-only. Do not pipe the run
-through `tail` to read a total — it truncates the summary away, and inside a `> file` redirect it
-destroys the number on disk. Read the exit status out of a variable, never off the end of a
-pipeline: a trailing `grep` makes the harness report success while the real exit was 1.
+Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
+failed**, including the release build; Python inside it → **629 passed**; Swift → **299 XCTest
+(`Executed 303 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 322**. The 4 skips
+are the hardware-gated tests, by design. `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'`
+→ **0** after that full run, so nothing in the suite reached the real input device.
+
+Read the exit status from a captured variable, never off a pipeline: on the first run of this batch
+the harness reported "exit code 0" while `CHECK=1` sat in the output, and the real failure was the
+BUG5 staleness gate (`bin/ownscribe-audio` older than `SettingsView.swift`). Fixed with
+`bash swift/build.sh` — that gate firing is it working, and it fires on ANY Swift edit, including
+menu-bar-only ones the capture binary does not contain.
+
+Both frameworks must be counted: `swift test` prints an XCTest total AND a separate
+`Test run with N tests` line for swift-testing, so every "276 Swift" in this file's history was
+XCTest-only. And do not pipe the run through `tail` to read a total — it truncates the summary away,
+and inside a `> file` redirect it destroys the number on disk.
 
 **⚠️ THE DESIGN IS NOT GOOD. The user opened the built app on 2026-07-28 and rejected it.**
 
@@ -335,8 +343,19 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
    are a display to wire up, not a computation to write.
 9. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
    evidence. Depends on W0-4's reader.
-10. **Settings.** Still a single token field. Mic on/off, silence timeout, diarization, language and
-    output dir all live only in TOML.
+10. **Settings.** ~~Still a single token field.~~ **Mic on/off and silence timeout are now in the
+    pane** (`558da55`) — the rest (diarization, language, output dir) is still TOML-only, named as
+    deliberately out of scope rather than forgotten. The writer is the interesting part: the config
+    holds your HF token under `[diarization]` and had no `[audio]` section at all, so a
+    serialize-the-struct writer would have destroyed the token and its four neighbours. It is
+    line-oriented instead, preserving every other line byte-for-byte, and it restores the file mode
+    after writing because `Data.write(options: .atomic)` is a temp-file-and-rename that would
+    otherwise leave the token file at `0644` instead of `600`. Verified: mutating the writer to
+    discard the existing text turns the token test RED (re-run independently of the builder's own
+    claim), and the real `~/.config/ownscribe/config.toml` is untouched — mtime still 2026-07-27,
+    mode still `600`, all five keys present. **`AppState` reads the config once at `init`**, so the
+    pane says a restart is needed; live re-application is a separate change and is NOT done.
+    **Unverified: how the pane looks. Nobody has looked at it.**
 
 ## Performance — what is settled and what is open
 
