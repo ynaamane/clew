@@ -1,13 +1,15 @@
 # TODO — meeting-scribe
 
-## Status: 926 tests green (635 Python + 291 Swift), 4 Swift skipped + 1 Python deselected, HEAD `178b05d`, pushed through `532f363` — 12 commits held locally.
+## Status: 629 Python + 297 Swift green, HEAD `5a9639d`, pushed through `7f20a0b` — 2 commits held locally.
 
-Measured 2026-07-28, not quoted: `uv run pytest -q` → 635 passed, 1 deselected. Swift needs both
-frameworks counted — `swift test` prints an XCTest total (276, of which 4 skipped) AND a separate
-`Test run with 19 tests` for swift-testing, so the real figure is 291 passing. Every earlier "276
-Swift" in this file's history was XCTest-only. Do not pipe the run through `tail` to read the
-total: it truncates the summary away, and inside a `> file` redirect it destroys the number on
-disk. `bash scripts/check.sh` → all 10 gates green including the release build.
+Measured 2026-07-29, not quoted. `bash scripts/check.sh` → `BASELINE_EXIT=0`, all 10 gates
+including the release build; Python inside it → **629 passed, 7 deselected**. Swift measured
+separately after the avatar fix → **274 XCTest + 23 swift-testing = 297**, exit 0. Both frameworks
+must be counted: `swift test` prints an XCTest total AND a separate `Test run with N tests` line for
+swift-testing, so every "276 Swift" in this file's history was XCTest-only. Do not pipe the run
+through `tail` to read a total — it truncates the summary away, and inside a `> file` redirect it
+destroys the number on disk. Read the exit status out of a variable, never off the end of a
+pipeline: a trailing `grep` makes the harness report success while the real exit was 1.
 
 **⚠️ THE DESIGN IS NOT GOOD. The user opened the built app on 2026-07-28 and rejected it.**
 
@@ -96,22 +98,33 @@ Deliberately unbuilt, not bugs:
   item))` — adding `?? "0"` there survives the suite. Closing it needs a view-host test, which
   deadlocked this project twice for 29 minutes with the SwiftPM lock held. One named line on a
   cosmetic badge against that risk.
-- **`SpeakerAvatarStyle.color` maps `SPEAKER_00` and `SPEAKER_10` to the same colour**
-  (`hasSuffix("0")`). Unreachable on current data — every real transcript holds only `_00` and `_01`
-  — but a genuine collision at ten speakers, and two people sharing an avatar is the
-  "scrambled transcript that looks fine" failure.
+- ~~**`SpeakerAvatarStyle.color` maps `SPEAKER_00` and `SPEAKER_10` to the same colour**
+  (`hasSuffix("0")`).~~ **CLOSED in `d448e2b`, and it was worse than this entry said.** The collapse
+  was not two labels but *all* of them: seven concurrent speakers produced **two** colours. Filing it
+  as "unreachable on current data" was accurate about the data and missed that
+  `SpeakerAvatarStyleTests.speakerEndingIn0GetsBlue` **asserted the collision**, so the suite would
+  have gone red on a correct fix — a named test had locked the bug in place. Fixed by indexing the
+  palette on the parsed number, which keeps `_00` blue and `_01` purple so the honest assertions stay
+  true. Restoring `hasSuffix` turns exactly the two new tests red and nothing else. Found underneath
+  it: `Int("-1")` parses and `palette[-1 % 7]` **traps** — the guardless mutation exits on signal 5
+  with `Fatal error: Index out of range`, i.e. a crash, not a wrong colour. `max_speakers = 0`
+  (auto-detect) means nothing bounds the speaker count, so the eighth speaker wrapping onto the first
+  colour is now pinned as a known limit rather than left to be discovered in a ten-person call.
 - **`AudioTracksPresence` checks existence only.** A zero-byte `mic.wav` would show a green
   checkmark. BUG4 shipped 33.5s of silence past a green suite, so this is the shape to watch.
   *(Now closed in `71de1ee` — it reads real frames and excludes zero-byte files. An independent
   mutation confirmed it: replacing the frame check with `duration > 0` turns the real-silent-file
   test RED against the actual BUG4 artifact.)*
-- **`SpeakerAvatarStyle`'s and `BadgeText`'s call sites in the views are untested**, confirmed by
-  grep: `MeetingDetailView` and `LibraryWindow` appear nowhere under `swift/Tests/`. So reverting
-  the avatar label to `split("_").last` (which rendered `Léa_B` as `B`), or the colour to the
-  per-process `hashValue`, or the badge to `?? 0`, survives all 291 tests. The helpers are
-  well covered; their consumption is review-guarded only. Closing this needs a view-host test —
-  the thing that deadlocked this project twice for 29 minutes holding the SwiftPM lock — so it
-  stays open as a NAMED gap rather than a pretended pass.
+- **`SpeakerAvatarStyle`'s and `BadgeText`'s call sites in the views are untested.** Re-grepped
+  2026-07-29 rather than inherited: `MeetingDetailView`, `LibraryWindow` and `UtteranceRow` each
+  appear in **0** files under `swift/Tests/` (`MeetingInspector` now appears in 5, so the gap is
+  narrower than this entry used to claim). Reverting the avatar label to `split("_").last` (which
+  rendered `Léa_B` as `B`) or the badge to `?? 0` therefore survives the whole suite. The helpers are
+  well covered; their consumption at the render site is review-guarded only. Closing it needs a
+  view-host test — the thing that deadlocked this project twice for 29 minutes holding the SwiftPM
+  lock — so it stays a NAMED gap rather than a pretended pass. Note the avatar *colour* half of this
+  is now genuinely guarded (`d448e2b`): the helper's collapse-to-two-colours behaviour would fail
+  the suite, even though the call site still would not.
 
 W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
 investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
