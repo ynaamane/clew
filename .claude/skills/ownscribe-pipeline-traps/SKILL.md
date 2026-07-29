@@ -61,6 +61,22 @@ because it holds biometric voiceprints (GDPR Art. 9, cleared for this use, still
 `~/ownscribe/2026-07-27_1352/` is the BUG4 artifact: 12,890,112 bytes, 33.56s, **peak 0.0, rms
 0.0**. Useful precisely because it is valid-but-empty — the case a presence check calls "fine".
 
+`/tmp/ms-fixture/` is a DERIVED copy of the 27-July meeting, shared by two suites: Swift's
+`EnvelopeDocumentTests` (500 buckets, peak 1.0) and Python's
+`test_anchoring_context_contains_token.py`, which exists to defend a context-window fix against
+that meeting's **14 real anchors**. It lives in `/tmp`, so it does not survive a reboot;
+`scripts/regenerate_fixtures.py` rebuilds it through production functions, reading the real meeting
+and writing only under `/tmp`.
+
+**Regenerating it from a different recording is worse than losing it.** The first attempt sourced
+`~/ownscribe/scribe_selftest_*`, whose transcript anchors to **0** tokens — so the Python test's
+loop body never executes, `missing_token` stays empty, and a fully reverted anchoring fix passes.
+Coverage deleted, suite still green. `md5` on `transcript.md`/`summary.md` is the cheap check that a
+fixture is the meeting it claims to be. Two rules follow: a fixture generator is production code for
+the test suite, and any test whose assertion lives inside a loop needs a non-empty guard **before**
+the loop (`assert len(anchors) > 0`) or "found nothing" is indistinguishable from "all correct".
+Mutation-check that guard by handing the test an empty summary — it must go red.
+
 ## A green suite cannot see a dead consumer
 
 Five instances of one shape, none visible in a diff:
