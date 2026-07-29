@@ -1,10 +1,10 @@
 # TODO — meeting-scribe
 
-## Status: 629 Python + 340 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
+## Status: 629 Python + 343 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
 
 Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
-failed**, including the release build; Python inside it → **629 passed**; Swift → **317 XCTest
-(`Executed 321 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 340**. The 4 skips
+failed**, including the release build; Python inside it → **629 passed**; Swift → **320 XCTest
+(`Executed 324 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 343**. The 4 skips
 are the hardware-gated tests, by design. `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'`
 → **0** after that full run, so nothing in the suite reached the real input device.
 

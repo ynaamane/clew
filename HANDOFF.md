@@ -4,15 +4,15 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**629 Python + 340 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
+**629 Python + 343 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
 6 tests matériel à la demande. Rien n'est retenu en local — mais vérifie avec
 `git log --oneline origin/main..main | wc -l` au lieu de croire cette phrase : elle a affirmé
 « tout est poussé » pendant que 14 commits attendaient, et la première correction a épinglé un hash
 périmé au commit suivant. Un fait mutable appartient à une commande, pas à une phrase.
 
 Mesuré le 2026-07-29 sur l'arbre fusionné, pas recopié. Le compte Swift demande d'additionner
-**deux** frameworks : `swift test` imprime un total XCTest (`Executed 321 tests, with 4 tests
-skipped and 0 failures` → 317 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
+**deux** frameworks : `swift test` imprime un total XCTest (`Executed 324 tests, with 4 tests
+skipped and 0 failures` → 320 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
 swift-testing. Un relecteur indépendant a trouvé ce chiffre périmé à **322** dans quatre endroits
 de ces deux fichiers alors que je venais de mesurer 340 : écrire le nombre est une étape séparée de
 le mesurer, et elle se rate seule. Tout « 276 Swift » plus haut dans l'historique de ce fichier ne comptait que XCTest.
