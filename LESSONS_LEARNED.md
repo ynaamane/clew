@@ -28,6 +28,19 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
   "nobody has looked", write that — "unverified" costs one line; a false claim costs the user's
   trust in every other line. Corollary: correcting a claim-without-evidence by writing a *different*
   claim-without-evidence is not a correction, it is the same error with new wording.
+- **A capture seam is not enough if the PERMISSION CHECK still runs first.** The mic-hijack fix
+  injected `makeSystemCapture`/`makeMicCapture` so no test constructs real hardware — but
+  `start()` still called `runCoreAudioTapPermissionPreflight` *unconditionally*, before consulting
+  the injected fake. That preflight **creates a real CoreAudio tap**; `coreaudiod` refuses it, and
+  the churn is what renegotiates AirPods into the 24 kHz HFP profile. So a fully-faked test still
+  reached the hardware, one layer above the seam everyone was looking at. Fixed by gating the
+  preflight on `makeSystemCapture == nil` and extracting `systemPermissionCheck` as its own seam.
+  **Measured, which is the only claim worth making here:** `/usr/bin/log show --last 60s | grep -cE
+  'PauseIO|ResumeIO'` → **0 at rest and 0 after a full `swift test`** (it was 7920 before the seams
+  existed). Mutation: removing the `makeSystemCapture == nil` gate turns the injection test RED
+  while the non-regression test correctly stays green, because it injects no fake. The general
+  shape: **enumerate everything `start()` does before it reaches your seam** — a seam placed
+  correctly can still sit downstream of the side effect you were trying to avoid.
 - **A test surviving a mutation only means something if it COULD have failed it.** A reviewer
   reported 5 `MeetingInspectorConfigFormatTests` as false greens because breaking *single*-quote
   TOML stripping left them all green. But those tests write `format = "markdown"` / `"json"` with

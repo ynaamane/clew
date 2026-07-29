@@ -43,6 +43,13 @@ public final class RecordingController {
 
     var makeSystemCapture: ((String) -> SystemAudioCapturing)?
 
+    var systemPermissionCheck: (Bool) -> Bool = { needsMic in
+        if !preflightScreenCaptureAccess() {
+            _ = CGRequestScreenCaptureAccess()
+        }
+        return runCoreAudioTapPermissionPreflight(needsMic: needsMic)
+    }
+
     var makeMicCapture: (() -> MicCapture?) = { MicCapture() }
 
     var startMicCapture: ((MicCapture, String, String?) throws -> Void) = { mic, path, deviceName in
@@ -83,15 +90,13 @@ public final class RecordingController {
     public func start(outputPath: String) async throws {
         guard state == .idle else { throw RecordingError.alreadyRecording }
 
-        if !preflightScreenCaptureAccess() {
-            _ = CGRequestScreenCaptureAccess()
-        }
-        guard runCoreAudioTapPermissionPreflight(needsMic: enableMic) else {
-            throw RecordingError.permissionDenied
-        }
-
-        guard #available(macOS 14.2, *) else {
-            throw RecordingError.unsupportedOSVersion
+        if makeSystemCapture == nil {
+            guard systemPermissionCheck(enableMic) else {
+                throw RecordingError.permissionDenied
+            }
+            guard #available(macOS 14.2, *) else {
+                throw RecordingError.unsupportedOSVersion
+            }
         }
 
         let tempPaths = RecordingTempPaths(outputPath: outputPath, micEnabled: enableMic)
