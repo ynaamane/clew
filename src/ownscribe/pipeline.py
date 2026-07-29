@@ -654,8 +654,17 @@ def run_summarize(config: Config, transcript_file: str) -> None:
         )
 
     summary_md = format_summary(summary)
-    summary_path = out_dir / "summary.md"
+    ext = "json" if config.output.format == "json" else "md"
+    summary_path = out_dir / f"summary.{ext}"
     summary_path.write_text(summary_md)
+
+    save_anchors(anchor_summary_claims(summary, transcript_text), out_dir)
+
+    for candidate in ("recording.wav", "system.wav"):
+        audio_path = out_dir / candidate
+        if audio_path.is_file():
+            _generate_and_save_envelope(audio_path, out_dir)
+            break
 
     if title_slug:
         out_dir, old_out_dir = _rename_output_dir(out_dir, title_slug), out_dir
@@ -670,7 +679,7 @@ def run_summarize(config: Config, transcript_file: str) -> None:
             if audio_dir.is_dir() and out_dir != old_out_dir:
                 _rename_output_dir(audio_dir, title_slug)
 
-    summary_path = out_dir / "summary.md"
+    summary_path = out_dir / f"summary.{ext}"
 
     click.echo(f"\n{summary_md}")
     click.echo(f"Summary saved to {summary_path}")
