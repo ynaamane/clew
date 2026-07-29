@@ -68,3 +68,58 @@ private final class HardwareFreeFakeCapture: SystemAudioCapturing {
 
     func stop() {}
 }
+
+final class PermissionErrorNamesTheMissingOneTests: XCTestCase {
+    @MainActor
+    private func controllerDenying(_ missing: RecordingController.RecordingError?) -> RecordingController {
+        let controller = RecordingController()
+        controller.systemPermissionCheck = { _ in false }
+        controller.missingPermission = { missing }
+        return controller
+    }
+
+    @MainActor
+    func testSystemAudioDenialNamesSystemAudioAndTellsTheUserWhereToGo() async {
+        let controller = controllerDenying(.systemAudioPermissionDenied)
+        do {
+            try await controller.start(outputPath: "/tmp/never-written-\(UUID().uuidString).wav")
+            XCTFail("a denied permission must not start a recording")
+        } catch let error as RecordingController.RecordingError {
+            XCTAssertEqual(error, .systemAudioPermissionDenied)
+            XCTAssertTrue(
+                error.description.contains("System Settings"),
+                "the message must say where to fix it; the old text named neither permission nor a "
+                    + "destination, and the preflight's detail goes to stderr, which a Finder-launched "
+                    + "app has nowhere to show")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    @MainActor
+    func testMicDenialSaysTheCallIsStillRecordedWithoutYourVoice() async {
+        let controller = controllerDenying(.microphonePermissionDenied)
+        do {
+            try await controller.start(outputPath: "/tmp/never-written-\(UUID().uuidString).wav")
+            XCTFail("a denied permission must not start a recording")
+        } catch let error as RecordingController.RecordingError {
+            XCTAssertEqual(error, .microphonePermissionDenied)
+            XCTAssertTrue(error.description.contains("Microphone"))
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    @MainActor
+    func testAnUnattributableDenialStillFailsClosed() async {
+        let controller = controllerDenying(nil)
+        do {
+            try await controller.start(outputPath: "/tmp/never-written-\(UUID().uuidString).wav")
+            XCTFail("must not start")
+        } catch let error as RecordingController.RecordingError {
+            XCTAssertEqual(error, .permissionDenied, "no attribution must never become a pass")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+}

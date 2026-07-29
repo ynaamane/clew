@@ -11,14 +11,24 @@ public final class RecordingController {
         case stopping
     }
 
-    public enum RecordingError: Error, CustomStringConvertible {
+    public enum RecordingError: Error, Equatable, CustomStringConvertible {
         case permissionDenied
+        case systemAudioPermissionDenied
+        case microphonePermissionDenied
         case unsupportedOSVersion
         case notRecording
         case alreadyRecording
 
         public var description: String {
             switch self {
+            case .systemAudioPermissionDenied:
+                return "System Audio Recording is off for MeetingScribe. Open System Settings → "
+                    + "Privacy & Security → Screen & System Audio Recording, enable MeetingScribe, "
+                    + "then quit and reopen the app."
+            case .microphonePermissionDenied:
+                return "Microphone access is off for MeetingScribe. Open System Settings → "
+                    + "Privacy & Security → Microphone and enable MeetingScribe. The call will still "
+                    + "be recorded without it, but your own voice will be missing."
             case .permissionDenied: return "System Audio Recording or Microphone permission is not granted."
             case .unsupportedOSVersion: return "CoreAudio process-tap capture requires macOS 14.2 or later."
             case .notRecording: return "No recording is in progress."
@@ -43,11 +53,20 @@ public final class RecordingController {
 
     var makeSystemCapture: ((String) -> SystemAudioCapturing)?
 
-    var systemPermissionCheck: (Bool) -> Bool = { needsMic in
+    var systemPermissionCheck: (Bool) async -> Bool = { needsMic in
         if !preflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
         }
+        if needsMic {
+            _ = await requestMicrophoneAccessIfUnanswered()
+        }
         return runCoreAudioTapPermissionPreflight(needsMic: needsMic)
+    }
+
+    var missingPermission: () -> RecordingError? = {
+        if !preflightScreenCaptureAccess() { return .systemAudioPermissionDenied }
+        if !preflightMicrophoneAccess() { return .microphonePermissionDenied }
+        return nil
     }
 
     var makeMicCapture: (() -> MicCapture?) = { MicCapture() }
@@ -91,8 +110,9 @@ public final class RecordingController {
         guard state == .idle else { throw RecordingError.alreadyRecording }
 
         if makeSystemCapture == nil {
-            guard systemPermissionCheck(enableMic) else {
-                throw RecordingError.permissionDenied
+            let permitted = await systemPermissionCheck(enableMic)
+            guard permitted else {
+                throw missingPermission() ?? RecordingError.permissionDenied
             }
             guard #available(macOS 14.2, *) else {
                 throw RecordingError.unsupportedOSVersion
