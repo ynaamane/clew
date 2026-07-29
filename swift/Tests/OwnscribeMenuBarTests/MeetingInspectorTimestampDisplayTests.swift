@@ -11,12 +11,13 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        XCTAssertNotNil(keyPoint.anchors, "Key point should have anchors")
-        XCTAssertEqual(keyPoint.anchors?.count, 1)
-        XCTAssertNotNil(keyPoint.anchors?["Gary"])
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
 
-        let firstAnchor = keyPoint.anchors?["Gary"]?.first
-        XCTAssertEqual(firstAnchor?.timestamp, "08:30")
+        XCTAssertEqual(
+            display,
+            .evidence([AnchorEvidenceChip(token: "Gary", timestamp: "08:30")]),
+            "A key point with one anchored token renders one evidence chip")
+        XCTAssertNil(display.placeholderText, "Evidence must not render a placeholder")
     }
 
     func testKeyPointWithMultipleTokensDisplaysAllTimestamps() {
@@ -31,15 +32,15 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(keyPoint.anchors?.count, 2, "Should have two anchored tokens")
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
 
-        let jwtAnchors = keyPoint.anchors?["JWT"]
-        XCTAssertEqual(jwtAnchors?.count, 2, "JWT should have two timestamps")
-        XCTAssertEqual(jwtAnchors?.first?.timestamp, "05:28")
-
-        let lambdaAnchors = keyPoint.anchors?["Lambda"]
-        XCTAssertEqual(lambdaAnchors?.count, 1)
-        XCTAssertEqual(lambdaAnchors?.first?.timestamp, "05:09")
+        XCTAssertEqual(
+            display.chips,
+            [
+                AnchorEvidenceChip(token: "JWT", timestamp: "05:28"),
+                AnchorEvidenceChip(token: "Lambda", timestamp: "05:09")
+            ],
+            "Every anchored token gets its own chip")
     }
 
     func testKeyPointWithoutAnchorsShowsDash() {
@@ -48,15 +49,24 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             anchors: [:]
         )
 
-        XCTAssertNotNil(keyPoint.anchors, "Anchors should be non-nil empty dict")
-        XCTAssertTrue(keyPoint.anchors?.isEmpty == true, "Key point should have no anchors")
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+
+        XCTAssertEqual(
+            display, .noEvidenceFound,
+            "Anchoring ran and found nothing for this claim — that is a dash, not an absence of checking")
+        XCTAssertEqual(display.placeholderText, "—")
+        XCTAssertTrue(display.chips.isEmpty)
     }
 
-    func testAnchorTimestampFormat() {
-        let anchor = TokenAnchor(timestamp: "08:30", context: "Gary discussed the bug")
+    func testChipLabelJoinsTokenAndTimestamp() {
+        let keyPoint = KeyPointWithAnchors(
+            text: "Gary discussed the bug",
+            anchors: ["Gary": [TokenAnchor(timestamp: "08:30", context: "Gary discussed the bug")]]
+        )
 
-        XCTAssertEqual(anchor.timestamp, "08:30")
-        XCTAssertTrue(anchor.context.contains("Gary"))
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+
+        XCTAssertEqual(display.chips.first?.label, "Gary→08:30", "The rendered label is token→timestamp")
     }
 
     func testMultipleAnchorsForSameTokenOnlyFirstIsUsed() {
@@ -70,33 +80,99 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
             ]
         )
 
-        let jwtAnchors = keyPoint.anchors?["JWT"]
-        XCTAssertEqual(jwtAnchors?.count, 2, "Both anchors are stored")
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
 
-        let firstTimestamp = jwtAnchors?.first?.timestamp
-        XCTAssertEqual(firstTimestamp, "05:28", "First timestamp should be used for display")
+        XCTAssertEqual(display.chips.count, 1, "One chip per token, not one per occurrence")
+        XCTAssertEqual(
+            display.chips.first?.timestamp, "05:28",
+            "The earliest recorded occurrence is the one offered as evidence")
     }
 
     func testSortedTokenKeysProduceConsistentDisplay() {
-        let keyPoint = KeyPointWithAnchors(
-            text: "Discussion with multiple tokens",
-            anchors: [
-                "Zoom": [TokenAnchor(timestamp: "01:10", context: "Zoom")],
-                "Gary": [TokenAnchor(timestamp: "08:30", context: "Gary")],
-                "JWT": [TokenAnchor(timestamp: "05:28", context: "JWT")]
-            ]
-        )
+        let tokens = ["Zoom", "Gary", "JWT", "Lambda", "Confluence", "PPTX", "Aurora", "Redshift"]
+        var anchors: [String: [TokenAnchor]] = [:]
+        for token in tokens {
+            anchors[token] = [TokenAnchor(timestamp: "01:10", context: token)]
+        }
+        let keyPoint = KeyPointWithAnchors(text: "Discussion with multiple tokens", anchors: anchors)
 
-        let sortedKeys = Array(keyPoint.anchors?.keys.sorted() ?? [])
-        XCTAssertEqual(sortedKeys, ["Gary", "JWT", "Zoom"], "Keys should be alphabetically sorted")
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+
+        XCTAssertEqual(
+            display.chips.map(\.token), tokens.sorted(),
+            "Dictionary order is seeded per process, so an unsorted display reshuffles between launches. Eight tokens are used deliberately: with three, a random order is already sorted one run in six, and a mutation that drops the sort survived 1 of 8 runs at that size.")
     }
 
     func testKeyPointWithNilAnchorsShowsNotYetVerified() {
-        let keyPoint = KeyPointWithAnchors(
-            text: "Some claim without anchoring",
-            anchors: nil
-        )
+        let keyPoint = KeyPointWithAnchors(text: "Some claim without anchoring", anchors: nil)
 
-        XCTAssertNil(keyPoint.anchors, "Anchors should be nil when file is absent")
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+
+        XCTAssertEqual(
+            display, .notYetVerified,
+            "No anchors.json means nobody checked — that must never look like checked-and-found-nothing")
+        XCTAssertEqual(display.placeholderText, "(pas encore vérifié)")
+    }
+
+    func testTokenWhoseOccurrencesAllFailedToParseIsNotSilentlyEmpty() {
+        let keyPoint = KeyPointWithAnchors(text: "Gary discussed a bug", anchors: ["Gary": []])
+
+        let display = AnchorEvidenceDisplayModel.display(for: keyPoint)
+
+        XCTAssertEqual(
+            display, .noEvidenceFound,
+            "A token with zero usable occurrences has no chip to show; rendering nothing at all would leave the claim unlabelled")
+        XCTAssertEqual(display.placeholderText, "—")
+    }
+
+    func testDisplayConsumesWhatTheDiskLoaderProduces() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        let configDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: configDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: configDir) }
+
+        let configURL = configDir.appendingPathComponent("config.toml")
+        try "[output]\nformat = \"markdown\"\n".write(to: configURL, atomically: true, encoding: .utf8)
+
+        let summaryMd = """
+        # Meeting Summary
+
+        ## Key Points
+        - Gary discussed a bug that needs checking
+        - The possibility of using a fictitious user was considered
+
+        ## Action Items
+        None.
+        """
+        try summaryMd.write(to: tempDir.appendingPathComponent("summary.md"), atomically: true, encoding: .utf8)
+
+        let withoutAnchorsFile = MeetingInspectorState.loadKeyPointsWithAnchors(
+            from: tempDir, configURL: configURL, fileManager: fileManager)
+        XCTAssertEqual(withoutAnchorsFile?.count, 2)
+        XCTAssertEqual(
+            withoutAnchorsFile.map { $0.map(AnchorEvidenceDisplayModel.display(for:)) },
+            [.notYetVerified, .notYetVerified],
+            "With no anchors.json on disk every claim reads as unchecked")
+
+        let anchorsJson = """
+        {
+          "version": "1.0",
+          "anchors": {
+            "Gary": [{"timestamp": "08:30", "context": "Gary discussed the bug"}]
+          }
+        }
+        """
+        try anchorsJson.write(to: tempDir.appendingPathComponent("anchors.json"), atomically: true, encoding: .utf8)
+
+        let withAnchorsFile = MeetingInspectorState.loadKeyPointsWithAnchors(
+            from: tempDir, configURL: configURL, fileManager: fileManager)
+        XCTAssertEqual(
+            withAnchorsFile.map { $0.map(AnchorEvidenceDisplayModel.display(for:)) },
+            [.evidence([AnchorEvidenceChip(token: "Gary", timestamp: "08:30")]), .noEvidenceFound],
+            "The same loader output now separates anchored evidence from a checked-but-unanchored claim")
     }
 }

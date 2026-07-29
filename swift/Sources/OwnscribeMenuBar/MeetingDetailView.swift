@@ -8,28 +8,52 @@ struct MeetingDetailView: View {
     @State private var showBackchannel = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                if let envelope {
-                    EnvelopeStrip(buckets: envelope.buckets)
-                        .padding(.horizontal, 26)
-                        .padding(.bottom, 14)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    if let envelope {
+                        EnvelopeStrip(buckets: envelope.buckets)
+                            .padding(.horizontal, 26)
+                            .padding(.bottom, 14)
+                    }
+                    transcriptBody
                 }
-                transcriptBody
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(.background)
-        .inspector(isPresented: .constant(true)) {
-            MeetingInspector(meeting: meeting, transcript: transcript)
+            .background(.background)
+            .inspector(isPresented: .constant(true)) {
+                MeetingInspector(
+                    meeting: meeting,
+                    transcript: transcript,
+                    onScrollToAnchor: { timestamp in scrollToAnchor(timestamp, using: proxy) }
+                )
                 .inspectorColumnWidth(min: 240, ideal: 286, max: 360)
+            }
         }
         .navigationTitle(meeting.displayTitle)
         .task(id: meeting.id) {
             let assets = loadMeetingAssets(from: meeting)
             transcript = assets.transcript
             envelope = assets.envelope
+        }
+    }
+
+    private func scrollToAnchor(_ timestamp: String, using proxy: ScrollViewProxy) {
+        guard let target = AnchorScrollTargeting.target(
+            forAnchorTimestamp: timestamp,
+            in: transcript?.utterances ?? [],
+            backchannelVisible: showBackchannel
+        ) else { return }
+
+        guard target.revealsBackchannel else {
+            withAnimation { proxy.scrollTo(target.utteranceID, anchor: .center) }
+            return
+        }
+
+        showBackchannel = true
+        DispatchQueue.main.async {
+            withAnimation { proxy.scrollTo(target.utteranceID, anchor: .center) }
         }
     }
 
@@ -66,6 +90,7 @@ struct MeetingDetailView: View {
                 }
                 ForEach(visibleUtterances) { utterance in
                     UtteranceRow(utterance: utterance)
+                        .id(utterance.id)
                 }
             }
             .padding(EdgeInsets(top: 4, leading: 26, bottom: 30, trailing: 26))
