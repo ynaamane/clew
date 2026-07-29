@@ -113,6 +113,39 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
   deliberate `Int?` three commits after it was chosen. **When a type encodes "unknown", grep every
   render site for `??` before believing the guarantee holds.**
 
+## The suite can DEFEND a bug (2026-07-29)
+
+- **`SpeakerAvatarStyleTests.speakerEndingIn0GetsBlue` asserted the collision as intended
+  behaviour.** `SpeakerAvatarStyle.color` routed every diarized label through `hasSuffix("0")`, so
+  seven concurrent speakers collapsed to **two** colours and `SPEAKER_00`/`SPEAKER_10` shared an
+  avatar. `TODO.md` had it filed as "unreachable on current data" — true, real transcripts hold only
+  `_00` and `_01` — but the test made it worse than unguarded: a correct fix would have turned the
+  suite RED, so the suite argued against repair. A named test asserting a known-wrong output is not
+  coverage; it is a lock. When filing a defect as unreachable, grep whether a test PINS it.
+- **The interesting bug was one layer under the one I set out to fix.** Parsing the index instead of
+  the suffix, `Int("-1")` succeeds, and `palette[-1 % 7]` is `palette[-1]`, which **traps**: the
+  mutation without an `index >= 0` guard exits on **signal 5**, `Fatal error: Index out of range`.
+  A wrong avatar colour is cosmetic; a crash on a malformed label is not. Swift's `Int` also rejects
+  `"1_2"` where **Python's accepts the underscore** — my first probe was a Python mirror of the Swift
+  parse and gave the wrong answer for that input. Mirror a parse in the language that runs it, or
+  the probe invents behaviour.
+- **Three of my own replacement tests were unfalsifiable before they were fixed**, each caught by
+  asking what could make it fail: `f(x) == f(x)` (a tautology); a version calling a
+  `hashColorForTesting` shim, which is the forbidden test-only production method; then widening
+  `private` → internal, which is that same move renamed. The honest version pins the colour the hash
+  branch actually returns — measured, not assumed. Related trap avoided: an `|| label == "SPEAKER_ab"`
+  escape clause, which would have made the assertion true by construction for the one input that
+  disagreed. When an assertion needs an exception to pass, the claim is wrong, not the input.
+- **A shared `/tmp` fixture can turn a real test vacuous.** `EnvelopeDocumentTests` reads
+  `/tmp/ms-fixture/`, which is untracked and does not survive a reboot: moved aside, it exits **1**
+  with `Code=260` instead of skipping, so `check.sh` goes red for no code reason. But the fix that
+  regenerates it from a *different* recording is worse than the bug —
+  `tests/test_anchoring_context_contains_token.py` consumes the same directory and pins 14 real
+  anchors; the substitute source yields **0**, so its loop body never runs and a fully reverted
+  context fix stays green. Verified by `md5` on both files and by counting anchors in each
+  `anchors.json`. A fixture generator is production code for the test suite: regenerating it with
+  plausible-but-different data silently deletes coverage while every test still passes.
+
 ## Bugs caught by REAL runs (not synthetic tests) — the highest-value catches
 
 - **BUG0 (CRITICAL): the CoreAudio tap FROZE Zoom + no permission prompt fired.** First live-call test: starting the tap froze Zoom so hard the user couldn't join; Ctrl+C released it instantly. Root cause: the CLI binary had NO embedded Info.plist → no NSAudioCaptureUsageDescription → macOS had nothing to prompt with → the unauthorized tap stalled CoreAudio (~60s, per Chromium's documented behavior on the same API) which froze every audio client. Fix: embed the Info.plist via `-sectcreate __TEXT __info_plist` (verified present in the shipped binary via otool + strings) + a CGPreflightScreenCaptureAccess fail-loud guard before tap creation. On macOS 26.1+/27 the tap rides the existing Screen Recording grant, so no prompt fires on an already-granted machine (expected, not a bug). A synthetic tone test could NEVER have caught this — needed a real call with a real competing audio client.
