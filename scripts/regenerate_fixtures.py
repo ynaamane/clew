@@ -9,6 +9,7 @@ EnvelopeDocumentTests (Swift) and test_anchoring_context_contains_token (Python)
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -52,9 +53,6 @@ def main() -> None:
         print("Error: envelope generation returned None", file=sys.stderr)
         sys.exit(1)
 
-    import json
-    import numpy as np
-
     envelope_path = fixture_dir / "envelope.json"
     envelope_path.write_text(json.dumps({"envelope": envelope.tolist()}, indent=2))
     print(f"Wrote {envelope_path}")
@@ -73,10 +71,7 @@ def main() -> None:
         size = path.stat().st_size
         print(f"  {path.name:20s} {size:>8d} bytes")
 
-    import json as json_module
-
-    envelope_data = json_module.load(open(envelope_path))
-    env_list = envelope_data["envelope"]
+    env_list = json.loads(envelope_path.read_text())["envelope"]
     buckets = len(env_list)
     max_val = max(env_list)
     zeros = env_list.count(0.0)

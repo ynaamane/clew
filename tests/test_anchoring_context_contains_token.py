@@ -32,8 +32,7 @@ def test_all_anchors_contain_their_token(real_meeting_data):
     anchors = anchor_summary_claims(summary, transcript)
 
     assert len(anchors) > 0, (
-        "Fixture must contain non-empty anchors to test token containment. "
-        "An empty anchor dict causes vacuous pass."
+        "Fixture must contain non-empty anchors to test token containment. An empty anchor dict causes vacuous pass."
     )
 
     missing_token = []
