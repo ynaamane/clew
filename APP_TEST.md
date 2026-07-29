@@ -155,8 +155,8 @@ mistake ship twice on 2026-07-28: the design was declared "matching the
 validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
-**No test in this repo can verify appearance.** As of 2026-07-29 that is 340
-green Swift tests (317 XCTest + 23 swift-testing) and 629 Python; three
+**No test in this repo can verify appearance.** As of 2026-07-29 that is 343
+green Swift tests (320 XCTest + 23 swift-testing) and 629 Python; three
 `glassEffect` call sites; the right symbols in the binary. Every one of those
 proves the code RUNS. They are all silent on whether the window reads well. The
 count going up changes nothing about that — which is the whole point of this
@@ -193,10 +193,22 @@ and `design/mockup.html`:
       was hiding it. New in `a5a2056`. Two things only you can judge: whether
       a `.link`-styled chip reads as clickable in the inspector, and whether
       the scroll lands somewhere legible rather than pinning the line to the
-      very top or bottom. **This needs a meeting with a populated
-      `anchors.json`** — of the six on disk, only the selftest dir has the
-      file at all and its `anchors` object is `{}`, so a fresh recording is
-      what exercises the path.
+      very top or bottom.
+      **The LOGIC is now verified against real data**, so this check is purely
+      visual: `AnchorEvidenceRealMeetingTests` drives the 27-July meeting's 9
+      real tokens / 14 occurrences through the production loader, the display
+      model and the scroll targeting, and it caught a genuine defect no
+      synthetic fixture could — `SPEAKER_00`'s "OK." and the sentence
+      containing "Lambda" are BOTH stamped `[05:09]`, and the chip resolved to
+      the two-word backchannel, offering it as proof of a claim about
+      architecture (fixed in `c4659cb`).
+      *(An earlier version of this line said only a fresh recording could
+      exercise the path, because no meeting under `~/ownscribe/` has populated
+      anchors — one of six has the file and its `anchors` object is `{}`. That
+      was wrong about the mechanism: `/tmp/ms-fixture/` is a derived copy of
+      the same meeting WITH its anchors, which is exactly what the new tests
+      use. A fresh recording is still the only way to see the chips **in the
+      app**, since the window reads `~/ownscribe/`, not `/tmp`.)*
 - [ ] **Settings → the two new controls** (mic on/off, silence timeout) — new
       in `558da55`. The write path is tested and the HF token is provably
       preserved; how the pane READS is unverified, nobody has looked. Note it
