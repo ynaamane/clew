@@ -26,7 +26,7 @@ struct MeetingDetailView: View {
                 MeetingInspector(
                     meeting: meeting,
                     transcript: transcript,
-                    onScrollToAnchor: { timestamp in scrollToAnchor(timestamp, using: proxy) }
+                    onScrollToAnchor: { chip in scrollToAnchor(chip, using: proxy) }
                 )
                 .inspectorColumnWidth(min: 240, ideal: 286, max: 360)
             }
@@ -39,9 +39,10 @@ struct MeetingDetailView: View {
         }
     }
 
-    private func scrollToAnchor(_ timestamp: String, using proxy: ScrollViewProxy) {
+    private func scrollToAnchor(_ chip: AnchorEvidenceChip, using proxy: ScrollViewProxy) {
         guard let target = AnchorScrollTargeting.target(
-            forAnchorTimestamp: timestamp,
+            forAnchorTimestamp: chip.timestamp,
+            provingToken: chip.token,
             in: transcript?.utterances ?? [],
             backchannelVisible: showBackchannel
         ) else { return }

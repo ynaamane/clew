@@ -27,18 +27,43 @@ public struct AnchorScrollTargeting {
         in utterances: [Utterance],
         backchannelVisible: Bool
     ) -> AnchorScrollTarget? {
+        return target(
+            forAnchorTimestamp: timestamp,
+            provingToken: nil,
+            in: utterances,
+            backchannelVisible: backchannelVisible)
+    }
+
+    public static func target(
+        forAnchorTimestamp timestamp: String,
+        provingToken token: String?,
+        in utterances: [Utterance],
+        backchannelVisible: Bool
+    ) -> AnchorScrollTarget? {
         guard let anchorSeconds = seconds(fromAnchorTimestamp: timestamp) else { return nil }
         guard let lastAtOrBefore = utterances.lastIndex(where: { $0.start <= anchorSeconds }) else { return nil }
 
-        var index = lastAtOrBefore
-        while index > 0, utterances[index - 1].start == utterances[index].start {
-            index -= 1
+        var earliestSharingTimecode = lastAtOrBefore
+        while earliestSharingTimecode > 0,
+              utterances[earliestSharingTimecode - 1].start == utterances[earliestSharingTimecode].start {
+            earliestSharingTimecode -= 1
         }
+
+        let sharedRange = earliestSharingTimecode...lastAtOrBefore
+        let index = token
+            .flatMap { needle in sharedRange.first { containsToken(needle, in: utterances[$0].text) } }
+            ?? earliestSharingTimecode
 
         let utterance = utterances[index]
         let needsReveal = utterance.isBackchannel && !backchannelVisible
 
         return AnchorScrollTarget(utteranceID: utterance.id, revealsBackchannel: needsReveal)
+    }
+
+    static func containsToken(_ token: String, in text: String) -> Bool {
+        let needle = token.lowercased()
+        return text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .contains { $0.lowercased() == needle }
     }
 
     public static func canReach(anchorTimestamp: String, in utterances: [Utterance]) -> Bool {

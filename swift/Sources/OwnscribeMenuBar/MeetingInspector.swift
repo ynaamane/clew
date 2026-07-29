@@ -3,7 +3,7 @@ import SwiftUI
 struct MeetingInspector: View {
     let meeting: MeetingSummary
     let transcript: TranscriptDocument?
-    let onScrollToAnchor: (String) -> Void
+    let onScrollToAnchor: (AnchorEvidenceChip) -> Void
 
     @State private var summary: SummaryDocument?
     @State private var keyPointsWithAnchors: [KeyPointWithAnchors]?
@@ -106,7 +106,7 @@ struct MeetingInspector: View {
         let utterances = transcript?.utterances ?? []
         switch AnchorScrollTargeting.interactivity(forAnchorTimestamp: chip.timestamp, in: utterances) {
         case .scrollButton:
-            Button(chip.label) { onScrollToAnchor(chip.timestamp) }
+            Button(chip.label) { onScrollToAnchor(chip) }
                 .buttonStyle(.link)
                 .font(.caption2)
         case .staticText:
