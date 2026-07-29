@@ -5,7 +5,10 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 ## Où en est le projet
 
 **629 Python + 340 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
-6 tests matériel à la demande. Tout est poussé (HEAD `ac153a9`, 0 commit en attente).
+6 tests matériel à la demande. Rien n'est retenu en local — mais vérifie avec
+`git log --oneline origin/main..main | wc -l` au lieu de croire cette phrase : elle a affirmé
+« tout est poussé » pendant que 14 commits attendaient, et la première correction a épinglé un hash
+périmé au commit suivant. Un fait mutable appartient à une commande, pas à une phrase.
 
 Mesuré le 2026-07-29 sur l'arbre fusionné, pas recopié. Le compte Swift demande d'additionner
 **deux** frameworks : `swift test` imprime un total XCTest (`Executed 321 tests, with 4 tests

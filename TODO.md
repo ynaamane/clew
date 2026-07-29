@@ -1,6 +1,6 @@
 # TODO — meeting-scribe
 
-## Status: 629 Python + 340 Swift green, all 10 gates green, everything pushed (HEAD `ac153a9`, 0 unpushed).
+## Status: 629 Python + 340 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
 
 Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
 failed**, including the release build; Python inside it → **629 passed**; Swift → **317 XCTest
@@ -77,7 +77,7 @@ One test is deliberately skipped: the merge-failure path only runs with a live `
 
 **A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
 
-Everything is pushed as of `ac153a9` — re-derive with `git log --oneline origin/main..main | wc -l` rather than trusting this sentence, which was false for most of 2026-07-29 while 14 commits sat local. `design/directions.html` holds the three visual directions that were mocked up; **Glass** is the one being built.
+**Never trust a "pushed" claim in this file — run `git log --oneline origin/main..main | wc -l`.** This sentence read "Everything is pushed" while 14 commits sat local for most of 2026-07-29, and the first fix pinned a hash that was stale one commit later, which is the same rot with an extra step. A statement about mutable state belongs in a command, not in prose. `design/directions.html` holds the three visual directions that were mocked up; **Glass** is the one being built.
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
