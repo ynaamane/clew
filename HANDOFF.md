@@ -4,13 +4,15 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**629 Python + 322 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
-6 tests matériel à la demande. Poussé jusqu'à `7f20a0b` ; le reste est tenu en local.
+**629 Python + 340 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
+6 tests matériel à la demande. Tout est poussé (HEAD `ac153a9`, 0 commit en attente).
 
 Mesuré le 2026-07-29 sur l'arbre fusionné, pas recopié. Le compte Swift demande d'additionner
-**deux** frameworks : `swift test` imprime un total XCTest (`Executed 303 tests, with 4 tests
-skipped and 0 failures` → 299 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
-swift-testing. Tout « 276 Swift » plus haut dans l'historique de ce fichier ne comptait que XCTest.
+**deux** frameworks : `swift test` imprime un total XCTest (`Executed 321 tests, with 4 tests
+skipped and 0 failures` → 317 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
+swift-testing. Un relecteur indépendant a trouvé ce chiffre périmé à **322** dans quatre endroits
+de ces deux fichiers alors que je venais de mesurer 340 : écrire le nombre est une étape séparée de
+le mesurer, et elle se rate seule. Tout « 276 Swift » plus haut dans l'historique de ce fichier ne comptait que XCTest.
 Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
 détruit le chiffre sur le disque. Et lis le code de sortie depuis une **variable capturée**, jamais
 au bout d'un pipeline : au premier passage de ce lot le harness a annoncé « exit 0 » alors que
@@ -62,7 +64,7 @@ un espacement ou une couleur et d'itérer à l'aveugle contre une cible que pers
 
 **W0-9 — Vérification de disponibilité CLI avant l'enregistrement** (8 tests) : L'app te prévient AVANT de commencer l'enregistrement que le CLI ownscribe est absent, donc tu ne record plus une réunion entière puis apprends que rien ne peut la transcrire. Une bannière apparaît quand le CLI n'est pas dispo : *« Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio. »* La vérif tourne avant le start et une fois à l'ouverture de fenêtre. L'enregistrement est **autorisé** (pas désactivé) car la réunion est irremplaçable — l'audio survit pour un `redo` ultérieur. La vérif est pas chère (lookup env + un `isExecutableFile`, pas de walk PATH) et respecte le seam `pipelineRunnerFactory` injecté. Précédence bannière : `.failed` → avertissement mute → avertissement CLI → nil, donc un vrai échec ou un état mute-non-confirmé passe toujours en premier. Les tests épinglent la précédence et prouvent que la factory est appelée.
 
-**W0-4 — Les compteurs sidebar fonctionnent maintenant** (implémenté par `builder-counts` en parallèle) : Les compteurs des filtres action et anchor étaient toujours à zéro car aucun writer n'existait — ils sont maintenant calculés à chaque refresh sidebar (0,44 ms, pas de cache nécessaire). Les compteurs sont `Int?` plutôt que `Int`, car zéro des six réunions sur disque ont `anchors.json` — render un compteur absent comme `0` clamerait « toutes les affirmations ont une preuve » pour des réunions jamais vérifiées, ce qui est l'échec du signal anti-hallucination W0-1. Absence → nil → rendu en texte grisé ou état UI distinct. Le piège qui se généralise : quand un compteur a une source-fichier qui peut ne pas exister (un `anchors.json` ajouté tardivement, une vérif différée), le typer `Int?` pour que l'absence ne se fasse pas passer pour zéro. Scope comme pas cher, donc pas de couche cache ajoutée.
+**W0-4 — Les compteurs sidebar fonctionnent maintenant** (implémenté par `builder-counts` en parallèle) : Les compteurs des filtres action et anchor étaient toujours à zéro car aucun writer n'existait — ils sont maintenant calculés à chaque refresh sidebar (0,44 ms, pas de cache nécessaire). Les compteurs sont `Int?` plutôt que `Int`, car sur les six réunions sur disque **une seule** a un `anchors.json`, et son objet `anchors` est `{}` — donc **zéro** a des ancres exploitables (mesuré le 2026-07-29). Render un compteur absent comme `0` clamerait « toutes les affirmations ont une preuve » pour des réunions jamais vérifiées, ce qui est l'échec du signal anti-hallucination W0-1. Absence → nil → rendu en texte grisé ou état UI distinct. Le piège qui se généralise : quand un compteur a une source-fichier qui peut ne pas exister (un `anchors.json` ajouté tardivement, une vérif différée), le typer `Int?` pour que l'absence ne se fasse pas passer pour zéro. Scope comme pas cher, donc pas de couche cache ajoutée.
 
 Les deux défauts avaient la même forme : des valeurs câblées jusqu'à des consommateurs jamais appelés. Ni l'un ni l'autre n'était détectable par une suite verte.
 

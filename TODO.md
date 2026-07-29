@@ -1,10 +1,10 @@
 # TODO — meeting-scribe
 
-## Status: 629 Python + 322 Swift green, all 10 gates green, pushed through `7f20a0b` — the rest held locally.
+## Status: 629 Python + 340 Swift green, all 10 gates green, everything pushed (HEAD `ac153a9`, 0 unpushed).
 
 Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
-failed**, including the release build; Python inside it → **629 passed**; Swift → **299 XCTest
-(`Executed 303 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 322**. The 4 skips
+failed**, including the release build; Python inside it → **629 passed**; Swift → **317 XCTest
+(`Executed 321 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 340**. The 4 skips
 are the hardware-gated tests, by design. `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'`
 → **0** after that full run, so nothing in the suite reached the real input device.
 
@@ -77,7 +77,7 @@ One test is deliberately skipped: the merge-failure path only runs with a live `
 
 **A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
 
-Everything is pushed. `design/directions.html` holds the three visual directions that were mocked up; **Glass** is the one being built.
+Everything is pushed as of `ac153a9` — re-derive with `git log --oneline origin/main..main | wc -l` rather than trusting this sentence, which was false for most of 2026-07-29 while 14 commits sat local. `design/directions.html` holds the three visual directions that were mocked up; **Glass** is the one being built.
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
@@ -87,7 +87,7 @@ Everything is pushed. `design/directions.html` holds the three visual directions
 
 **W0-9 — CLI availability pre-flight check** (8 tests): The app can now warn you BEFORE starting to record that the ownscribe CLI is missing, so you don't record an entire meeting then learn nothing can transcribe it. A banner appears when the CLI is unavailable: *"Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio."* The check runs before starting a recording and once when the window opens. Recording is ALLOWED (not disabled) because the meeting is irreplaceable — the audio survives for later `redo`. The check is cheap (env lookups + one `isExecutableFile`, no PATH walk) and respects the injected `pipelineRunnerFactory` seam. Banner precedence: `.failed` → mute warning → CLI warning → nil, so a real failure or an unverified-mute state always shows first. Tests pin the precedence and prove the factory is called.
 
-**W0-4 — Sidebar counts now populate** (implemented by `builder-counts` in parallel): The action and anchor filters' counts were always zero because no writer existed — they're now computed on every sidebar refresh (0.44 ms, no cache needed). The counts are `Int?` rather than `Int`, because zero of six meetings on disk have `anchors.json` — rendering an absent count as `0` would claim "all claims have evidence" for meetings that were never checked, which is the W0-1 anti-hallucination signal failure. Absence → nil → rendered as grayed-out text or a distinct UI state. The trap that can be generalized: when a count's source file may not exist (a late-added `anchors.json`, a deferred check), make it `Int?` so absence cannot masquerade as zero. Scoped as cheap, so no caching layer added.
+**W0-4 — Sidebar counts now populate** (implemented by `builder-counts` in parallel): The action and anchor filters' counts were always zero because no writer existed — they're now computed on every sidebar refresh (0.44 ms, no cache needed). The counts are `Int?` rather than `Int`, because of the six meetings on disk **one** has an `anchors.json` at all and its `anchors` object is `{}` — so **zero have usable anchors**, measured 2026-07-29 with `find ~/ownscribe -name anchors.json` plus a token count on the file. (This entry said "zero of six have `anchors.json`", which was true when written and is now off by one file; the distinction that matters is present-but-empty versus absent, and both must stay distinguishable from a real zero.) Rendering an absent count as `0` would claim "all claims have evidence" for meetings that were never checked, which is the W0-1 anti-hallucination signal failure. Absence → nil → rendered as grayed-out text or a distinct UI state. The trap that can be generalized: when a count's source file may not exist (a late-added `anchors.json`, a deferred check), make it `Int?` so absence cannot masquerade as zero. Scoped as cheap, so no caching layer added.
 
 Both defects had the same shape: values plumbed to consumers that were never called. Neither was detectable by a green suite.
 
@@ -335,10 +335,11 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
    and word-boundary match key points for `unanchoredClaimCount`. Both `Int?`; `nil` means unknown and
    must not be filtered into "Non ancrées" nor rendered as 0. Parse inline — measured at 0.44 ms per
    refresh for 10 meetings, so a cache would only add invalidation bugs.
-8. **W0-5 — the envelope strip and per-speaker lanes.** `pipeline.py` writes `envelope.json`
-   (500 buckets) and NO Swift file reads it. This is what makes an abnormal silence visible without
-   opening a 400 MB wav. Zero of six meetings on disk have the file, so absent-means-unknown applies
-   here too. Note `AudioLevels.computePeakLevel` is already live (called from `CoreAudioTapCapture`,
+8. ~~**W0-5 — the envelope strip.**~~ **DONE** — `EnvelopeDocument` + `EnvelopeStrip` read
+   `envelope.json` and `MeetingDetailView` draws it; absent file → no strip, because a flat band
+   would assert total silence over a full meeting. Of the six meetings on disk **one** has the file
+   (measured 2026-07-29: `find ~/ownscribe -name envelope.json` → 1), so absent-means-unknown is
+   still the common path. Per-speaker lanes are NOT built. Note `AudioLevels.computePeakLevel` is already live (called from `CoreAudioTapCapture`,
    `MicCapture` and `main.swift`) — the level exists and only goes to `stderr`, so the live vumeters
    are a display to wire up, not a computation to write.
 9. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
