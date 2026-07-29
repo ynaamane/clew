@@ -1,13 +1,81 @@
 # TODO — meeting-scribe
 
-## Status: 629 Python + 343 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
+## WHAT IS ACTUALLY LEFT (2026-07-29, end of day)
 
-Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
-failed**, including the release build; Python **inside it** → **629 passed**, because `check.sh:23`
-runs `-m "not hardware"`; plain `uv run pytest` → **635 passed, 1 deselected**. Both are correct for
-their command, so a Python count without its invocation is meaningless — an independent reviewer and
-I reported 635 and 629 for the same tree before reconciling them. Swift → **320 XCTest
-(`Executed 324 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 343**. The 4 skips
+Everything below this block is history and traps worth keeping. This is the open list.
+
+### 1. Blocking, and only you can do it: the design
+
+The window has been seen twice and rejected twice. **Nobody has ever named a part.** Until that
+happens no design work should start, because iterating blind against an unseen target is what wasted
+2026-07-28. Open ⌘0 and say which of the eight checks in `APP_TEST.md` § Design pass fails, and how.
+
+Do not accept "the tests are green" as progress here, from me or anyone: 345 green tests say nothing
+about how the window reads. That substitution has already been made twice.
+
+### 2. Blocking, needs one real recording
+
+Three things can only be closed by recording a short real meeting through the app:
+
+- **`resume` now writes `anchors.json` + `envelope.json`** (fixed today, mutation-verified). No
+  meeting on disk has usable anchors — one of six has the file and its `anchors` object is `{}` — so
+  the evidence chips have never rendered against real data in the app.
+- **The clickable chip → scroll**: logic is verified against the real 27-July meeting via
+  `/tmp/ms-fixture`, but the window reads `~/ownscribe`, so a fresh recording is the only way to see
+  it.
+- **The mic permission prompt** (fixed today): the app never asked for microphone access, so the
+  record button could not work on a machine where the answer was still `.notDetermined`. It now
+  requests, and names which permission is missing with the exact Settings path. Whether the prompt
+  actually appears for you is a one-launch check.
+
+### 3. Small, non-blocking, found by the 2026-07-29 sweep and deliberately NOT fixed yet
+
+None of these can lie to you; that is why they waited. Fix them in a batch, not mixed with an
+integrity fix:
+
+- **`ProgressEvent.detail` is decoded then discarded** (`AppState.handle` → `case .detail: break`).
+  The CLI shows sub-step text ("Loading alignment model (fr)", download percentages); the app's
+  progress line stays on the coarse step name.
+- **`MeetingRow` merges two of the three anchor states** (`LibraryWindow.swift:123`): "never checked"
+  (`nil`) and "checked, all anchored" (`0`) render identically in the list. The inspector
+  distinguishes all three correctly. This UNDER-claims (an unverified meeting looks unremarkable), so
+  it is not the `?? 0` failure — but it is the exact distinction `Int?` exists for, at a render site
+  with zero test coverage.
+- **The sidebar badge is a lower bound shown without qualification**: "Non ancrées 1" when the honest
+  statement is "1 known, 7 unknown".
+- **Three functions with no callers**: `PipelineRunner.cancel()` (so a running pipeline cannot be
+  stopped), `GlobalHotKeyRegistration.unregister()`, and `WindowActivationPolicy.resetForTesting()` —
+  the last is test-only production code, which CLAUDE.md forbids.
+- **`_capture_prep_output` is dead** (`whisperx_transcriber.py:123`); production calls
+  `_capture_download_output`. Three tests in `test_transcription.py` patch the dead one, so they pass
+  for a different reason than they claim (spy count measured: 0 vs 1).
+- **`registerTerminationSignalHandlers` has zero test references** — the SIGTERM/SIGINT path to
+  `restoreUnmutedOnQuit`, i.e. the highest-blast function in the app (a mic left muted after a kill).
+- **`openAudioFileWithFrames`'s zero-frame filter is an uncovered branch**: no test writes a
+  zero-frame WAV, which is precisely BUG4's condition.
+- **`checkHasAudio` reads only the first 48,000 frames**, so a file silent for its first second
+  reports `hasContent=false`. Suspected, un-probed.
+
+### 4. Deferred by earlier decision, unchanged
+
+Per-speaker envelope lanes · live transcript preview while recording · live vumeters in the menu bar
+(`AudioLevels.computePeakLevel` already computes the value and only writes it to `stderr`) ·
+diarization/language/output-dir in Settings (still TOML-only) · `AppState` re-reading config after
+Apply (it reads once at launch, so the pane says restart) · the `.badge()` render site, which needs a
+view-host test — the thing that deadlocked this project twice for 29 minutes holding the SwiftPM
+lock · the AirPods mute case, irreducibly manual · MPS diarization until the token pass clears it.
+
+---
+
+## Status: 636 Python + 353 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
+
+Measured 2026-07-29 on the merged tree, not quoted — and I first typed 355 here before running the
+command, which is the fourth time today that writing a number failed as a separate step from
+measuring it. `bash scripts/check.sh` → **`CHECK=0`, 0 gates failed**, including the release build;
+Python **inside it** → **636 passed**, because `check.sh:23` runs `-m "not hardware"`. A Python count
+without its invocation is meaningless — an independent reviewer and I once reported 635 and 629 for
+the same tree before reconciling them. Swift → **330 XCTest
+(`Executed 334 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 353**. The 4 skips
 are the hardware-gated tests, by design. `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'`
 → **0** after that full run, so nothing in the suite reached the real input device.
 
@@ -22,7 +90,21 @@ Both frameworks must be counted: `swift test` prints an XCTest total AND a separ
 XCTest-only. And do not pipe the run through `tail` to read a total — it truncates the summary away,
 and inside a `> file` redirect it destroys the number on disk.
 
-**⚠️ THE DESIGN IS NOT GOOD. The user opened the built app on 2026-07-28 and rejected it.**
+**⚠️ THE DESIGN IS NOT GOOD. Rejected on 2026-07-28, and rejected AGAIN on 2026-07-29** after a
+rebuild that shipped 11 changed files. Nothing was done to the design between those two rejections —
+the second one confirms it, it does not add information. Still nobody has named a part.
+
+**And the 2026-07-29 rejection came with a defect that made the app unusable, which is the more
+useful signal:** clicking Record reported missing permissions and refused to start. Root cause, found
+in the log rather than guessed: `AVCaptureDevice.authorizationStatus` returns `.notDetermined` until
+something asks, `preflightMicrophoneAccess` required `== .authorized`, and **no code in the app ever
+called `requestAccess`** — `grep -rn requestAccess swift/Sources/` returned nothing. Since a missing
+`[audio]` section means `mic ?? true`, the mic was always required, so the record button could never
+work on a machine that had never answered a prompt it was never shown. The preflight's detail text
+goes to `stderr`, which a Finder-launched app has nowhere to display, so the banner said "System
+Audio Recording **or** Microphone" without naming either. Fixed: the app now requests when the answer
+is unanswered, fails closed on a real denial, and names the missing permission with its exact Settings
+path. Mutation-verified four ways.
 
 And read how this line got here, because the mistake is worse than the design: earlier
 on 2026-07-28 this file claimed the Glass direction was delivered, on the reasoning that
