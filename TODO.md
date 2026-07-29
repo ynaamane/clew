@@ -3,7 +3,10 @@
 ## Status: 629 Python + 343 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
 
 Measured 2026-07-29 on the merged tree, not quoted. `bash scripts/check.sh` → **`CHECK=0`, 0 gates
-failed**, including the release build; Python inside it → **629 passed**; Swift → **320 XCTest
+failed**, including the release build; Python **inside it** → **629 passed**, because `check.sh:23`
+runs `-m "not hardware"`; plain `uv run pytest` → **635 passed, 1 deselected**. Both are correct for
+their command, so a Python count without its invocation is meaningless — an independent reviewer and
+I reported 635 and 629 for the same tree before reconciling them. Swift → **320 XCTest
 (`Executed 324 tests, with 4 tests skipped and 0 failures`) + 23 swift-testing = 343**. The 4 skips
 are the hardware-gated tests, by design. `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'`
 → **0** after that full run, so nothing in the suite reached the real input device.
@@ -113,7 +116,13 @@ Deliberately unbuilt, not bugs:
   `SpeakerAvatarStyleTests.speakerEndingIn0GetsBlue` **asserted the collision**, so the suite would
   have gone red on a correct fix — a named test had locked the bug in place. Fixed by indexing the
   palette on the parsed number, which keeps `_00` blue and `_01` purple so the honest assertions stay
-  true. Restoring `hasSuffix` turns exactly the two new tests red and nothing else. Found underneath
+  true. Restoring `hasSuffix` turns **5** tests red as the suite now stands, measured 2026-07-29 —
+  `d448e2b`'s message claimed "exactly the two new tests", which an independent reviewer measured as
+  4 at that commit and I re-measured as 5 after two more tests landed. The fix was better guarded
+  than its own commit message claimed, and the failure mode is worth naming: the reds are all in
+  **swift-testing**, so an XCTest-only grep shows zero and reads as "the mutation survived". A wrong
+  number here is the "fix correct AND evidence wrong" class — both must hold, and they fail
+  independently. Found underneath
   it: `Int("-1")` parses and `palette[-1 % 7]` **traps** — the guardless mutation exits on signal 5
   with `Fatal error: Index out of range`, i.e. a crash, not a wrong colour. `max_speakers = 0`
   (auto-detect) means nothing bounds the speaker count, so the eighth speaker wrapping onto the first
