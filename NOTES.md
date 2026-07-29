@@ -751,3 +751,76 @@ whole suite green (552 passed, 0 failed). Only a peak-RSS assertion could catch 
 that is machine-dependent and flaky enough to be worse than the risk. Hence this note: the
 commit message is where the why was first recorded, but a commit message is not where
 anyone looks before editing a line.
+
+## 2026-07-29 — three parallel builders, two independent reviewers, and four documentary errors of mine
+
+Not a task in the numbered series: a batch of four code lots plus a docs pass. What is worth
+recording is not the fixes but the *evidence failures*, because every one of them was a case of
+holding the wrong proof rather than doing the wrong work.
+
+**The avatar collision was locked in place by a test.** `SpeakerAvatarStyle.color` routed every
+diarized label through `hasSuffix("0")`, so seven concurrent speakers collapsed to **two** colours
+and `SPEAKER_00`/`SPEAKER_10` shared an avatar. `TODO.md` had filed it as "unreachable on current
+data" — true, real transcripts hold only `_00` and `_01` — and that framing hid the real problem:
+`speakerEndingIn0GetsBlue` **asserted** the collision, so a correct fix turned the suite red. A
+named test asserting a known-wrong output is not coverage, it is a lock. When filing a defect as
+harmless, grep whether a test pins it.
+
+Underneath it, a crash: parsing the index instead of the suffix, `Int("-1")` succeeds and
+`palette[-1 % 7]` is `palette[-1]`, which **traps** — signal 5, `Fatal error: Index out of range`.
+Cosmetic bug on top, process death underneath. Also: Swift's `Int` rejects `"1_2"` where Python's
+accepts the underscore, so my first probe (a Python mirror of the Swift parse) gave the wrong answer
+for that input. Mirror a parse in the language that runs it.
+
+**The clickable-evidence chip landed on the wrong line, and only real data could show it.** In the
+27-July transcript `SPEAKER_00` says "OK." and `SPEAKER_01` says the sentence containing "Lambda" —
+both stamped `[05:09]`. The duplicate-timecode rewind always walked to the *first* utterance sharing
+the stamp, so clicking `Lambda→05:09` scrolled to a two-word backchannel and offered it as proof of
+a claim about architecture. Every synthetic fixture has unique timecodes, so no hand-built test
+could ever have seen it. Fixed by searching the shared-timecode range for the utterance that
+actually contains the token; the seam widened from `String` to `AnchorEvidenceChip` so the compiler
+refuses a call site that drops the token.
+
+**A fixture can be a snapshot of a bug.** When that real-data test first failed, the on-disk
+`/tmp/ms-fixture/anchors.json` had a `Lambda` context truncated at 100 chars *before the word it
+proves* — precisely the defect `test_anchoring_context_contains_token.py` exists to catch. Current
+production centres the window correctly; the fixture predated the fix, so a correct fix looked
+broken. Decide first whether the code or the snapshot is stale (`anchor_summary_claims` on the live
+source settles it in one command), and note the mirror image is worse: a fixture regenerated past a
+real regression makes a broken fix look correct.
+
+**Three of my own replacement tests were unfalsifiable before they were fixed**, each caught by
+asking what could make it fail: `f(x) == f(x)`; then a version calling a `hashColorForTesting` shim,
+which is the forbidden test-only production method; then widening `private` → internal, the same
+move renamed. And one test kept failing against a correct fix because a `replace_all` had missed its
+second call site, so it still invoked the old overload — a test that does not call what production
+calls proves nothing in *either* direction.
+
+**Mutation testing itself has a sample-size problem.** Dropping `.sorted()` from the anchor display
+killed its test in only **7 of 8 runs**: with three tokens, a per-process-seeded dictionary order is
+already sorted about one run in six, so the single run the protocol asks for had a real chance of
+certifying a guard that does not guard. At eight tokens it is 8/8. Anything seeded per process
+(dictionary/set order, hashes, clocks, interleaving) needs the kill *rate*, not a verdict.
+
+**And a mutation's kills can hide in the other framework.** `d448e2b`'s message claimed "exactly the
+two new tests red"; an independent reviewer measured **4**, I re-measured **5** after two more tests
+landed. All of them are swift-testing (`✘ Test name()`), so a grep for XCTest's format
+(`Test Case '-[Suite name]' failed`) returns zero hits and reads exactly like a survived mutation.
+The fix was better guarded than its own evidence claimed — still the "fix correct AND evidence
+wrong" class, and those fail independently.
+
+**Four documentary errors, all mine, three caught by reviewers.** I measured 340 Swift tests and
+then wrote 322 into `TODO.md` and `HANDOFF.md`, twice each — writing a number is a separate step from
+measuring it and it fails on its own. "Everything is pushed" sat there while 14 commits were local;
+my first fix pinned a hash that was stale one commit later, which is the same rot with an extra step,
+so both mentions now defer to `git log --oneline origin/main..main | wc -l`. "Zero of six meetings
+have `anchors.json`" was off by one file — and a file count is still the wrong evidence, because that
+one file parses to zero tokens. And a reviewer reported Python at 635 against my 629: both correct,
+because `check.sh:23` adds `-m "not hardware"`. A count without its invocation is not a fact.
+
+**A reviewer's worktree can predate the code under review.** The first independent reviewer was
+branched from the commit *before* all five deliveries: two production files absent,
+`grep -c diarizationIndex` → 0. Every mutation it ran was against code that was not there, and a
+missing file reads exactly like a test going red. Caught by comparing its `git log -1` to mine while
+it worked, not from anything it reported. It recovered by extracting a pristine tree with
+`git archive` when `git reset --hard` was correctly denied against the shared checkout.
