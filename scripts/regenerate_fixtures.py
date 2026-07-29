@@ -1,8 +1,10 @@
 #!/usr/bin/env -S uv run python3
 """Regenerate /tmp/ms-fixture/* from production functions.
 
-Reads a selftest recording, generates anchors + envelope via production
-functions, writes to /tmp/ms-fixture/ for EnvelopeDocumentTests to consume.
+Sources the real 27-July meeting from ~/ownscribe/2026-07-27_1536_* (READ-ONLY),
+generates anchors + envelope via production functions (generate_envelope_from_file,
+anchor_summary_claims, save_anchors), writes to /tmp/ms-fixture/ for both
+EnvelopeDocumentTests (Swift) and test_anchoring_context_contains_token (Python).
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from ownscribe.summarization.anchors_output import save_anchors
 
 
 def main() -> None:
-    source_dir = Path.home() / "ownscribe" / "scribe_selftest_quarterly-review-next-steps"
+    source_dir = Path.home() / "ownscribe" / "2026-07-27_1536_project-technical-review-key-points"
 
     if not source_dir.exists():
         print(f"Error: source directory not found: {source_dir}", file=sys.stderr)
