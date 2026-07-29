@@ -4,14 +4,21 @@ Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**926 tests verts** (635 Python + 291 Swift), 4 Swift sautés volontairement + 1 Python désélectionné,
-plus 6 tests matériel à la demande. HEAD `178b05d`. 12 commits tenus en local depuis `532f363`.
+**629 Python + 322 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
+6 tests matériel à la demande. Poussé jusqu'à `7f20a0b` ; le reste est tenu en local.
 
-Mesuré le 2026-07-28, pas recopié. Le compte Swift demande d'additionner **deux** frameworks :
-`swift test` imprime un total XCTest (276, dont 4 sautés) *et* une ligne séparée
-`Test run with 19 tests` pour swift-testing → 291 qui passent. Tout « 276 Swift » plus haut dans
-l'historique de ce fichier ne comptait que XCTest. Et ne lis jamais le total via `tail` : ça tronque
-le résumé, et dans une redirection `> fichier` ça détruit le chiffre sur le disque.
+Mesuré le 2026-07-29 sur l'arbre fusionné, pas recopié. Le compte Swift demande d'additionner
+**deux** frameworks : `swift test` imprime un total XCTest (`Executed 303 tests, with 4 tests
+skipped and 0 failures` → 299 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
+swift-testing. Tout « 276 Swift » plus haut dans l'historique de ce fichier ne comptait que XCTest.
+Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
+détruit le chiffre sur le disque. Et lis le code de sortie depuis une **variable capturée**, jamais
+au bout d'un pipeline : au premier passage de ce lot le harness a annoncé « exit 0 » alors que
+`CHECK=1` était dans la sortie, et l'échec était réel — la porte anti-péremption de BUG5
+(`bin/ownscribe-audio` plus vieux qu'un source Swift). `bash swift/build.sh` la referme.
+
+Après ce run complet : `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0**. Aucun
+test n'a touché le micro.
 
 **⚠️ LE DESIGN N'EST PAS BON. Rejeté par l'utilisateur le 2026-07-28 après avoir ouvert l'app.**
 
@@ -65,7 +72,9 @@ Les deux défauts avaient la même forme : des valeurs câblées jusqu'à des co
 
 **Piège de diagnostic à connaître** (un handoff d'une autre session s'y est fait prendre le 28/07) : cinq SIGTRAP `xctest` ont été attribués à `EnrolledSpeakerStore.names(in:)`, avec un correctif recommandé sur du code qui n'a **aucun** défaut — la fonction n'a jamais contenu d'`assertionFailure` de toute son histoire. `_assertionFailure` est le symbole de trap générique de Swift ; la frame au-dessus était `Array._checkSubscript`, donc un index hors limites. Et les cinq crashs tournaient depuis `/private/tmp/*/ownscribe-audioPackageTests` — des copies isolées d'agents de revue, pas le dépôt, dont la suite était verte pendant tout ce temps. Vérifier le chemin du bundle qui crashe avant de toucher la production.
 
-**⚠️ Une seule chose attend l'utilisateur : la fenêtre n'a jamais été vue.** Elle a 163 tests verts et zéro vérification visuelle — l'écran était en veille à chaque capture. `⌘0` depuis la barre de menus. Et le bundle installé date d'avant la fenêtre : relancer `bash swift/build-app.sh`.
+**⚠️ Une seule chose attend l'utilisateur, et ce n'est plus « la voir ».** La fenêtre **a** été vue, deux fois le 28/07, et rejetée les deux fois (voir plus haut). Ce qui manque est une lecture *précise* : « pas bon du tout » porte sur l'ensemble, personne n'a nommé une partie. Donc la question est « ouvre `⌘0` et dis laquelle des huit vérifications de `APP_TEST.md` § Design pass échoue, et comment » — aucun audit ne peut la fermer, et deviner l'espacement encore moins. Le bundle installé est plus ancien que ces commits : relancer `bash swift/build-app.sh` d'abord (jamais depuis un agent : il `rm -rf` le bundle et ses autorisations TCC).
+
+Le volet Réglages ajouté le 29/07 (micro + délai de silence) est dans le même cas : les tests prouvent que l'écriture du fichier de config est correcte, ils ne disent **rien** de son apparence. Personne ne l'a regardé.
 
 **Design retenu : Glass** (direction B de `design/directions.html`), choisie après trois maquettes construites sur l'apparence réelle de ce Mac (mode sombre, accent violet) et sur l'enveloppe RMS réelle du call du 27 juillet — pas des barres inventées. Cible de déploiement montée à macOS 26 pour que Liquid Glass soit natif ; les 5 targets sont épinglés en mode langage Swift 5, car passer les outils en 6.0 a sorti 3 erreurs de concurrence stricte dans le code CoreAudio (chantier séparé).
 
