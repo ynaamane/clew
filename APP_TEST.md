@@ -155,10 +155,12 @@ mistake ship twice on 2026-07-28: the design was declared "matching the
 validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
-**No test in this repo can verify appearance.** 276 green Swift tests, three
-`glassEffect` call sites and the right symbols in the binary all prove the
-code runs. They are silent on whether the window reads well. So this pass is
-a human looking, and there is no substitute.
+**No test in this repo can verify appearance.** As of 2026-07-29 that is 340
+green Swift tests (317 XCTest + 23 swift-testing) and 629 Python; three
+`glassEffect` call sites; the right symbols in the binary. Every one of those
+proves the code RUNS. They are all silent on whether the window reads well. The
+count going up changes nothing about that — which is the whole point of this
+section, so do not read a bigger number as progress on this pass.
 
 Open `⌘0` from the menu bar and judge against `design/direction-b-glass.png`
 and `design/mockup.html`:
@@ -176,11 +178,30 @@ and `design/mockup.html`:
 - [ ] Density and spacing versus the mockup — the mockup's `:root` block
       carries the intended values.
 - [ ] Speaker avatars: legible at 18pt, and do two speakers in one meeting
-      ever look alike?
+      ever look alike? *(The code-level collision is fixed as of `d448e2b` —
+      seven speakers now get seven distinct palette colours, where every
+      diarized label previously collapsed to two. So this check is now purely
+      about whether the colours are DISTINGUISHABLE to your eye at 18pt,
+      which no test can answer. Note the palette wraps at the eighth
+      speaker.)*
 - [ ] The envelope strip: is it informative, or decoration?
 - [ ] Inspector states read correctly — `(pas encore vérifié)` reads as
       "not checked yet", `—` reads as "no evidence found", and the two are
       not confusable.
+- [ ] **Click an anchor timestamp chip** (`Gary→08:30`) — it should scroll the
+      transcript to that utterance, and reveal it if the backchannel toggle
+      was hiding it. New in `a5a2056`. Two things only you can judge: whether
+      a `.link`-styled chip reads as clickable in the inspector, and whether
+      the scroll lands somewhere legible rather than pinning the line to the
+      very top or bottom. **This needs a meeting with a populated
+      `anchors.json`** — of the six on disk, only the selftest dir has the
+      file at all and its `anchors` object is `{}`, so a fresh recording is
+      what exercises the path.
+- [ ] **Settings → the two new controls** (mic on/off, silence timeout) — new
+      in `558da55`. The write path is tested and the HF token is provably
+      preserved; how the pane READS is unverified, nobody has looked. Note it
+      says a restart is needed, because `AppState` reads the config once at
+      launch.
 
 **When the verdict is negative, get specifics before changing anything.**
 "Pas bon du tout" is a verdict on the whole; guessing at spacing or colour
