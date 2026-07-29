@@ -74,8 +74,13 @@ class TestFindUngroundedNames:
 
     def test_result_is_sorted(self):
         transcript = "Nothing relevant here."
-        summary = "## Action Items\n- Zach to follow up.\n- Amy to review.\n"
+        names = ["Zach", "Amy", "Priya", "Idris", "Sam", "Lea", "Marc", "Yuki"]
+        summary = "## Action Items\n" + "".join(f"- {name} to follow up.\n" for name in names)
 
         result = find_ungrounded_names(summary, transcript)
 
-        assert result == sorted(result)
+        assert result == sorted(names), (
+            "summary_words is a set, so iteration order is seeded per process. Eight names are used "
+            "deliberately: with two, any order is already sorted half the time, so dropping sorted() "
+            "survived 7 of 8 runs and the guard was a coin flip."
+        )

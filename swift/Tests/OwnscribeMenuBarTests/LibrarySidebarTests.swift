@@ -6,8 +6,8 @@ final class LibrarySidebarTests: XCTestCase {
         _ name: String,
         transcript: Bool = true,
         summary: Bool = true,
-        actions: Int = 0,
-        unanchored: Int = 0
+        actions: Int? = 0,
+        unanchored: Int? = 0
     ) -> MeetingSummary {
         MeetingSummary(
             directory: URL(fileURLWithPath: "/tmp/\(name)"),
@@ -129,5 +129,39 @@ final class LibrarySidebarTests: XCTestCase {
         let badge = BadgeText.badgeText(for: allItem)
 
         XCTAssertEqual(badge, "3")
+    }
+
+    func testAnUncheckedMeetingIsNotFilteredInAsIfItHadActions() {
+        let unchecked = meeting("never-summarised", summary: false, actions: nil, unanchored: nil)
+        let real = meeting("has-one", actions: 1, unanchored: 1)
+
+        XCTAssertEqual(
+            LibraryFilter.withActions.apply(to: [unchecked, real]).map(\.displayTitle),
+            [real.displayTitle],
+            "actionItemCount is Int? so that a meeting nobody indexed reads as UNKNOWN; letting nil "
+                + "into 'has actions' would assert a count that was never computed")
+        XCTAssertEqual(
+            LibraryFilter.unanchored.apply(to: [unchecked, real]).map(\.displayTitle),
+            [real.displayTitle],
+            "same for unanchored claims: nil means anchoring never ran, which is not the same as "
+                + "'this meeting has unverified claims'")
+    }
+
+    func testAZeroCountIsFilteredOutJustLikeNilButMeansSomethingDifferent() {
+        let checkedAndClean = meeting("checked-none-found", actions: 0, unanchored: 0)
+        let unchecked = meeting("never-summarised", summary: false, actions: nil, unanchored: nil)
+
+        XCTAssertTrue(LibraryFilter.withActions.apply(to: [checkedAndClean, unchecked]).isEmpty)
+        let checkedItem = LibrarySidebarItem(
+            id: "checked", title: "Actions", filter: .withActions, count: 0, children: [])
+        let uncheckedItem = LibrarySidebarItem(
+            id: "unchecked", title: "Actions", filter: .withActions, count: nil, children: [])
+
+        XCTAssertEqual(
+            BadgeText.badgeText(for: checkedItem), "0",
+            "a checked meeting with no action items renders 0")
+        XCTAssertNil(
+            BadgeText.badgeText(for: uncheckedItem),
+            "an unchecked meeting renders NO badge, because 0 would claim a count nobody computed")
     }
 }

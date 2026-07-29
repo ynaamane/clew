@@ -373,6 +373,28 @@ class TestRankMeetings:
         ranked = _rank_meetings("What did Anna say about the deadline?", meetings)
         assert ranked[0].folder_name == "2026-02-12_0930_standup"
 
+    def test_tied_scores_rank_newest_first_regardless_of_input_order(self, tmp_path):
+        same_text = "budget review fiscal quarter spending"
+        _make_meeting_dir(tmp_path, "2026-02-11_0900_alpha", same_text)
+        _make_meeting_dir(tmp_path, "2026-02-13_1501_beta", same_text)
+
+        meetings, _ = _discover_meetings(tmp_path, since=None, limit=None)
+        question = "What was discussed about the budget?"
+
+        forward = [m.folder_name for m in _rank_meetings(question, meetings)]
+        reversed_input = [m.folder_name for m in _rank_meetings(question, list(reversed(meetings)))]
+
+        assert forward == reversed_input, (
+            "identical summaries tie on overlap and speaker_boost, so folder_name is the only "
+            "discriminator left; ask() builds its candidate list by iterating a set, whose order "
+            "varies per process, so without the tiebreak the same question answers in a different "
+            "order run to run"
+        )
+        assert forward == ["2026-02-13_1501_beta", "2026-02-11_0900_alpha"], (
+            "folder names sort lexicographically by date, and the sort is reverse=True, so a tie "
+            "must resolve to the NEWEST meeting first"
+        )
+
 
 # -- Answer from transcripts --
 

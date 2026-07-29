@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import shutil
 from unittest import mock
 
 import pytest
@@ -2638,3 +2639,128 @@ class TestRunListEnrolled:
 
         captured = capsys.readouterr()
         assert "No enrolled speakers" in captured.out
+
+
+class TestResumeWritesTheEvidenceFiles:
+    """The app launches `resume`, so the recovery path must produce what the app reads.
+
+    `run_summarize` wrote only summary.md: no anchors.json, no envelope.json. Both writers
+    lived exclusively inside `_do_transcribe_and_summarize`, and `run_resume` routes a
+    transcript-present/summary-absent directory to `run_summarize` — which is exactly what
+    `AppState.runPipeline` invokes and exactly what the pipeline's own failure message
+    advertises ("Resume with: ownscribe resume <dir>").
+    """
+
+    TRANSCRIPT = (
+        "# Transcript\n\n"
+        "**Language:** en\n"
+        "**Duration:** 00:42\n\n"
+        "**SPEAKER_00** [00:05]\n"
+        "The JWT token is validated before the Lambda runs.\n"
+        "[00:20] Gary confirmed the Confluence page is updated.\n"
+    )
+    SUMMARY = (
+        "## Summary\nReviewed the auth path.\n\n"
+        "## Key Points\n- The JWT token is validated before the Lambda runs\n"
+        "- Gary confirmed the Confluence page\n\n"
+        "## Action Items\nNone mentioned.\n"
+    )
+
+    def _run_resume(self, tmp_path, output_format="markdown"):
+        from ownscribe.pipeline import run_resume
+
+        config = Config()
+        config.output.format = output_format
+        config.output.dir = str(tmp_path.parent)
+        config.summarization.enabled = True
+
+        ext = "json" if output_format == "json" else "md"
+        (tmp_path / f"transcript.{ext}").write_text(self.TRANSCRIPT)
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = self.SUMMARY
+
+        with (
+            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            run_resume(config, str(tmp_path))
+        return tmp_path
+
+    def test_resume_writes_anchors_so_the_app_can_show_evidence(self, tmp_path):
+        out = self._run_resume(tmp_path)
+
+        anchors_file = out / "anchors.json"
+        assert anchors_file.exists(), (
+            "the app reads anchors.json to decide between '(pas encore vérifié)' and real "
+            "evidence; without it every key point of every resumed meeting reads as unchecked "
+            "forever, which is the W0-1 anti-hallucination signal inverted"
+        )
+
+        anchors = json.loads(anchors_file.read_text())["anchors"]
+        assert anchors, "anchoring found tokens on this transcript, so an empty file means it never ran"
+        for token, occurrences in anchors.items():
+            for occurrence in occurrences:
+                assert token.lower() in occurrence["context"].lower(), (
+                    f"the quote offered as evidence for {token} must contain it"
+                )
+
+    def test_resume_writes_the_envelope_so_the_detail_view_can_draw_it(self, tmp_path, synthetic_wav):
+        shutil.copy(synthetic_wav, tmp_path / "recording.wav")
+
+        out = self._run_resume(tmp_path)
+
+        envelope_file = out / "envelope.json"
+        assert envelope_file.exists(), (
+            "MeetingDetailView draws the RMS strip from envelope.json; absent, a resumed "
+            "meeting silently loses its waveform"
+        )
+        buckets = json.loads(envelope_file.read_text())["envelope"]
+        assert len(buckets) == 500
+
+    def test_resume_without_audio_still_writes_anchors_and_no_envelope(self, tmp_path):
+        out = self._run_resume(tmp_path)
+
+        assert (out / "anchors.json").exists(), "anchoring needs only the transcript and summary"
+        assert not (out / "envelope.json").exists(), (
+            "no recording means no envelope; writing a flat one would assert silence "
+            "over a meeting whose audio was never present"
+        )
+
+    def test_resume_picks_the_system_track_when_there_is_no_merged_recording(self, tmp_path, synthetic_wav):
+        shutil.copy(synthetic_wav, tmp_path / "system.wav")
+
+        out = self._run_resume(tmp_path)
+
+        assert (out / "envelope.json").exists(), (
+            "a meeting whose merge failed keeps system.wav without recording.wav, and it is "
+            "exactly the meeting worth inspecting; naming only recording.wav would skip it"
+        )
+
+    def test_resume_does_not_read_an_absent_audio_path(self, tmp_path):
+        from ownscribe import pipeline
+
+        seen: list[str] = []
+        real_generate = pipeline._generate_and_save_envelope
+
+        def spy(audio_path, out_dir):
+            seen.append(audio_path.name)
+            return real_generate(audio_path, out_dir)
+
+        with mock.patch.object(pipeline, "_generate_and_save_envelope", side_effect=spy):
+            self._run_resume(tmp_path)
+
+        assert seen == [], (
+            "with no audio in the directory the generator must not be called at all; "
+            "_generate_and_save_envelope happens to return early on an unreadable path, so "
+            "without this the presence check could be deleted and every test would stay green"
+        )
+
+    def test_resume_honours_the_configured_output_format(self, tmp_path):
+        out = self._run_resume(tmp_path, output_format="json")
+
+        assert (out / "summary.json").exists(), (
+            "run_summarize hardcoded summary.md, so a JSON-configured user's summary was "
+            "invisible to the app, which looks for summary.json when format == json"
+        )
