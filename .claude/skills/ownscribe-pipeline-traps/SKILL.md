@@ -61,10 +61,11 @@ because it holds biometric voiceprints (GDPR Art. 9, cleared for this use, still
 `~/ownscribe/2026-07-27_1352/` is the BUG4 artifact: 12,890,112 bytes, 33.56s, **peak 0.0, rms
 0.0**. Useful precisely because it is valid-but-empty — the case a presence check calls "fine".
 
-`/tmp/ms-fixture/` is a DERIVED copy of the 27-July meeting, shared by two suites: Swift's
-`EnvelopeDocumentTests` (500 buckets, peak 1.0) and Python's
-`test_anchoring_context_contains_token.py`, which exists to defend a context-window fix against
-that meeting's **14 real anchors**. It lives in `/tmp`, so it does not survive a reboot;
+`/tmp/ms-fixture/` is a DERIVED copy of the 27-July meeting, shared by **three** suites (grep it
+before assuming, the count keeps growing): Swift's `EnvelopeDocumentTests` (500 buckets, peak 1.0),
+Swift's `AnchorEvidenceRealMeetingTests` (the clickable-evidence path against 9 real tokens), and
+Python's `test_anchoring_context_contains_token.py`, which exists to defend a context-window fix
+against that meeting's **14 real anchors**. It lives in `/tmp`, so it does not survive a reboot;
 `scripts/regenerate_fixtures.py` rebuilds it through production functions, reading the real meeting
 and writing only under `/tmp`.
 
@@ -76,6 +77,15 @@ fixture is the meeting it claims to be. Two rules follow: a fixture generator is
 the test suite, and any test whose assertion lives inside a loop needs a non-empty guard **before**
 the loop (`assert len(anchors) > 0`) or "found nothing" is indistinguishable from "all correct".
 Mutation-check that guard by handing the test an empty summary — it must go red.
+
+**And the fixture itself goes stale.** On 2026-07-29 the on-disk copy predated an anchoring fix:
+its `Lambda` context was truncated at 100 chars *before the word it proves*, which is the exact
+defect `test_anchoring_context_contains_token.py` exists to catch — the fixture was a snapshot of
+the bug. Current production centres the window correctly, and the regeneration script rebuilt it
+identically otherwise. So when a real-data test fails, decide FIRST whether the code or the
+snapshot is wrong: `anchor_summary_claims` on the live source, compared against the stored
+`anchors.json`, settles it in one command. A stale fixture makes a correct fix look broken, and its
+mirror image — a fixture regenerated past a real regression — makes a broken fix look correct.
 
 ## A green suite cannot see a dead consumer
 
