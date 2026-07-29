@@ -6,11 +6,21 @@ enum SpeakerAvatarStyle {
         case "Owner": return .green
         case "Unknown": return .secondary
         default:
-            if speaker.hasPrefix("SPEAKER_") {
-                return speaker.hasSuffix("0") ? .blue : .purple
+            if let index = diarizationIndex(in: speaker) {
+                return palette[index % palette.count]
             }
             return hashColor(for: speaker)
         }
+    }
+
+    private static let palette: [Color] = [.blue, .purple, .orange, .pink, .indigo, .teal, .cyan]
+
+    private static func diarizationIndex(in speaker: String) -> Int? {
+        guard speaker.hasPrefix("SPEAKER_"),
+              let index = Int(speaker.dropFirst("SPEAKER_".count)),
+              index >= 0
+        else { return nil }
+        return index
     }
 
     static func displayLabel(for speaker: String) -> String {
@@ -24,9 +34,8 @@ enum SpeakerAvatarStyle {
     }
 
     private static func hashColor(for name: String) -> Color {
-        let colors: [Color] = [.blue, .purple, .orange, .pink, .indigo, .teal, .cyan]
         let hash = fnv1aHash(name)
-        return colors[Int(hash % UInt32(colors.count))]
+        return palette[Int(hash % UInt32(palette.count))]
     }
 
     private static func fnv1aHash(_ string: String) -> UInt32 {

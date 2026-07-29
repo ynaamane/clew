@@ -19,8 +19,29 @@ import SwiftUI
         #expect(SpeakerAvatarStyle.color(for: "SPEAKER_01") == .purple)
     }
 
-    @Test func speakerEndingIn0GetsBlue() {
-        #expect(SpeakerAvatarStyle.color(for: "SPEAKER_10") == .blue)
+    @Test func speaker10DoesNotShareSpeaker00sColor() {
+        let s00 = SpeakerAvatarStyle.color(for: "SPEAKER_00")
+        let s10 = SpeakerAvatarStyle.color(for: "SPEAKER_10")
+        #expect(s00 != s10, "two speakers sharing an avatar reads as one person")
+    }
+
+    @Test func sevenConcurrentSpeakersAllGetDistinctColors() {
+        let speakers = (0..<7).map { String(format: "SPEAKER_%02d", $0) }
+        let colors = speakers.map { SpeakerAvatarStyle.color(for: $0) }
+        #expect(Set(colors).count == 7, "collapsed to \(Set(colors).count) colors for 7 speakers")
+    }
+
+    @Test func theEighthSpeakerWrapsOntoTheFirstColor() {
+        #expect(SpeakerAvatarStyle.color(for: "SPEAKER_07") == SpeakerAvatarStyle.color(for: "SPEAKER_00"))
+    }
+
+    @Test func aNegativeIndexReachesTheHashBranchInsteadOfSubscriptingOutOfRange() {
+        #expect(SpeakerAvatarStyle.color(for: "SPEAKER_-1") == .indigo)
+    }
+
+    @Test func aMalformedIndexReachesTheHashBranch() {
+        #expect(SpeakerAvatarStyle.color(for: "SPEAKER_ab") == .orange)
+        #expect(SpeakerAvatarStyle.color(for: "SPEAKER_1_2") == .cyan)
     }
 
     @Test func displayLabelExtractsSuffix() {
