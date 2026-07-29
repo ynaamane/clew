@@ -17,6 +17,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
+- [The macOS app](#the-macos-app)
 - [Configuration](#configuration)
 - [Audio Retention](#audio-retention)
 - [Summarization Templates](#summarization-templates)
@@ -235,6 +236,48 @@ This runs a two-stage pipeline:
 2. **Answer** — sends the full transcripts of relevant meetings to the LLM to produce an answer with quotes
 
 If the LLM finds no relevant meetings, a keyword fallback searches summaries and transcripts directly.
+
+## The macOS app
+
+Everything above is the CLI. There is also a menu-bar app (`swift/Sources/OwnscribeMenuBar`) that
+drives the same pipeline — it shells out to this repo's `ownscribe`, so the CLI is the engine and the
+app is a front end, not a reimplementation.
+
+```bash
+bash swift/build-app.sh                  # build, sign AND install to /Applications
+SKIP_INSTALL=1 bash swift/build-app.sh   # stop at dist/ without installing
+open /Applications/MeetingScribe.app     # always launch the INSTALLED copy
+```
+
+`build-app.sh` installs on purpose and fails if the installed binary differs from the one just
+built — a real call was once recorded against a stale bundle because building and installing were
+separate steps.
+
+What the app adds over the CLI:
+
+- **A three-column library window** (⌘0): filters, meeting list, transcript with an inspector.
+  Meetings come from `~/ownscribe/` (or `[output] dir` in the config).
+- **A record button and a global hotkey** (⌘⇧M) for the system-wide mic mute. The mute is verified
+  by reading the device back, and the menu bar shows three distinct states — not muted, muted and
+  verified, muted but **unverified** in amber — because a hardware-refused mute once displayed as
+  successful, meaning the app said "muted" while the call could still hear you.
+- **Claim anchoring in the inspector.** Each summary key point shows the timestamps where its rare
+  tokens appear in the transcript, and clicking one scrolls to that utterance. Three states are kept
+  deliberately distinct: `(pas encore vérifié)` means no `anchors.json` exists, `—` means anchoring
+  ran and found nothing, and a chip means real evidence. Absence must never render as a confident
+  zero.
+- **An RMS envelope strip**, so an abnormal silence is visible without opening a 400 MB wav.
+- **Settings**: the HuggingFace token (stored in the login Keychain), plus mic on/off and the
+  silence timeout. Everything else still lives in the TOML. The app reads the config once at
+  launch, so changing these needs a restart.
+
+Two caveats worth knowing before you build:
+
+- The app requires **macOS 26+** (`swift/Package.swift`), because the design targets the current
+  visual language. The CLI has no such requirement.
+- macOS ties permission grants to the signing identity, so **never delete or recreate the signing
+  cert** — a new cert is a new identity and every System Audio Recording / Microphone grant resets.
+  See `BUILD.md`.
 
 ## Configuration
 
