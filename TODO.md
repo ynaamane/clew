@@ -140,17 +140,27 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
-9. **Sidebar labels truncate — and the cause is NOT the label length.** Measured with `NSFont`
-   rather than guessed: the longest label, `Toutes les réunions`, is **117pt**, a row spends ~73pt on
-   inset + icon + gaps + badge, so it needs **~190pt** against a column the AX tree reports at
-   **196pt**. They fit. The real cause is that AppKit **persists the split position** — `defaults read
-   com.ownscribe.menubar` holds `"NSSplitView Subview Frames library…" = ("0,0,216,660", …)` and a
-   saved frame **overrides** `navigationSplitViewColumnWidth`, so raising `ideal` does nothing on any
-   install that has already opened the window. Fix is to clear or stop honouring the saved frame,
-   which is a real decision (it also discards the user's own resize). **Shortening the labels was
-   tried and reverted** (`d7bbf16`): it fixed nothing and turned `Non ancrées` into `Ancres`, i.e.
-   named the PRESENCE of anchors on the row that selects meetings whose claims LACK evidence. No test
-   asserted any sidebar label, so the inversion passed the whole suite; two guards added.
+9. ~~**Sidebar labels truncate.**~~ **FIXED** (`f10d3c7`) — at the third diagnosis, and the first two
+   are worth keeping because both were plausible and both were wrong.
+   `.navigationSplitViewColumnWidth` was applied to the **`List` inside** the sidebar's `ZStack`
+   (the `ZStack` exists to host the banner overlay), so `NavigationSplitView` measured a container
+   with no width preference and collapsed the column. Moved onto the `ZStack`; `ideal` returns to the
+   mockup's own **216** and the descriptive labels stay. Nothing had to be sacrificed — which is what
+   distinguishes a root cause from a plausible one.
+   - **Wrong diagnosis 1: "the labels are too long."** Measured with `NSFont`: the longest,
+     `Toutes les réunions`, is **117pt**; a row spends ~73pt on inset + icon + gaps + badge, so ~190pt
+     of a 216pt column. They fit. Shortening them was tried and **reverted** (`d7bbf16`) — it fixed
+     nothing and turned `Non ancrées` into `Ancres`, naming the PRESENCE of anchors on the row that
+     selects meetings whose claims **LACK** evidence. No test asserted any sidebar label, so the
+     inversion passed the entire suite.
+   - **Wrong diagnosis 2: "AppKit's persisted split frame overrides it."** The frame IS persisted
+     (`defaults read com.ownscribe.menubar` → `"NSSplitView Subview Frames library…"` at 216pt) and it
+     is NOT the cause: the renderer runs in a process with no such default and truncated identically.
+   - **What settled it:** an A/B changing exactly ONE variable — the same `List` at the same
+     `ideal: 216`, once bare and once inside the `ZStack`. Bare, labels whole; wrapped, all four
+     clipped. My first attempt varied two things at once and pointed at the banner.
+   Guarded structurally (a column width is invisible to any view-host test here): the test reads
+   `LibraryWindow.swift` and fails if the declaration sits above the `ZStack`'s closing brace.
 10. **The CLI-missing banner is unreadable** — a 200-character message inside the 216pt sidebar
     `ZStack` wraps to ~20 lines and overlaps the sidebar items. Visible whenever the CLI is absent.
 11. **The inspector shows a bare `—` under every key point** where the mockup has a timestamp chip.
