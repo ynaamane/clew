@@ -103,11 +103,14 @@ about how the window reads. That substitution has already been made twice.
 Three items are struck: two were already built (invisible behind the empty detail column) and one
 was a mis-diagnosis of the machine's own setting. What is left is smaller and better grounded.
 
-0. **A review harness that works with the screen LOCKED** — a prerequisite, not a design item. The
-   `screencapture -l` loop cannot run on a locked screen, so every item below is otherwise
-   unverifiable without the user present. Off-screen `NSWindow` + `NSHostingView` + `cacheDisplay`,
-   rendering the REAL `LibraryWindow` tree (never a hand-built replica — that is how a harness ends
-   up validating a design the app does not have).
+0. ~~**A review harness that works with the screen LOCKED.**~~ **DONE.**
+   `bash scripts/ui-evidence/render.sh /tmp/ui-render` → `library-light.png` + `library-dark.png`,
+   off-screen, works locked, renders the REAL `LibraryWindow` (it lives in the test target so it can
+   `@testable import OwnscribeMenuBar` — the standalone-`swiftc` route hits a type-checker timeout and
+   pushes you toward a hand-built replica, which is how a harness ends up validating a design the app
+   does not have). It prints its own CANNOT-VERIFY list; read it before trusting a render.
+   **It found a user-visible bug on its first correct reading** (`4b1fcfc`): the header was printing
+   `^[1 voix](inflect: true)` verbatim, guarded by a test that asserted the broken string.
 1. ~~**Make the window honour Dark mode.**~~ **STRUCK — it already does; the machine is in light
    mode.** See § 0 finding 1. Hardcoding dark would override the user's auto-switch setting.
 2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` (`LibraryWindow.swift:36`) onto a
@@ -122,14 +125,29 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 4. ~~**Render speaker avatars.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:129`.
 5. ~~**Draw the envelope strip.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:15-19`.
    (Both were invisible only because no meeting is selected — see item 6.)
-6. **Select the most recent meeting by default** (`LibraryWindow.swift:8`). Promoted from cosmetic to
-   load-bearing: it is what makes items 4 and 5 visible at all, and it fills a column that is ~60%
-   empty. Must stay correct when the list is empty or the selection is filtered out.
-7. **Give slugless meetings a real title** instead of five rows reading "Sans titre", and stop an LLM
-   refusal from becoming a directory name (§ 3).
+6. ~~**Select the most recent meeting by default.**~~ **DONE** (`46e1810`) via a pure
+   `LibrarySelection.resolve(current:shown:)` — nil→first, filtered-out→first visible, empty→nil, and
+   a **still-valid selection stays UNCHANGED** so a finishing pipeline cannot yank you out of what you
+   are reading. Confirmed by render: the right column now shows résumé, points clés, actions, pistes,
+   the waveform AND the speaker avatars, i.e. items 4 and 5 above were revealed rather than built.
+7. **Give slugless meetings a real title** — IN PROGRESS, one round still open. `ba9e6ad` added the
+   fallback chain slug → first non-backchannel transcript line (60 chars) → time, and the LLM-refusal
+   guard is DONE and verified (1/14 false positives, 0/7 false negatives; `3dffe4d`). What remains is
+   legibility: five of nine rows have no transcript, so they render as a bare clock time with the
+   **same time repeated in the subtitle directly beneath** (`15:37` over `29 Jul · 15:37`). "Sans
+   titre" was uninformative; this is redundant, which scans worse. Fix in flight: when the title IS
+   the time, the subtitle shows the date alone.
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
+9. **Sidebar labels truncate at the mockup's own ideal width** — `Avec acti…`, `Non ancr…`,
+   `Non index…` at `ideal: 216` (`LibraryWindow.swift:35`), which is the mockup's `--sidebar` value.
+   The icon plus badge eats the room the labels need. Measure what they need rather than guessing.
+10. **The CLI-missing banner is unreadable** — a 200-character message inside the 216pt sidebar
+    `ZStack` wraps to ~20 lines and overlaps the sidebar items. Visible whenever the CLI is absent.
+11. **The inspector shows a bare `—` under every key point** where the mockup has a timestamp chip.
+    Correct per `APP_TEST.md` (`—` means "no evidence found") but a column of dashes reads as broken
+    rather than as unverified. Needs a legible empty state, not a data change.
 
 After each: render both appearances with the § 2.0 harness and **read the PNG**. The old loop
 (`open "ownscribe://library"` + `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`) still
