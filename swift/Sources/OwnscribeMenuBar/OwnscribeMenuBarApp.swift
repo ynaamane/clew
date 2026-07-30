@@ -13,8 +13,8 @@ struct OwnscribeMenuBarApp: App {
         Window("Réunions", id: LibraryWindow.sceneID) {
             LibraryWindow()
                 .environment(appState)
-                .onAppear { WindowActivationPolicy.windowDidOpen() }
-                .onDisappear { WindowActivationPolicy.windowDidClose() }
+                .onAppear { WindowActivationPolicy.shared.windowDidOpen() }
+                .onDisappear { WindowActivationPolicy.shared.windowDidClose() }
         }
         .defaultSize(width: 1080, height: 660)
 

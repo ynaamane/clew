@@ -13,15 +13,26 @@ struct MeetingStatusBadge: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
-    enum Variant {
+    enum Variant: Equatable {
         case unanchored(count: Int)
+        case neverChecked
         case actionItems(count: Int)
         case mutedTrack
+
+        init?(anchorState: UnanchoredClaimBadge) {
+            switch anchorState {
+            case .neverChecked: self = .neverChecked
+            case .allAnchored: return nil
+            case .unanchored(let count): self = .unanchored(count: count)
+            }
+        }
 
         var text: String {
             switch self {
             case .unanchored(let count):
                 return count == 1 ? "1 non ancré" : "\(count) non ancrés"
+            case .neverChecked:
+                return "non vérifiée"
             case .actionItems(let count):
                 return count == 1 ? "1 action" : "\(count) actions"
             case .mutedTrack:
@@ -33,10 +44,10 @@ struct MeetingStatusBadge: View {
             switch self {
             case .unanchored:
                 return .orange
+            case .neverChecked, .mutedTrack:
+                return .secondary
             case .actionItems:
                 return .green
-            case .mutedTrack:
-                return .secondary
             }
         }
 
@@ -46,7 +57,7 @@ struct MeetingStatusBadge: View {
                 return Color.orange.opacity(0.16)
             case .actionItems:
                 return Color.green.opacity(0.16)
-            case .mutedTrack:
+            case .neverChecked, .mutedTrack:
                 return Color(white: 0.5, opacity: 0.16)
             }
         }

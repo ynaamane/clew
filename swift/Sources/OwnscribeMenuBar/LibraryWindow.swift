@@ -59,8 +59,8 @@ struct LibraryWindow: View {
         .navigationTitle("Réunions")
         .toolbar {
             ToolbarItemGroup {
-                if case .processing(let step, _) = appState.phase {
-                    Label(step, systemImage: "circle.lefthalf.filled")
+                if case .processing(let step, _, let detail) = appState.phase {
+                    Label(detail ?? step, systemImage: "circle.lefthalf.filled")
                         .foregroundStyle(.orange)
                 }
                 if case .failed = appState.phase {
@@ -118,6 +118,10 @@ private struct MeetingRow: View {
     let meeting: MeetingSummary
     @State private var summaryExcerpt: String?
 
+    private var anchorState: UnanchoredClaimBadge {
+        UnanchoredClaimBadge.state(unanchoredClaimCount: meeting.unanchoredClaimCount)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(meeting.displayTitle)
@@ -125,8 +129,8 @@ private struct MeetingRow: View {
                 .lineLimit(1)
             HStack(spacing: 6) {
                 Text(meeting.displayDate)
-                if let count = meeting.unanchoredClaimCount, count > 0 {
-                    MeetingStatusBadge(variant: .unanchored(count: count))
+                if let badge = MeetingStatusBadge.Variant(anchorState: anchorState) {
+                    MeetingStatusBadge(variant: badge)
                 }
                 if let count = meeting.actionItemCount, count > 0 {
                     MeetingStatusBadge(variant: .actionItems(count: count))

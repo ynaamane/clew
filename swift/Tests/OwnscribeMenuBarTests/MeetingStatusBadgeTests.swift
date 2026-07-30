@@ -4,6 +4,37 @@ import SwiftUI
 
 @Suite("MeetingStatusBadge")
 struct MeetingStatusBadgeTests {
+    @Test("The pill is driven by the three-state anchor model, not by a bare count")
+    func testEveryAnchorStateMapsToTheRightPill() {
+        func variant(unanchored: Int?) -> MeetingStatusBadge.Variant? {
+            let meeting = MeetingSummary(
+                directory: URL(fileURLWithPath: "/tmp/2026-07-30_1200_m"),
+                hasTranscript: true,
+                hasSummary: true,
+                actionItemCount: 0,
+                unanchoredClaimCount: unanchored
+            )
+            return MeetingStatusBadge.Variant(
+                anchorState: UnanchoredClaimBadge.state(unanchoredClaimCount: meeting.unanchoredClaimCount))
+        }
+
+        #expect(
+            variant(unanchored: nil) == .neverChecked,
+            "every meeting on the real disk is unchecked; dropping this pill makes the whole library look verified")
+        #expect(
+            variant(unanchored: 0) == nil,
+            "a meeting whose claims all have evidence is the quiet case and carries no pill")
+        #expect(variant(unanchored: 2) == .unanchored(count: 2))
+    }
+
+    @Test("An unchecked meeting is grey, not amber")
+    func testNeverCheckedIsNotAlarming() {
+        #expect(MeetingStatusBadge.Variant.neverChecked.text == "non vérifiée")
+        #expect(
+            MeetingStatusBadge.Variant.neverChecked.foregroundColor == Color.secondary,
+            "unknown is not the same as bad; amber here would cry wolf on every meeting")
+    }
+
     @Test("Amber pill for unanchored claims")
     func testUnanchoredBadge() {
         let badge = MeetingStatusBadge.Variant.unanchored(count: 3)

@@ -153,9 +153,9 @@ final class LibrarySidebarTests: XCTestCase {
 
         XCTAssertTrue(LibraryFilter.withActions.apply(to: [checkedAndClean, unchecked]).isEmpty)
         let checkedItem = LibrarySidebarItem(
-            id: "checked", title: "Actions", filter: .withActions, count: 0, children: [])
+            id: "checked", title: "Actions", filter: .withActions, count: 0, hasUnknowns: false, children: [])
         let uncheckedItem = LibrarySidebarItem(
-            id: "unchecked", title: "Actions", filter: .withActions, count: nil, children: [])
+            id: "unchecked", title: "Actions", filter: .withActions, count: nil, hasUnknowns: false, children: [])
 
         XCTAssertEqual(
             BadgeText.badgeText(for: checkedItem), "0",

@@ -81,4 +81,26 @@ struct MeetingSearchFilterTests {
         #expect(filtered.count == 1)
         #expect(filtered.first?.id == meeting1.id)
     }
+
+    @Test("Both halves of the comparison are folded the same way")
+    func testTitleAndDateAreFoldedIdentically() throws {
+        let accentedTitle = MeetingSummary(
+            directory: URL(fileURLWithPath: "/tmp/2026-02-11_0900_revue-technique-préparée"),
+            hasTranscript: true,
+            hasSummary: true
+        )
+
+        let renderedDate = accentedTitle.displayDate
+        try #require(!renderedDate.isEmpty, "an unparseable folder name would make this test vacuous")
+
+        #expect(
+            MeetingSearchFilter.filter([accentedTitle], query: "preparee").count == 1,
+            "an accentless query must reach an accented title")
+        #expect(
+            MeetingSearchFilter.filter([accentedTitle], query: "PRÉPARÉE").count == 1,
+            "and an accented, wrong-case query must reach it too, which needs the FIELD folded, not just the query")
+        #expect(
+            MeetingSearchFilter.filter([accentedTitle], query: renderedDate.uppercased()).count == 1,
+            "a wrong-case date query must still match")
+    }
 }

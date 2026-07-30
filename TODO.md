@@ -28,33 +28,65 @@ Three things can only be closed by recording a short real meeting through the ap
   requests, and names which permission is missing with the exact Settings path. Whether the prompt
   actually appears for you is a one-launch check.
 
-### 3. Small, non-blocking, found by the 2026-07-29 sweep and deliberately NOT fixed yet
+### 3. The 2026-07-29 sweep list — 6 of 8 CLOSED on 2026-07-30, 2 still open
 
-None of these can lie to you; that is why they waited. Fix them in a batch, not mixed with an
-integrity fix:
+Fixed, each mutation-verified. Four builders were killed mid-task by an API stream stall; their work
+survived only because it was on disk, and **every lot needed correction before it could be trusted**
+— which is the argument for reviewing a dead agent's output rather than merging it.
 
-- **`ProgressEvent.detail` is decoded then discarded** (`AppState.handle` → `case .detail: break`).
-  The CLI shows sub-step text ("Loading alignment model (fr)", download percentages); the app's
-  progress line stays on the coarse step name.
-- **`MeetingRow` merges two of the three anchor states** (`LibraryWindow.swift:123`): "never checked"
-  (`nil`) and "checked, all anchored" (`0`) render identically in the list. The inspector
-  distinguishes all three correctly. This UNDER-claims (an unverified meeting looks unremarkable), so
-  it is not the `?? 0` failure — but it is the exact distinction `Int?` exists for, at a render site
-  with zero test coverage.
-- **The sidebar badge is a lower bound shown without qualification**: "Non ancrées 1" when the honest
-  statement is "1 known, 7 unknown".
-- **Three functions with no callers**: `PipelineRunner.cancel()` (so a running pipeline cannot be
-  stopped), `GlobalHotKeyRegistration.unregister()`, and `WindowActivationPolicy.resetForTesting()` —
-  the last is test-only production code, which CLAUDE.md forbids.
-- **`_capture_prep_output` is dead** (`whisperx_transcriber.py:123`); production calls
-  `_capture_download_output`. Three tests in `test_transcription.py` patch the dead one, so they pass
-  for a different reason than they claim (spy count measured: 0 vs 1).
-- **`registerTerminationSignalHandlers` has zero test references** — the SIGTERM/SIGINT path to
-  `restoreUnmutedOnQuit`, i.e. the highest-blast function in the app (a mic left muted after a kill).
-- **`openAudioFileWithFrames`'s zero-frame filter is an uncovered branch**: no test writes a
-  zero-frame WAV, which is precisely BUG4's condition.
-- **`checkHasAudio` reads only the first 48,000 frames**, so a file silent for its first second
-  reports `hasContent=false`. Suspected, un-probed.
+- ~~**`checkHasAudio` reads only the first 48,000 frames.**~~ **CLOSED, and it was LIVE, not
+  "suspected".** One second at 48 kHz. Measured through production's own `checkTracks`:
+  `~/ownscribe/2026-07-27_1531/recording.wav` is a real 238.7s recording, whole-file peak 0.999,
+  first audible sample at **5.33s** — it reported `hasContent=false` and wore the BUG4 ⚠ that means
+  "your recording failed". `2026-07-27_1352` is silent end to end and correctly still warns. That
+  pair is the discriminator. Now a chunked full scan with early exit; worst case (a silent file,
+  which cannot exit early) measured **0.25s**. A bigger fixed window was rejected — same bug, longer
+  fuse.
+- ~~**`openAudioFileWithFrames`'s zero-frame branch is uncovered.**~~ **CLOSED** — both branches
+  covered; accepting zero-frame files turns the new test red.
+- ~~**`ProgressEvent.detail` is decoded then discarded.**~~ **CLOSED.** A detail now updates the
+  detail alone, keeping the step and fraction it arrived under — a detail event carries no fraction,
+  so overwriting would reset the bar to indeterminate. `.complete`/`.fail` stay no-ops **on purpose**,
+  now pinned by a test: assigning a terminal phase from the progress stream is what once let a
+  finishing pipeline clobber a live recording.
+- ~~**`MeetingRow` merges two of the three anchor states.**~~ **CLOSED** — the row now says
+  "non vérifiée" in secondary text, deliberately not amber: unchecked is unknown, not bad. All six
+  meetings on disk are in that state, so the library used to read as fully verified.
+- ~~**The sidebar badge is an unqualified lower bound.**~~ **CLOSED, with a second defect found
+  underneath.** It shows "1+" when any meeting lacks the data. But zero-known-with-unknowns first
+  rendered **"0+"**, which reads as "no problems, plus some unknowns" when the truth is that nothing
+  was checked — and that is the only path visible on the real disk. Zero-with-unknowns now renders
+  NO badge; a real zero over fully-checked meetings still renders "0", because that one is
+  information.
+- ~~**`WindowActivationPolicy.resetForTesting()` is test-only production code.**~~ **CLOSED** — the
+  reset hook was a symptom; the disease was process-wide mutable state. Now an instance with an
+  injected apply-policy closure. ~~`GlobalHotKeyRegistration.unregister()`~~ deleted (no callers,
+  `deinit` does the same work).
+- ~~**`_capture_prep_output` is dead and three tests patch it.**~~ **CLOSED** — wrapper deleted, the
+  three tests patch `_capture_download_output` (what `prepare_models` actually reaches) and each
+  asserts the call happened, so the inertness cannot return silently. Renaming the target kills all
+  three by name; against the old version the same mutation left them green.
+
+**Still open, deliberately — the two the stalled agent never reached:**
+
+- **`PipelineRunner.cancel()` still has no caller**, so a multi-minute transcription cannot be
+  stopped. Decide: wire it to a control, or delete it. If wired, it must not leave `phase` stuck on
+  `.processing` and must not clobber a phase that has already moved on.
+- **`registerTerminationSignalHandlers` still has zero test references** (`AppState.swift:108`) —
+  the SIGTERM/SIGINT path to `restoreUnmutedOnQuit`, the highest-blast function in the app. Needs a
+  seam so registration and the handler body are testable without raising a real signal, and without
+  adding a test-only method to production.
+
+**Two traps this batch produced, both worth keeping:**
+
+- **A test can pass while the production function it names is fully sabotaged.** Four badge tests
+  computed `count` and `hasUnknowns` themselves and fed them to `badgeText`, never calling
+  `LibrarySidebar.sections`. Proof: sabotaging `sections()` to always claim complete data left **all
+  21 tests green**. Rewritten through `sections()`, the same sabotage kills 2.
+- **A new function with tests and no callers is not a fix.** `UnanchoredClaimBadge` shipped with 4
+  green tests, zero production callers, and logic that returned nil for BOTH `nil` and `0` — it
+  relocated the merge it was meant to remove. Same shape as `silence_timeout`. Trace a feature to its
+  consumer.
 
 ### 4. Deferred by earlier decision, unchanged
 
@@ -67,7 +99,19 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 636 Python + 353 Swift green, all 10 gates green, nothing held back (`git log --oneline origin/main..main | wc -l` → 0 when last checked).
+## Status: 636 Python + 376 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
+
+Measured 2026-07-30 on the merged tree after five lots landed: `bash scripts/check.sh` → **`CHECK=0`
+read from a captured variable, 0 failed gates**, including the release build. Swift → **350 XCTest
+(`Executed 354 tests, with 4 tests skipped and 0 failures`) + 26 swift-testing = 376**. Python
+**inside check.sh** → **636 passed, 7 deselected** (`check.sh:23` runs `-m "not hardware"`).
+`/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run, so nothing
+reached the real input device.
+
+The BUG5 staleness gate fired on the first attempt — correctly, since five lots edited Swift sources —
+and the harness reported **exit code 0 while a gate had FAILED inside**, which is exactly why the exit
+status must be captured into a variable and read from the log rather than taken from the runner. Fixed
+with `bash swift/build.sh`.
 
 Measured 2026-07-29 on the merged tree, not quoted — and I first typed 355 here before running the
 command, which is the fourth time today that writing a number failed as a separate step from

@@ -55,12 +55,12 @@ class TestPrepareModels:
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(language="en"), None, progress=progress)
 
-        def passthrough(stage_label, fn, *args, **kwargs):
-            _ = stage_label
+        def passthrough(step_key, stage_label, fn, *args, **kwargs):
+            _ = (step_key, stage_label)
             return fn(*args, **kwargs)
 
         with (
-            mock.patch.object(transcriber, "_capture_prep_output", side_effect=passthrough),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough) as mock_capture,
             mock.patch.object(transcriber, "_load_model", side_effect=lambda: setattr(transcriber, "_model", object())),
             mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
         ):
@@ -69,6 +69,7 @@ class TestPrepareModels:
         assert ("begin", "preparing_models") in progress.calls
         assert ("complete", "preparing_models") in progress.calls
         assert ("fail", "preparing_models") not in progress.calls
+        assert mock_capture.call_count >= 1
 
     def test_prepare_models_skips_diarization_without_token(self):
         from ownscribe.config import DiarizationConfig, TranscriptionConfig
@@ -78,12 +79,12 @@ class TestPrepareModels:
         diar = DiarizationConfig(enabled=True, hf_token="")
         transcriber = WhisperXTranscriber(TranscriptionConfig(language="en"), diar, progress=progress)
 
-        def passthrough(stage_label, fn, *args, **kwargs):
-            _ = stage_label
+        def passthrough(step_key, stage_label, fn, *args, **kwargs):
+            _ = (step_key, stage_label)
             return fn(*args, **kwargs)
 
         with (
-            mock.patch.object(transcriber, "_capture_prep_output", side_effect=passthrough),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough) as mock_capture,
             mock.patch.object(transcriber, "_load_model", side_effect=lambda: setattr(transcriber, "_model", object())),
             mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
             mock.patch.object(transcriber, "_load_diarization_pipeline") as mock_diar_load,
@@ -91,6 +92,7 @@ class TestPrepareModels:
             transcriber.prepare_models(language="en")
 
         mock_diar_load.assert_not_called()
+        assert mock_capture.call_count >= 1
 
     def test_prepare_models_reuses_loaded_whisper_model(self):
         from ownscribe.config import TranscriptionConfig
@@ -99,12 +101,12 @@ class TestPrepareModels:
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(language="en"), None, progress=progress)
 
-        def passthrough(stage_label, fn, *args, **kwargs):
-            _ = stage_label
+        def passthrough(step_key, stage_label, fn, *args, **kwargs):
+            _ = (step_key, stage_label)
             return fn(*args, **kwargs)
 
         with (
-            mock.patch.object(transcriber, "_capture_prep_output", side_effect=passthrough),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough) as mock_capture,
             mock.patch.object(
                 transcriber,
                 "_load_model",
@@ -116,6 +118,7 @@ class TestPrepareModels:
             transcriber.prepare_models(language="en")
 
         assert mock_load_model.call_count == 1
+        assert mock_capture.call_count >= 1
 
 
 class TestDownloadProgressHooks:

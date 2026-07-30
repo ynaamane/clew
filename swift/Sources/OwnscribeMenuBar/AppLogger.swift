@@ -37,11 +37,15 @@ extension AppState.Phase {
         case .recording(let startedAt):
             let timestamp = Int(startedAt.timeIntervalSince1970)
             return "recording(startedAt: \(timestamp))"
-        case .processing(let step, let fraction):
+        case .processing(let step, let fraction, let detail):
+            var parts = ["processing(step: \(step)"]
             if let frac = fraction {
-                return String(format: "processing(step: %@, fraction: %.2f)", step, frac)
+                parts.append(String(format: "fraction: %.2f", frac))
             }
-            return "processing(step: \(step))"
+            if let det = detail {
+                parts.append("detail: \(det)")
+            }
+            return parts.joined(separator: ", ") + ")"
         case .done(let directory):
             return "done(directory: \(directory.lastPathComponent))"
         case .failed:
