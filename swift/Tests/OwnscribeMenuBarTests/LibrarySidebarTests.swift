@@ -30,6 +30,34 @@ final class LibrarySidebarTests: XCTestCase {
         }
     }
 
+    func testTheUnanchoredFilterIsNotLabelledAsItsOwnOpposite() {
+        let withMissingEvidence = meeting("bad", unanchored: 2)
+        let item = LibrarySidebar.sections(for: [withMissingEvidence], enrolledSpeakers: [])
+            .flatMap(\.items)
+            .first { $0.filter == .unanchored }
+
+        let title = item?.title ?? ""
+        XCTAssertEqual(item?.count, 1, "the filter selects meetings whose claims LACK evidence")
+        XCTAssertFalse(
+            title == "Ancres" || title == "Ancrées" || title == "Avec preuves",
+            "This row lists meetings MISSING evidence. A shortening to \"\(title)\" inverts the anti-hallucination signal: it names the presence of anchors while selecting their absence.")
+        XCTAssertTrue(
+            title.lowercased().hasPrefix("non ") || title.lowercased().hasPrefix("sans "),
+            "The label must carry the negation that the filter applies; \"\(title)\" does not")
+    }
+
+    func testLibraryLabelsFitTheSidebarTheyAreRenderedIn() {
+        let widest = LibrarySidebar.sections(for: [meeting("a")], enrolledSpeakers: [])
+            .first { $0.id == "library" }?
+            .items
+            .map(\.title.count)
+            .max() ?? 0
+
+        XCTAssertLessThanOrEqual(
+            widest, 20,
+            "The sidebar renders at 196pt (measured from the AX tree, not the 216pt ideal), and a row spends ~73pt on inset, icon, gaps and badge. \"Toutes les réunions\" is the longest at 19 characters / 117pt and fits. Truncation observed in a render is more likely the persisted NSSplitView frame in user defaults overriding navigationSplitViewColumnWidth than a label that is too long — shortening labels was tried first and fixed nothing.")
+    }
+
     func testAllMeetingsCountsEverything() {
         let meetings = [meeting("a"), meeting("b"), meeting("c")]
 
