@@ -25,6 +25,13 @@ Default on every non-trivial change — not a per-task ask:
   for the REQUIRED one: a passing suite, N `glassEffect` call sites and a symbol in the binary prove
   the code RUNS, never how it READS. Write "unverified" when nobody has looked. Correcting a
   claim-without-evidence with a different claim-without-evidence is not a correction.
+- **Never explain the BUG5 staleness gate away — run `bash swift/build.sh` and see.** It fired on
+  2026-07-30 and was dismissed as *"a false positive: that file is excluded from the audio binary
+  target (`Package.swift:19`)"*. It is not scoped to a target: `scripts/check.sh:34` is
+  `find swift/Sources -name '*.swift' -newer "$shipped"`, so ANY Swift edit fires it, by design. The
+  run had genuinely failed. The over-broad scan is the point — one rebuild is cheaper than reasoning
+  about which target holds which file and being wrong once, which is exactly how BUG5 shipped a
+  three-day-old binary past a green suite. Testing the hypothesis costs one command.
 - **An observation is not yet a defect — and the review loop needs an UNLOCKED screen.** Looking is
   necessary and it is not sufficient: of seven findings from the first visual review, four died on
   re-checking, including the one filed as priority 1. "The window is light, the mockup is dark" was a
