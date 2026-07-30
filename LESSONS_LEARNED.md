@@ -11,6 +11,74 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
 - **Diarization: pyannote community-1 on CPU, never MPS.** The whole ASR path is CPU-bound anyway (CTranslate2 has no Metal backend), so forcing CPU costs nothing extra. MPS re-test deferred to the token pass.
 - **Naming reuses pyannote's own per-cluster embeddings** (DiarizationPipeline return_embeddings=True) — no separate ECAPA/SpeechBrain dependency.
 
+## Looking is necessary and not sufficient (2026-07-30, the first real renders)
+
+The rule above says a claim about appearance requires LOOKING. Half a day of acting on that
+produced its complement: **an observation is not yet a defect.** Of seven findings from the first
+visual review, re-checking each against the system and the code before building on it killed
+**four**.
+
+- **"The window is LIGHT, the mockup is DARK" was a fact about the MACHINE, not the code.**
+  `AppleInterfaceStyle` absent from the global domain, `System Events → dark mode` = false,
+  `AppleInterfaceStyleSwitchesAutomatically` = 1. No `preferredColorScheme` and no
+  `NSRequiresAquaSystemAppearance` anywhere in the sources — the app was obeying the system, which
+  is correct. It renders dark properly under `NSAppearance(named: .darkAqua)`. Filed as priority 1;
+  "fixing" it would have overridden an explicit user setting and broken the light half of an
+  auto-switching Mac. **A screenshot shows a system state and a code state superimposed, and says
+  nothing about which produced what.**
+- **"Speaker avatars are absent" and "no envelope strip" were both wrong** — both are built and
+  wired (`MeetingDetailView.swift:129` and `:15-19`). They were invisible because **nothing in that
+  column was rendering at all**: no meeting is selected by default. One finding explained two
+  others, and the fix that mattered ("select a meeting") revealed two features already paid for
+  rather than building anything.
+- **"The search field is in the wrong column" was wrong, and so was the fix I then proposed.** It is
+  on the right column with `placement: .toolbar`. I wrote that this was a one-argument change;
+  rendering `.toolbar`, `.sidebar` and `.automatic` side by side produced **byte-identical** output
+  (55218b ×3) — on macOS `NavigationSplitView` a `.searchable` field goes to the toolbar whatever
+  you ask. Matching the mockup means dropping `.searchable` and losing `⌘F`, which is a decision,
+  not a patch.
+- **The one finding that survived survived because it was REPRODUCED**, not merely seen: the sidebar
+  oval, reproduced off-screen from the real view tree.
+
+**Equal byte counts are a smell, not a pass.** Two renders that "differed" matched at 44090b
+because the element under test was missing from both. And `md5` on the first 8 bytes of a PNG
+returns the PNG magic number for every file — a hash that always agrees is not a comparison.
+
+**A capture path can require a human without saying so.** The documented review loop
+(`open ownscribe://library` + `screencapture -l`) silently needs an unlocked screen: with the
+screen locked the window reports `onscreen=no`, its AX window count drops to **0**, and
+`screencapture -l` refuses it. An autonomous loop that only works while someone is sitting there
+is not autonomous. Off-screen `NSWindow` + `NSHostingView` + `cacheDisplay` works locked — but
+capture `contentView.superview` (**NSThemeFrame**), not `contentView`, or the titlebar and the
+entire toolbar are absent from the image.
+
+**Know what a harness CANNOT see, and print it.** Off-screen, `glassEffect` on a `List`,
+`glassEffect` on a container, and **no glass at all** render byte-identically (one md5 for all
+three). Selection highlights paint the row opaque black over its own icon, label and badge — which
+nearly produced a false "the badge is missing" report against code that provably returns the count.
+So the harness answers layout, type, text and appearance, and must refuse glass, materials and
+anything on a selected row. An undocumented blind spot is worse than a missing tool: someone
+renders a glass change, sees a clean rail, and certifies it. That is this file's opening lesson
+wearing new tooling.
+
+**A test can encode a bug as a requirement.** Reading a correct render found the header printing
+`^[1 voix](inflect: true)` to the user — SwiftUI resolves inflection markup only in a literal, and
+`Text(_:)` was handed a `String` variable. No suite could have caught it, because
+`testTheCountKeepsItsInflectionMarkup` **asserted the broken string**, reasoning that "SwiftUI does
+the pluralisation". A correct fix turned that test red. Second instance of this shape after the
+avatar test that asserted a colour collision, and the tell is the same: a test whose rationale
+explains why the wrong output is right.
+
+**A guard against bad content can destroy good content, and its own tests will not say so.** A
+refusal-detector meant to stop an LLM apology becoming a meeting title matched bare common words
+(`transcript`, `need`, `please`) and erased **7 of 10** legitimate titles — in an app whose meetings
+are often *about* transcripts. Both its tests passed, because both asserted only the true-positive
+direction. **A filter needs tests in both directions or it is half-tested.** What fixed it was
+structural rather than lexical: a refusal is a SENTENCE (first-person, question mark, imperative,
+sentence punctuation mid-string), a title is a PHRASE — 1/14 false positives against 7/10. And
+place the guard where the signal still exists: slugification destroys the punctuation and casing
+the structural test depends on, so it must run on the RAW title.
+
 ## Verification lessons (2026-07-28, the Glass batch — 5 builders, 4 reopened tasks)
 
 - **A claim about APPEARANCE requires LOOKING. This was violated TWICE in one day, the second time
