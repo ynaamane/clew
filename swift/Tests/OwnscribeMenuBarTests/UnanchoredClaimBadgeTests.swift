@@ -16,7 +16,7 @@ final class UnanchoredClaimBadgeTests: XCTestCase {
     func testTheThreeStatesAreNotCollapsedIntoTwo() {
         XCTAssertEqual(state(unanchored: nil), .neverChecked)
         XCTAssertEqual(state(unanchored: 0), .allAnchored)
-        XCTAssertEqual(state(unanchored: 3), .unanchored("^[3 non ancré](inflect: true)"))
+        XCTAssertEqual(state(unanchored: 3), .unanchored(count: 3))
 
         XCTAssertNotEqual(
             state(unanchored: nil), state(unanchored: 0),

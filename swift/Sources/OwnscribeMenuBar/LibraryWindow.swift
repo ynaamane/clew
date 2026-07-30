@@ -7,13 +7,15 @@ struct LibraryWindow: View {
     @State private var selectedFilter: LibraryFilter = .all
     @State private var selectedMeeting: MeetingSummary?
     @State private var showBannerDetail = false
+    @State private var searchQuery: String = ""
 
     private var sections: [LibrarySidebarSection] {
         LibrarySidebar.sections(for: appState.recentMeetings, enrolledSpeakers: appState.enrolledSpeakers)
     }
 
     private var shownMeetings: [MeetingSummary] {
-        selectedFilter.apply(to: appState.recentMeetings)
+        let filtered = selectedFilter.apply(to: appState.recentMeetings)
+        return MeetingSearchFilter.filter(filtered, query: searchQuery)
     }
 
     var body: some View {
@@ -45,7 +47,7 @@ struct LibraryWindow: View {
                 }
             }
         } content: {
-            MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting)
+            MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting, searchQuery: $searchQuery)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 292, max: 380)
         } detail: {
             if let meeting = selectedMeeting {
@@ -100,6 +102,7 @@ struct LibraryWindow: View {
 private struct MeetingListColumn: View {
     let meetings: [MeetingSummary]
     @Binding var selection: MeetingSummary?
+    @Binding var searchQuery: String
 
     var body: some View {
         List(meetings, selection: $selection) { meeting in
@@ -107,11 +110,13 @@ private struct MeetingListColumn: View {
                 .tag(meeting)
         }
         .navigationTitle("Réunions")
+        .searchable(text: $searchQuery, placement: .toolbar, prompt: "Rechercher dans les réunions…")
     }
 }
 
 private struct MeetingRow: View {
     let meeting: MeetingSummary
+    @State private var summaryExcerpt: String?
 
     private var anchorState: UnanchoredClaimBadge {
         UnanchoredClaimBadge.state(unanchoredClaimCount: meeting.unanchoredClaimCount)
@@ -124,9 +129,11 @@ private struct MeetingRow: View {
                 .lineLimit(1)
             HStack(spacing: 6) {
                 Text(meeting.displayDate)
-                if let anchorText = anchorState.rowText {
-                    Text(anchorText)
-                        .foregroundStyle(anchorState == .neverChecked ? Color.secondary : Color.orange)
+                if let badge = MeetingStatusBadge.Variant(anchorState: anchorState) {
+                    MeetingStatusBadge(variant: badge)
+                }
+                if let count = meeting.actionItemCount, count > 0 {
+                    MeetingStatusBadge(variant: .actionItems(count: count))
                 }
                 if !meeting.hasSummary {
                     Text("non indexée")
@@ -135,8 +142,31 @@ private struct MeetingRow: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            if let excerpt = summaryExcerpt {
+                Text(excerpt)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, 2)
+        .task {
+            loadSummaryExcerpt()
+        }
+    }
+
+    private func loadSummaryExcerpt() {
+        guard meeting.hasSummary, summaryExcerpt == nil else { return }
+
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let configPath = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+
+        summaryExcerpt = MeetingRowSummary.loadExcerpt(
+            from: meeting.directory,
+            configURL: configPath
+        )
     }
 }
 
