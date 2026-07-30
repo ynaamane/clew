@@ -5,6 +5,7 @@ public struct BadgeText {
         guard let count = item.count else {
             return nil
         }
-        return String(count)
+        guard item.hasUnknowns else { return String(count) }
+        return count > 0 ? "\(count)+" : nil
     }
 }
