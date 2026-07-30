@@ -31,6 +31,24 @@ final class MeetingDisplayTests: XCTestCase {
         XCTAssertTrue(refusal.displayTitle.contains("11:41"), "Should fall back to time when slug is refusal")
     }
 
+    func testTitleKeepsLegitimateUsesOfCommonWords() {
+        let legitimate = [
+            "transcript-pipeline-review",
+            "we-need-to-ship-friday",
+            "provide-api-access-to-vendor",
+            "sorry-state-of-the-build",
+            "cannot-reproduce-bug-triage",
+            "please-review-my-pr-process",
+            "transcription-quality-sprint",
+        ]
+
+        for dir in legitimate {
+            let shown = meeting("2026-07-29_1537_\(dir)").displayTitle
+            XCTAssertFalse(shown.contains(":"), "Legitimate title '\(dir)' must not fall back to time, got '\(shown)'")
+            XCTAssertTrue(shown.lowercased().contains(dir.split(separator: "-").first!), "Title should contain slug content for '\(dir)', got '\(shown)'")
+        }
+    }
+
     func testDateIsReadableRatherThanAFolderName() {
         let shown = meeting("2026-07-27_1536_project-technical-review").displayDate
 
