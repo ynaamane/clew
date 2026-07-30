@@ -166,16 +166,13 @@ final class DesignRenderTests: XCTestCase {
            (md5 613f4c7e77be8ae7bfb878d0b77bde8c). Only .background(.bar) differed.
            Liquid Glass needs the real compositor; cacheDisplay bypasses it.
 
-        2. Selection highlights: render as BLACK instead of grey
-           Evidence: Off-screen selected row samples as (0,0,0) pure black.
-           Real capture (/tmp/ui-ev/window.png) shows same row as (225,226,226) light grey.
-           Materials/vibrancy do not composite off-screen.
-
-        3. Badges on selected sidebar rows: invisible or missing
-           Evidence: Fixture data shows badge=9 for "Toutes les réunions" but the
-           rendered selected row (black pill artifact) shows no badge. The badge is
-           either not drawn or drawn in a color invisible against the black background.
-           Consequence of the black selection artifact above.
+        2. Selected row content: ENTIRE ROW UNREADABLE off-screen
+           Evidence: Off-screen selected row renders as opaque (0,0,0) black across
+           the full row (x=40..235, y=146..194 sampled uniformly black). Icon, label,
+           AND badge are invisible. Real capture shows same row as (225,226,226) grey.
+           The content IS being drawn (fixture data correct) but invisible against black.
+           Materials/vibrancy do not composite off-screen, so the entire selected row
+           is unverifiable — not just its background.
 
         4. Any other compositor-dependent effects: translucency, vibrancy, materials
 
@@ -187,7 +184,11 @@ final class DesignRenderTests: XCTestCase {
         📋 Ground truth comparison (expected badges from /tmp/ui-ev/window.png):
            Expected: [9, 1+, 1+, 5] for Bibliothèque section items
            Visible in render: [missing on selected row, 1+, 1+, 5]
-           Missing: "9" badge on "Toutes les réunions" (first item, selected/black)
+
+           Note: MISSING strings may mean "obscured by the black selection artifact"
+           rather than "absent from the app". The selected row's entire content
+           (icon, label, badge) is invisible off-screen. Check fixture data before
+           filing a missing-badge defect.
 
         """
         print(warning)
