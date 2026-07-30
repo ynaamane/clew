@@ -112,6 +112,7 @@ private struct MeetingListColumn: View {
 
 private struct MeetingRow: View {
     let meeting: MeetingSummary
+    @State private var summaryExcerpt: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -121,8 +122,10 @@ private struct MeetingRow: View {
             HStack(spacing: 6) {
                 Text(meeting.displayDate)
                 if let count = meeting.unanchoredClaimCount, count > 0 {
-                    Text("^[\(count) non ancré](inflect: true)")
-                        .foregroundStyle(.orange)
+                    MeetingStatusBadge(variant: .unanchored(count: count))
+                }
+                if let count = meeting.actionItemCount, count > 0 {
+                    MeetingStatusBadge(variant: .actionItems(count: count))
                 }
                 if !meeting.hasSummary {
                     Text("non indexée")
@@ -131,8 +134,31 @@ private struct MeetingRow: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            if let excerpt = summaryExcerpt {
+                Text(excerpt)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, 2)
+        .task {
+            loadSummaryExcerpt()
+        }
+    }
+
+    private func loadSummaryExcerpt() {
+        guard meeting.hasSummary, summaryExcerpt == nil else { return }
+
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let configPath = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+
+        summaryExcerpt = MeetingRowSummary.loadExcerpt(
+            from: meeting.directory,
+            configURL: configPath
+        )
     }
 }
 
