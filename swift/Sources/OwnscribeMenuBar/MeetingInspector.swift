@@ -72,7 +72,7 @@ struct MeetingInspector: View {
                 }
             }
             .formStyle(.grouped)
-            .background(.background)
+            .scrollContentBackground(.hidden)
         }
         .glassEffect()
         .task(id: meeting.id) {
