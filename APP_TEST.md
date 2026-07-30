@@ -189,8 +189,16 @@ not assumed:
 |---|---|
 | Layout, spacing, column widths | **Liquid Glass / `glassEffect`** |
 | Type scale, weights, truncation | Real translucency and vibrancy |
-| Text content, badge values | **Selection highlights** |
+| Text content, badge values | **Selection highlights — and everything ON the selected row** |
 | Light vs dark appearance | Anything the compositor draws |
+
+**The selected row is not just mis-coloured, it is unreadable.** Sampled across a rendered
+row — x=40 to x=235, y=146 to y=194 — every pixel is **(0,0,0)**: the artifact pill paints over
+the icon, the label AND the badge. So a badge can be present in the app and absent from the
+render. This nearly produced a false defect report ("the `9` badge is missing"), when
+`LibrarySidebar.sections` passes `hasUnknowns: false` for that item so `BadgeText` provably
+takes its `String(count)` path. When a string is missing from a render, first ask whether the
+selection artifact ate it.
 
 The two numbers behind the right-hand column, because "it looked fine" is exactly the trap:
 `glassEffect` on the `List`, `glassEffect` on a container, and **no glass at all** render
@@ -205,6 +213,27 @@ the required kind.
 
 Also dead, measured, do not retry: SwiftUI's `ImageRenderer` draws `List` as a yellow
 no-entry placeholder and `glassEffect` as nothing at all.
+
+**It works — and the first reading of a correct render found a bug no test could reach.** The
+meeting header was displaying `^[1 voix](inflect: true)` to the user, because SwiftUI resolves
+inflection markup only in a literal or `LocalizedStringKey` and `MeetingDetailView` handed
+`Text(_:)` a `String` variable. Fixed in `4b1fcfc`. The reason no suite caught it is the part
+worth keeping: a test named `testTheCountKeepsItsInflectionMarkup` **asserted the broken
+string**, on the reasoning that "SwiftUI does the pluralisation" — so a correct fix would have
+turned it red. Same shape as the avatar test that once asserted a colour collision. A suite can
+encode a bug as a requirement; a render cannot.
+
+Run it, then **Read the PNG**:
+
+```bash
+bash scripts/ui-evidence/render.sh /tmp/ui-render    # library-light.png + library-dark.png
+```
+
+Two fixture traps that made the first renders lie, both worth knowing before trusting a new one:
+`AppState.outputDir` resolves to **`homeDir/ownscribe`**, so copying meetings into `homeDir`
+itself yields an empty library with `0` badges; and injecting `pipelineRunnerFactory = { nil }`
+makes `isCliAvailable` false, which fires the CLI banner. Both produced renders that looked
+broken while faithfully showing the state they were given.
 
 This closes the *absence* half of a design review: an agent can now name what is missing,
 what colour the window actually is, and whether an effect renders as intended. The first such
