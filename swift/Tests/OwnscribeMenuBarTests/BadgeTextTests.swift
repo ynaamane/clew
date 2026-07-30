@@ -45,108 +45,68 @@ final class BadgeTextTests: XCTestCase {
         XCTAssertEqual(badge, "3")
     }
 
+    private func badge(for filter: LibraryFilter, in meetings: [MeetingSummary]) -> String? {
+        let item = LibrarySidebar.sections(for: meetings, enrolledSpeakers: [])
+            .flatMap(\.items)
+            .first { $0.filter == filter }
+        return item.flatMap(BadgeText.badgeText(for:))
+    }
+
     func testUnanchoredBadgeShowsPlusWhenSomeMeetingsLackAnchoringData() {
-        let meetings = [
-            meeting("checked", unanchored: 1),
-            meeting("unchecked", unanchored: nil)
-        ]
-
-        let unanchoredCount = meetings.filter { ($0.unanchoredClaimCount ?? 0) > 0 }.count
-        let allHaveAnchoringData = meetings.allSatisfy { $0.unanchoredClaimCount != nil }
-
-        let item = LibrarySidebarItem(
-            id: "unanchored",
-            title: "Non ancrées",
-            filter: .unanchored,
-            count: unanchoredCount,
-            hasUnknowns: !allHaveAnchoringData,
-            children: []
-        )
-
-        let badge = BadgeText.badgeText(for: item)
+        let badge = badge(
+            for: .unanchored,
+            in: [meeting("checked", unanchored: 1), meeting("unchecked", unanchored: nil)])
 
         XCTAssertEqual(
             badge, "1+",
-            "When some meetings lack anchoring data, the badge must show '1+' not '1' — a bare number claims completeness"
-        )
+            "When some meetings lack anchoring data, the badge must show '1+' not '1' — a bare number claims completeness")
     }
 
     func testUnanchoredBadgeShowsPlainNumberWhenAllMeetingsAreChecked() {
-        let meetings = [
-            meeting("checked1", unanchored: 1),
-            meeting("checked2", unanchored: 0),
-            meeting("checked3", unanchored: 2)
-        ]
+        let badge = badge(
+            for: .unanchored,
+            in: [
+                meeting("checked1", unanchored: 1),
+                meeting("checked2", unanchored: 0),
+                meeting("checked3", unanchored: 2)
+            ])
 
-        let unanchoredCount = meetings.filter { ($0.unanchoredClaimCount ?? 0) > 0 }.count
-        let allHaveAnchoringData = meetings.allSatisfy { $0.unanchoredClaimCount != nil }
-
-        let item = LibrarySidebarItem(
-            id: "unanchored",
-            title: "Non ancrées",
-            filter: .unanchored,
-            count: unanchoredCount,
-            hasUnknowns: !allHaveAnchoringData,
-            children: []
-        )
-
-        let badge = BadgeText.badgeText(for: item)
-
-        XCTAssertEqual(
-            badge, "2",
-            "When all meetings have anchoring data, show the plain count"
-        )
+        XCTAssertEqual(badge, "2", "When all meetings have anchoring data, show the plain count")
     }
 
     func testUnanchoredBadgeShowsZeroWhenAllCheckedAndNoneHaveIssues() {
-        let meetings = [
-            meeting("checked1", unanchored: 0),
-            meeting("checked2", unanchored: 0)
-        ]
+        let badge = badge(
+            for: .unanchored,
+            in: [meeting("checked1", unanchored: 0), meeting("checked2", unanchored: 0)])
 
-        let unanchoredCount = meetings.filter { ($0.unanchoredClaimCount ?? 0) > 0 }.count
-        let allHaveAnchoringData = meetings.allSatisfy { $0.unanchoredClaimCount != nil }
-
-        let item = LibrarySidebarItem(
-            id: "unanchored",
-            title: "Non ancrées",
-            filter: .unanchored,
-            count: unanchoredCount,
-            hasUnknowns: !allHaveAnchoringData,
-            children: []
-        )
-
-        let badge = BadgeText.badgeText(for: item)
-
-        XCTAssertEqual(
-            badge, "0",
-            "When all meetings are checked and clean, show '0' not nil"
-        )
+        XCTAssertEqual(badge, "0", "When all meetings are checked and clean, show '0' not nil")
     }
 
     func testActionsBadgeShowsPlusWhenSomeMeetingsLackActionData() {
-        let meetings = [
-            meeting("checked", actions: 2),
-            meeting("unchecked", actions: nil)
-        ]
-
-        let actionCount = meetings.filter { ($0.actionItemCount ?? 0) > 0 }.count
-        let allHaveActionData = meetings.allSatisfy { $0.actionItemCount != nil }
-
-        let item = LibrarySidebarItem(
-            id: "actions",
-            title: "Avec actions",
-            filter: .withActions,
-            count: actionCount,
-            hasUnknowns: !allHaveActionData,
-            children: []
-        )
-
-        let badge = BadgeText.badgeText(for: item)
+        let badge = badge(
+            for: .withActions,
+            in: [meeting("checked", actions: 2), meeting("unchecked", actions: nil)])
 
         XCTAssertEqual(
             badge, "1+",
-            "Same principle applies to action items: nil means unknown, not zero"
-        )
+            "Same principle applies to action items: nil means unknown, not zero")
+    }
+
+    func testTheRealLibraryOnDiskWouldNotClaimCompleteness() {
+        let sixMeetingsLikeTheUsersDisk = (1...6).map { meeting("m\($0)", unanchored: nil) }
+
+        XCTAssertNil(
+            badge(for: .unanchored, in: sixMeetingsLikeTheUsersDisk),
+            "no meeting on the real disk has usable anchors, so a '0+' badge would read as 'zero problems' when the truth is that nothing was checked")
+    }
+
+    func testZeroKnownWithUnknownsIsSilentButZeroKnownWithNoUnknownsIsAnAnswer() {
+        let noneChecked = badge(for: .unanchored, in: [meeting("a", unanchored: nil)])
+        let allCheckedAndClean = badge(for: .unanchored, in: [meeting("a", unanchored: 0)])
+
+        XCTAssertNil(noneChecked, "a count of zero over unchecked meetings is not a finding")
+        XCTAssertEqual(
+            allCheckedAndClean, "0",
+            "but a real zero, measured over meetings that were all checked, is information worth showing")
     }
 }
