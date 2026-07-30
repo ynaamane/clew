@@ -60,6 +60,7 @@ echo "Verifying Info.plist keys..."
 /usr/libexec/PlistBuddy -c "Print :NSAudioCaptureUsageDescription" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Print :NSMicrophoneUsageDescription" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$APP_DIR/Contents/Info.plist"
 
 INSTALL_DIR="/Applications/$APP_NAME"
 

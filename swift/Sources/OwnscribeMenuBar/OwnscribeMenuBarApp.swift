@@ -7,6 +7,7 @@ struct OwnscribeMenuBarApp: App {
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
+        UrlOpenHandler.shared.install()
     }
 
     var body: some Scene {
@@ -17,15 +18,27 @@ struct OwnscribeMenuBarApp: App {
                 .onDisappear { WindowActivationPolicy.shared.windowDidClose() }
         }
         .defaultSize(width: 1080, height: 660)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Ouvrir MeetingScribe") { showLibrary() }
+                    .keyboardShortcut("0", modifiers: .command)
+            }
+        }
 
         MenuBarExtra("ownscribe", systemImage: appState.muteIndicator.symbolName) {
             MenuBarContentView()
                 .environment(appState)
+                .task { UrlOpenHandler.shared.openScene = { _ in showLibrary() } }
         }
         .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()
         }
+    }
+
+    private func showLibrary() {
+        openWindow(id: LibraryWindow.sceneID)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 }

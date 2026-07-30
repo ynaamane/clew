@@ -22,5 +22,18 @@
 	<string>ownscribe captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ownscribe records your microphone so it can transcribe your side of the meeting.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ownscribe.menubar.library</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ownscribe</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -4,6 +4,38 @@
 
 Everything below this block is history and traps worth keeping. This is the open list.
 
+### 0. THE DESIGN HAS NOW BEEN LOOKED AT (2026-07-30) — and it is wrong, as you said
+
+First actual visual review in this project's history. `open "ownscribe://library"` +
+`screencapture -l <windowid>` + reading the PNG. Findings are OBSERVED, not inferred:
+
+1. **The window is LIGHT; the validated mockup is DARK.** `design/direction-b-glass.png` is
+   dark purple-grey; the app renders on white. This single gap plausibly accounts for the whole
+   "pas bon du tout" verdict, and no amount of spacing work matters until it is fixed. The
+   mockup's `@media (prefers-color-scheme: dark)` block holds the intended values.
+2. **The sidebar is visually deformed** — a huge rounded white blob, an oval wider than its
+   column, bleeding past the bottom edge. Cause: `.glassEffect()` sits on the `List`
+   (`LibraryWindow.swift:34`) rather than on a container, so it clips itself into a capsule
+   instead of backing the rail.
+3. **Speaker avatars are absent** from the list/detail — the mockup shows coloured `01` discs.
+   `SpeakerAvatarStyle` exists and is well tested; nothing renders it here.
+4. **No RMS envelope strip** in the detail header, though `EnvelopeStrip` exists and one meeting
+   on disk has `envelope.json`.
+5. **The right column is ~60% empty.** The mockup fills it with Résumé / Points clés / Actions /
+   Pistes; the app shows an empty-state because no meeting is selected by default.
+6. **Five rows read "Sans titre"** — meetings with no summary get no title at all.
+7. **The search field landed in the DETAIL column, not the list header** where the mockup puts
+   it, so "Réunions" and the search box sit in different columns.
+
+What DOES match: the amber/green pills (`2 non ancrés`, `3 actions`) are the mockup's style,
+summary excerpts render, search exists, and "non vérifiée" appears correctly on unchecked
+meetings — the three things built earlier today.
+
+**Still unmeasured:** the AX tree came back with **0 lines** because SwiftUI exposes almost
+nothing without `.accessibilityIdentifier`. So the findings above are visual, not measured; to
+put numbers on spacing and type scale, identifiers have to be added to the interactive views
+first. That is the next design step, not more guessing.
+
 ### 1. The design — three ABSENT elements built on 2026-07-30; the rest still needs your eyes
 
 Rejected twice with no part named. Rather than ask a third time, the mockup was diffed against the
