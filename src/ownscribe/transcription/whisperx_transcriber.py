@@ -120,9 +120,6 @@ class WhisperXTranscriber(Transcriber):
         writer.flush()
         return result
 
-    def _capture_prep_output(self, stage_label: str, fn, *args, **kwargs):
-        return self._capture_download_output("preparing_models", stage_label, fn, *args, **kwargs)
-
     def _prepare_transcription_models(
         self,
         *,
