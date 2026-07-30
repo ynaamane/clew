@@ -7,34 +7,67 @@ Everything below this block is history and traps worth keeping. This is the open
 ### 0. THE DESIGN HAS NOW BEEN LOOKED AT (2026-07-30) — and it is wrong, as you said
 
 First actual visual review in this project's history. `open "ownscribe://library"` +
-`screencapture -l <windowid>` + reading the PNG. Findings are OBSERVED, not inferred:
+`screencapture -l <windowid>` + reading the PNG.
 
-1. **The window is LIGHT; the validated mockup is DARK.** `design/direction-b-glass.png` is
-   dark purple-grey; the app renders on white. This single gap plausibly accounts for the whole
-   "pas bon du tout" verdict, and no amount of spacing work matters until it is fixed. The
-   mockup's `@media (prefers-color-scheme: dark)` block holds the intended values.
+**⚠️ RE-CHECKED THE SAME DAY: FOUR OF THE SEVEN FINDINGS BELOW WERE WRONG**, including the one
+filed as priority 1. They were struck rather than deleted, because the failure mode is worth
+more than the list: *I read a screenshot and attributed an ENVIRONMENT state, and two invisible
+columns, to the code.* Looking is necessary and it is not sufficient — an observation still
+needs a mechanism before it becomes a defect.
+
+1. ~~**The window is LIGHT; the validated mockup is DARK.**~~ **MIS-DIAGNOSIS — there is nothing
+   to fix, and "fixing" it would have broken light mode.** The machine is IN light mode:
+   `AppleInterfaceStyle` is absent from the global domain, `System Events → dark mode` returns
+   **false**, and `AppleInterfaceStyleSwitchesAutomatically` is **1** (auto day/night switching).
+   The app carries no `preferredColorScheme` and no `NSRequiresAquaSystemAppearance` anywhere in
+   `swift/Sources/` or either Info.plist — so it is OBEYING the system, which is correct
+   behaviour. It renders dark properly when told to: proven by rendering the real view tree under
+   `NSAppearance(named: .darkAqua)`. `design/direction-b-glass.png` is dark because the machine
+   was dark when it was mocked up. **Do not hardcode dark** — that would override an explicit
+   user setting and break the light half of an auto-switching Mac.
 2. **The sidebar is visually deformed** — a huge rounded white blob, an oval wider than its
-   column, bleeding past the bottom edge. Cause: `.glassEffect()` sits on the `List`
-   (`LibraryWindow.swift:34`) rather than on a container, so it clips itself into a capsule
-   instead of backing the rail.
-3. **Speaker avatars are absent** from the list/detail — the mockup shows coloured `01` discs.
-   `SpeakerAvatarStyle` exists and is well tested; nothing renders it here.
-4. **No RMS envelope strip** in the detail header, though `EnvelopeStrip` exists and one meeting
-   on disk has `envelope.json`.
-5. **The right column is ~60% empty.** The mockup fills it with Résumé / Points clés / Actions /
-   Pistes; the app shows an empty-state because no meeting is selected by default.
-6. **Five rows read "Sans titre"** — meetings with no summary get no title at all.
-7. **The search field landed in the DETAIL column, not the list header** where the mockup puts
-   it, so "Réunions" and the search box sit in different columns.
+   column, bleeding past the bottom edge, with the selected row rendered as a black pill. Cause:
+   `.glassEffect()` sits on the `List` (`LibraryWindow.swift:36`) rather than on a container, so
+   it clips itself into a capsule instead of backing the rail. **CONFIRMED by independent
+   reproduction** off-screen from the real view tree, so this one has a mechanism, not just a
+   sighting. The mockup treats the rail as a container background
+   (`mockup.html:95` — `background: var(--bg-sidebar); backdrop-filter: blur(28px)`).
+3. ~~**Speaker avatars are absent.**~~ **WRONG — they are built and wired.**
+   `MeetingDetailView.swift:129` renders an 18pt coloured disc via `SpeakerAvatarStyle`
+   (`:141-150`).
+4. ~~**No RMS envelope strip.**~~ **WRONG — also built and wired.**
+   `MeetingDetailView.swift:15-19` draws `EnvelopeStrip` whenever `envelope.json` exists.
+5. **The right column is ~60% empty** — and this is the finding that explains 3 and 4. No meeting
+   is selected by default (`LibraryWindow.swift:8`), so the detail column shows
+   `LibraryEmptyState` and everything in `MeetingDetailView` is off-screen. Avatars and the
+   envelope strip were reported "absent" because **nothing in that column was rendering at all.**
+   So selecting a meeting by default is not cosmetic: it reveals two features already paid for.
+6. **Five rows read "Sans titre"** — slugless directories throw away the time they do have.
+7. ~~**The search field landed in the DETAIL column, not the list header.**~~ **Misread.** It is
+   attached to the list column (`LibraryWindow.swift:113`, on `MeetingListColumn`) with
+   `placement: .toolbar`, which hoists it into the WINDOW toolbar — so it renders top-right,
+   away from "Réunions", exactly as the screenshot shows. The container is right and the
+   placement is wrong; that is a one-argument change, not a move between columns.
 
 What DOES match: the amber/green pills (`2 non ancrés`, `3 actions`) are the mockup's style,
 summary excerpts render, search exists, and "non vérifiée" appears correctly on unchecked
 meetings — the three things built earlier today.
 
-**Still unmeasured:** the AX tree came back with **0 lines** because SwiftUI exposes almost
-nothing without `.accessibilityIdentifier`. So the findings above are visual, not measured; to
-put numbers on spacing and type scale, identifiers have to be added to the interactive views
-first. That is the next design step, not more guessing.
+**Two measurement notes.** `find ~/ownscribe -name envelope.json` now returns **2** files, not
+the 1 recorded below — re-measure before quoting either. And the AX tree returned **55 lines**,
+not 0: it carries every row's text with pixel frames (`@433,322 174x16`), which is enough to
+measure spacing. What it lacks is `.accessibilityIdentifier` on the *interactive* views, so
+elements can be read but not reliably ADDRESSED.
+
+**⚠️ THE `screencapture` LOOP IS BLOCKED WHEN THE SCREEN IS LOCKED — and it was, minutes later.**
+`ioreg -n Root -d1 -r | grep CGSSessionScreenIsLocked` → `Yes`; the library window then reports
+`onscreen=no`, `AXWindow` count drops to **0**, and `screencapture -l` refuses it. So the
+documented review loop silently requires the user to be sitting at an unlocked machine, which is
+the opposite of reviewing autonomously. Replacement being built (task #34): an off-screen
+`NSWindow` + `NSHostingView` + `cacheDisplay`, which works locked, renders both appearances via
+`NSAppearance`, and reproduces the finding-2 deformation. **Dead end, measured, do not retry:**
+SwiftUI's `ImageRenderer` draws `List` as a yellow no-entry placeholder and `glassEffect` as
+nothing — useless for precisely the two things under review.
 
 ### 1. The design — three ABSENT elements built on 2026-07-30; the rest still needs your eyes
 
@@ -59,28 +92,40 @@ partly answered — but **whether it reads well is still yours**, and an image c
 Do not accept "the tests are green" as progress here, from me or anyone: 413 green tests say nothing
 about how the window reads. That substitution has already been made twice.
 
-### 2. THE NEXT DESIGN BATCH, in this order (all code, no waiting on anyone)
+### 2. THE NEXT DESIGN BATCH, re-ordered after the § 0 re-check
 
-Derived from the § 0 review. Ordered by how much each one explains:
+Three items are struck: two were already built (invisible behind the empty detail column) and one
+was a mis-diagnosis of the machine's own setting. What is left is smaller and better grounded.
 
-1. **Make the window honour Dark mode** — the single largest gap. Take the values from the mockup's
-   `@media (prefers-color-scheme: dark)` block. Everything else is cosmetic until this is right.
-2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` and onto a container so it backs
-   the rail instead of clipping into an oval that overflows its column.
-3. **Move the search field into the list-column header**, where the mockup puts it, so the title and
-   the search box stop living in different columns.
-4. **Render speaker avatars** — `SpeakerAvatarStyle` exists, is well tested, and nothing calls it at
-   a visible site.
-5. **Draw the envelope strip** in the detail header — `EnvelopeStrip` exists; one meeting on disk has
-   `envelope.json`, so there is real data to render.
-6. **Give summary-less meetings a title** instead of five rows reading "Sans titre".
-7. **Add `.accessibilityIdentifier` to the interactive views.** This is what turns the next review
-   from visual into MEASURED: the AX tree returns 0 lines today, so spacing and type scale cannot be
-   checked numerically. Do this before iterating further on layout.
+0. **A review harness that works with the screen LOCKED** — a prerequisite, not a design item. The
+   `screencapture -l` loop cannot run on a locked screen, so every item below is otherwise
+   unverifiable without the user present. Off-screen `NSWindow` + `NSHostingView` + `cacheDisplay`,
+   rendering the REAL `LibraryWindow` tree (never a hand-built replica — that is how a harness ends
+   up validating a design the app does not have).
+1. ~~**Make the window honour Dark mode.**~~ **STRUCK — it already does; the machine is in light
+   mode.** See § 0 finding 1. Hardcoding dark would override the user's auto-switch setting.
+2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` (`LibraryWindow.swift:36`) onto a
+   container so it backs the rail instead of clipping into an oval that overflows its column. Now
+   the top item, and the only § 0 finding independently reproduced.
+3. **Give the search field the right placement** — it is already on the list column
+   (`LibraryWindow.swift:113`) but `placement: .toolbar` hoists it into the window toolbar, away
+   from "Réunions". A placement argument, not a move.
+4. ~~**Render speaker avatars.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:129`.
+5. ~~**Draw the envelope strip.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:15-19`.
+   (Both were invisible only because no meeting is selected — see item 6.)
+6. **Select the most recent meeting by default** (`LibraryWindow.swift:8`). Promoted from cosmetic to
+   load-bearing: it is what makes items 4 and 5 visible at all, and it fills a column that is ~60%
+   empty. Must stay correct when the list is empty or the selection is filtered out.
+7. **Give slugless meetings a real title** instead of five rows reading "Sans titre", and stop an LLM
+   refusal from becoming a directory name (§ 3).
+8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
+   with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
+   controls. Lower priority than previously recorded.
 
-After each: `open "ownscribe://library"` then
-`bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev` and LOOK at the PNG. Activate the app
-first — `screencapture -l` fails on a window that is not frontmost.
+After each: render both appearances with the § 2.0 harness and **read the PNG**. The old loop
+(`open "ownscribe://library"` + `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`) still
+works when you are at an unlocked machine — activate the app first, since `screencapture -l` fails on
+a window that is not frontmost — but it cannot be the harness's only path.
 
 ### 3. Needs one real recording — one item left, and it is smaller than it was
 
