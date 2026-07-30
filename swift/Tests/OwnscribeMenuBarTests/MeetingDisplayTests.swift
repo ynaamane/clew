@@ -40,12 +40,27 @@ final class MeetingDisplayTests: XCTestCase {
             "cannot-reproduce-bug-triage",
             "please-review-my-pr-process",
             "transcription-quality-sprint",
+            "i-o-latency-investigation",
+            "i-18n-rollout-plan",
         ]
 
         for dir in legitimate {
             let shown = meeting("2026-07-29_1537_\(dir)").displayTitle
             XCTAssertFalse(shown.contains(":"), "Legitimate title '\(dir)' must not fall back to time, got '\(shown)'")
             XCTAssertTrue(shown.lowercased().contains(dir.split(separator: "-").first!), "Title should contain slug content for '\(dir)', got '\(shown)'")
+        }
+    }
+
+    func testTitleErasesShortRefusals() {
+        let refusals = [
+            "please-provide-the-transcript",
+            "could-you-send-the-notes",
+            "i-need-more-context",
+        ]
+
+        for dir in refusals {
+            let shown = meeting("2026-07-29_1537_\(dir)").displayTitle
+            XCTAssertTrue(shown.contains(":"), "Short refusal '\(dir)' must fall back to time, got '\(shown)'")
         }
     }
 
