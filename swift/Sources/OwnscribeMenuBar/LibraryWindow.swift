@@ -81,6 +81,20 @@ struct LibraryWindow: View {
         .task {
             appState.refreshRecentMeetings()
             appState.refreshCliAvailability()
+
+            if selectedMeeting == nil, let first = appState.recentMeetings.first {
+                selectedMeeting = first
+            }
+        }
+        .onChange(of: appState.recentMeetings) { _, newMeetings in
+            if selectedMeeting == nil, let first = newMeetings.first {
+                selectedMeeting = first
+            }
+        }
+        .onChange(of: shownMeetings) { _, newShown in
+            if let current = selectedMeeting, !newShown.contains(current) {
+                selectedMeeting = newShown.first
+            }
         }
         .onChange(of: appState.phase) { _, newPhase in
             if case .failed = newPhase {

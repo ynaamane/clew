@@ -26,8 +26,38 @@ public struct MeetingSummary: Identifiable, Hashable {
     public var displayTitle: String {
         let parts = directory.lastPathComponent.split(separator: "_", maxSplits: 2, omittingEmptySubsequences: false)
         let slug = parts.count >= 3 ? String(parts[2]) : (parts.count == 1 ? String(parts[0]) : "")
-        guard !slug.isEmpty else { return "Sans titre" }
+
+        guard !slug.isEmpty, !Self.isLLMRefusal(slug) else {
+            return displayTime
+        }
+
         return slug.replacingOccurrences(of: "-", with: " ").capitalizedFirstLetter
+    }
+
+    private var displayTime: String {
+        let parts = directory.lastPathComponent.split(separator: "_")
+        guard parts.count >= 2 else { return "" }
+
+        let timeComponent = String(parts[1])
+        guard timeComponent.count == 4 else { return "" }
+
+        let hour = String(timeComponent.prefix(2))
+        let minute = String(timeComponent.suffix(2))
+        return "\(hour):\(minute)"
+    }
+
+    private static func isLLMRefusal(_ slug: String) -> Bool {
+        let lower = slug.lowercased()
+        let refusalPatterns = [
+            "sorry",
+            "please",
+            "provide",
+            "transcript",
+            "need",
+            "cannot",
+            "could-you",
+        ]
+        return refusalPatterns.contains { lower.contains($0) }
     }
 
     public var displayDate: String {

@@ -409,10 +409,27 @@ def _generate_title_slug(summary: str, summarizer) -> str:
     """Generate a title slug from a summary. Returns empty string on failure."""
     try:
         title = summarizer.generate_title(summary)
+        if _is_llm_refusal(title):
+            return ""
         return _slugify(title)
     except Exception:
         logging.getLogger(__name__).warning("Could not generate title", exc_info=True)
         return ""
+
+
+def _is_llm_refusal(title: str) -> bool:
+    """Detect if the title is an LLM refusal/apology rather than an actual title."""
+    lower = title.lower()
+    refusal_patterns = [
+        "sorry",
+        "i need",
+        "i cannot",
+        "please provide",
+        "could you",
+        "transcript of",
+        "more information",
+    ]
+    return any(pattern in lower for pattern in refusal_patterns)
 
 
 def run_pipeline(config: Config) -> None:

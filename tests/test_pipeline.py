@@ -530,6 +530,33 @@ class TestGenerateTitleSlug:
 
         assert _generate_title_slug("summary", mock_summarizer) == ""
 
+    def test_rejects_llm_refusal_as_title(self):
+        from ownscribe.pipeline import _generate_title_slug
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.generate_title.return_value = "I'm sorry, but I need the transcript of the meeting"
+
+        result = _generate_title_slug("", mock_summarizer)
+
+        assert result == "", "LLM refusal must not become a slug"
+
+    def test_rejects_llm_apology_variations(self):
+        from ownscribe.pipeline import _generate_title_slug
+
+        refusals = [
+            "Sorry, please provide the transcript",
+            "I cannot summarize without the meeting transcript",
+            "Could you please provide the text",
+            "I need more information to proceed",
+        ]
+
+        mock_summarizer = mock.MagicMock()
+
+        for refusal in refusals:
+            mock_summarizer.generate_title.return_value = refusal
+            result = _generate_title_slug("", mock_summarizer)
+            assert result == "", f"Refusal '{refusal}' must not become a slug, got '{result}'"
+
 
 class TestRenameOutputDir:
     def test_renames_when_target_does_not_exist(self, tmp_path):

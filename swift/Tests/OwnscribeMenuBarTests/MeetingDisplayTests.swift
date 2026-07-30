@@ -16,8 +16,19 @@ final class MeetingDisplayTests: XCTestCase {
         XCTAssertEqual(shown, "Project technical review key points")
     }
 
-    func testTitleFallsBackWhenThereIsNoSlug() {
-        XCTAssertEqual(meeting("2026-07-27_1531").displayTitle, "Sans titre")
+    func testTitleShowsTimeWhenThereIsNoSlug() {
+        let shown = meeting("2026-07-29_1537").displayTitle
+
+        XCTAssertTrue(shown.contains("15:37"), "Should show time for slugless directory, got \(shown)")
+        XCTAssertFalse(shown.contains("Sans titre"), "Must not fabricate 'Sans titre', got \(shown)")
+    }
+
+    func testTitleGuardsAgainstLLMRefusalAsSlug() {
+        let refusal = meeting("2026-07-30_1141_sure-please-provide-the-transcript-of-the-meeting")
+
+        XCTAssertFalse(refusal.displayTitle.lowercased().contains("please"), "LLM refusal must not become title")
+        XCTAssertFalse(refusal.displayTitle.lowercased().contains("sorry"), "LLM apology must not become title")
+        XCTAssertTrue(refusal.displayTitle.contains("11:41"), "Should fall back to time when slug is refusal")
     }
 
     func testDateIsReadableRatherThanAFolderName() {
