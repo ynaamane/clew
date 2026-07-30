@@ -25,6 +25,35 @@ Default on every non-trivial change — not a per-task ask:
   for the REQUIRED one: a passing suite, N `glassEffect` call sites and a symbol in the binary prove
   the code RUNS, never how it READS. Write "unverified" when nobody has looked. Correcting a
   claim-without-evidence with a different claim-without-evidence is not a correction.
+- **An observation is not yet a defect — and the review loop needs an UNLOCKED screen.** Looking is
+  necessary and it is not sufficient: of seven findings from the first visual review, four died on
+  re-checking, including the one filed as priority 1. "The window is light, the mockup is dark" was a
+  fact about the MACHINE (system in light mode, no `preferredColorScheme` anywhere, so the app was
+  obeying correctly) and "fixing" it would have overridden the user's auto-switch setting. Two more
+  were features already built and wired but invisible because *nothing* in that column rendered — no
+  meeting is selected by default. **A screenshot shows a system state and a code state superimposed
+  and says nothing about which produced what.** The one finding that survived was the one
+  REPRODUCED, not merely seen. Also: `screencapture -l` cannot photograph a window on a LOCKED
+  screen (the window reports `onscreen=no`, AX count drops to 0), so use
+  `bash scripts/ui-evidence/render.sh /tmp/ui-render` — off-screen, works locked. Know its blind
+  spots before trusting it: `glassEffect` renders **byte-identically to no glass at all** off-screen,
+  and the selected row paints opaque black over its own icon, label and badge, so a badge present in
+  the app is absent from the render. Never certify glass or materials on a render; see `APP_TEST.md`.
+- **A test can encode a bug as a requirement.** `testTheCountKeepsItsInflectionMarkup` asserted
+  `"^[1 non ancré](inflect: true)"` as correct output, reasoning that "SwiftUI does the
+  pluralisation" — but SwiftUI resolves that markup only in a literal or `LocalizedStringKey`, never
+  in a `String` variable handed to `Text(_:)`. So the sibling call site printed the raw markup to the
+  user, and a correct fix turned the test RED. Second instance after `speakerEndingIn0GetsBlue`
+  asserted a colour collision. The tell is a test whose rationale explains why the wrong output is
+  right.
+- **A filter needs tests in BOTH directions.** A guard meant to stop an LLM apology becoming a
+  meeting title matched bare common words (`transcript`, `need`, `please`) and erased **7 of 10**
+  legitimate titles — in an app whose meetings are often about transcripts. Both its tests passed:
+  both asserted only that refusals are caught. What fixed it was structural rather than lexical (a
+  refusal is a SENTENCE, a title is a PHRASE: first-person opening, question mark, imperative,
+  sentence punctuation mid-string) — 1/14 false positives against 7/10. And put the guard where the
+  signal still exists: slugification destroys the punctuation the structural test needs, so it runs
+  on the RAW title.
 - **You CAN look at the window yourself — do it before claiming anything about appearance.**
   `open "ownscribe://library"` then `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`,
   then Read the PNG. The capture resolves the window id by OWNER and passes it to `screencapture -l`,
