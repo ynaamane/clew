@@ -1,16 +1,32 @@
 # TODO — meeting-scribe
 
-## WHAT IS ACTUALLY LEFT (2026-07-29, end of day)
+## WHAT IS ACTUALLY LEFT (2026-07-30)
 
 Everything below this block is history and traps worth keeping. This is the open list.
 
-### 1. Blocking, and only you can do it: the design
+### 1. The design — three ABSENT elements built on 2026-07-30; the rest still needs your eyes
 
-The window has been seen twice and rejected twice. **Nobody has ever named a part.** Until that
-happens no design work should start, because iterating blind against an unseen target is what wasted
-2026-07-28. Open ⌘0 and say which of the eight checks in `APP_TEST.md` § Design pass fails, and how.
+Rejected twice with no part named. Rather than ask a third time, the mockup was diffed against the
+sources, which turns part of the question into presence/absence facts that need no judgement:
 
-Do not accept "the tests are green" as progress here, from me or anyone: 345 green tests say nothing
+- **There was no search field at all** — `grep -rn "searchable\|Rechercher" swift/Sources/` returned
+  **zero**, while the mockup puts one in the list header and the target PNG shows a "Rechercher" pill.
+  The window could not search its own library. Built: filters title + date, composes with the sidebar
+  filter so typing inside "Avec actions" narrows it.
+- **List rows carried no summary excerpt** (mockup `.i-s`, 2-line clamp), so the middle column never
+  said what a meeting was ABOUT — its whole job when scanning the next morning. Built, 0.11 ms/row
+  against the 0.44 ms sidebar reference, reusing `MeetingInspectorState.loadSummary` so `output.format`
+  is honoured.
+- **Badges were bare coloured text, not the mockup's filled pills.** Built as one component with
+  amber / green / grey variants at the mockup's padding, radius and weight.
+
+**What this does NOT settle.** These three were absent; the other five checks in `APP_TEST.md`
+§ Design pass are judgement — whether the whole reads as one design, transcript legibility, the type
+scale, whether the glass sits behind the content or fights it, density versus the mockup. **No
+automated proof can close those, and nobody has looked at the rendered window.** Open ⌘0 and name
+which of them fails, and how.
+
+Do not accept "the tests are green" as progress here, from me or anyone: 396 green tests say nothing
 about how the window reads. That substitution has already been made twice.
 
 ### 2. Blocking, needs one real recording
@@ -30,8 +46,9 @@ Three things can only be closed by recording a short real meeting through the ap
 
 ### 3. The 2026-07-29 sweep list — 6 of 8 CLOSED on 2026-07-30, 2 still open
 
-Fixed, each mutation-verified. Four builders were killed mid-task by an API stream stall; their work
-survived only because it was on disk, and **every lot needed correction before it could be trusted**
+Fixed, each mutation-verified. Five builders were killed mid-task by an API stream stall; their work
+survived only because it was on disk, and **every one of the six lots needed correction before it
+could be trusted**
 — which is the argument for reviewing a dead agent's output rather than merging it.
 
 - ~~**`checkHasAudio` reads only the first 48,000 frames.**~~ **CLOSED, and it was LIVE, not
@@ -99,11 +116,11 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 636 Python + 376 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 636 Python + 396 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
-Measured 2026-07-30 on the merged tree after five lots landed: `bash scripts/check.sh` → **`CHECK=0`
+Measured 2026-07-30 on the merged tree after six lots landed: `bash scripts/check.sh` → **`CHECK=0`
 read from a captured variable, 0 failed gates**, including the release build. Swift → **350 XCTest
-(`Executed 354 tests, with 4 tests skipped and 0 failures`) + 26 swift-testing = 376**. Python
+(`Executed 354 tests, with 4 tests skipped and 0 failures`) + 46 swift-testing = 396**. Python
 **inside check.sh** → **636 passed, 7 deselected** (`check.sh:23` runs `-m "not hardware"`).
 `/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run, so nothing
 reached the real input device.
