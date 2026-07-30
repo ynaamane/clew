@@ -1,11 +1,9 @@
-#!/usr/bin/env swift
+// Off-screen renderer for LibraryWindow — works with screen locked.
+// Based on spike at /tmp/win-spike/nav.swift.
+// Compiled together with OwnscribeCapture + OwnscribeMenuBar sources.
 import SwiftUI
 import AppKit
 import Foundation
-
-// This script renders LibraryWindow off-screen (works with screen locked) by creating a
-// non-visible NSWindow + NSHostingView + cacheDisplay. Based on spike at /tmp/win-spike/nav.swift.
-// Usage: swift render-offscreen.swift /path/to/output/dir /path/to/meetings/copy
 
 @MainActor
 func renderLibraryWindow(dark: Bool, outputPath: String, meetingsDir: URL) -> (success: Bool, message: String) {

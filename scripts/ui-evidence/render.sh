@@ -24,28 +24,28 @@ find "$LIVE_MEETINGS" -mindepth 1 -maxdepth 1 -type d | head -3 | while read -r 
   cp -R "$dir" "$MEETINGS_COPY/"
 done
 
-# Compile the renderer WITH all OwnscribeMenuBar sources plus the built OwnscribeCapture module
 cd "$REPO_ROOT/swift"
 
-# Build OwnscribeCapture module first
-swift build --product ownscribe-audio > /dev/null 2>&1
+# Build the Package modules first (provides OwnscribeCapture module)
+swift build > /dev/null 2>&1
 
 BUILD_DIR="$(swift build --show-bin-path)"
 
-# Compile renderer with OwnscribeMenuBar sources and link to OwnscribeCapture module
+# Now compile MenuBar sources + renderer with access to the OwnscribeCapture module
 swiftc -O \
   -target arm64-apple-macos26.0 \
   -swift-version 5 \
-  -I "$BUILD_DIR/../Modules" \
+  -I "$BUILD_DIR/Modules" \
   -L "$BUILD_DIR" \
+  -module-name RenderOffscreen \
   Sources/OwnscribeMenuBar/*.swift \
   "$HERE/render-offscreen.swift" \
   -o "$HERE/render-offscreen" \
-  -lOwnscribeCapture \
   -framework CoreAudio \
   -framework AudioToolbox \
   -framework AppKit \
-  -framework SwiftUI 2>&1 | head -50
+  -framework SwiftUI \
+  -Xlinker "$BUILD_DIR"/OwnscribeCapture.build/*.o 2>&1 | head -50
 
 if [[ ! -x "$HERE/render-offscreen" ]]; then
   printf 'Compilation failed — no binary produced.\n' >&2
