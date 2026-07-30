@@ -9,7 +9,7 @@ public final class AppState {
     public enum Phase: Equatable {
         case idle
         case recording(startedAt: Date)
-        case processing(step: String, fraction: Double?)
+        case processing(step: String, fraction: Double?, detail: String? = nil)
         case done(directory: URL)
         case failed(String)
     }
@@ -319,15 +319,17 @@ public final class AppState {
         }
     }
 
-    private func handle(_ event: ProgressEvent) {
-        guard case .processing = phase else { return }
+    internal func handle(_ event: ProgressEvent) {
+        guard case .processing(let currentStep, let currentFraction, _) = phase else { return }
 
         AppLogger.pipeline.debug("Pipeline progress: event=\(event.event.rawValue, privacy: .public), step=\(event.step, privacy: .public)")
 
         switch event.event {
         case .begin, .update:
-            phase = .processing(step: event.step, fraction: event.fraction)
-        case .complete, .fail, .detail:
+            phase = .processing(step: event.step, fraction: event.fraction, detail: nil)
+        case .detail:
+            phase = .processing(step: currentStep, fraction: currentFraction, detail: event.detail)
+        case .complete, .fail:
             break
         }
     }

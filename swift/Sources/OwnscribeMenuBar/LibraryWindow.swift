@@ -57,8 +57,8 @@ struct LibraryWindow: View {
         .navigationTitle("Réunions")
         .toolbar {
             ToolbarItemGroup {
-                if case .processing(let step, _) = appState.phase {
-                    Label(step, systemImage: "circle.lefthalf.filled")
+                if case .processing(let step, _, let detail) = appState.phase {
+                    Label(detail ?? step, systemImage: "circle.lefthalf.filled")
                         .foregroundStyle(.orange)
                 }
                 if case .failed = appState.phase {
@@ -113,6 +113,10 @@ private struct MeetingListColumn: View {
 private struct MeetingRow: View {
     let meeting: MeetingSummary
 
+    private var anchorState: UnanchoredClaimBadge {
+        UnanchoredClaimBadge.state(unanchoredClaimCount: meeting.unanchoredClaimCount)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(meeting.displayTitle)
@@ -120,9 +124,9 @@ private struct MeetingRow: View {
                 .lineLimit(1)
             HStack(spacing: 6) {
                 Text(meeting.displayDate)
-                if let count = meeting.unanchoredClaimCount, count > 0 {
-                    Text("^[\(count) non ancré](inflect: true)")
-                        .foregroundStyle(.orange)
+                if let anchorText = anchorState.rowText {
+                    Text(anchorText)
+                        .foregroundStyle(anchorState == .neverChecked ? Color.secondary : Color.orange)
                 }
                 if !meeting.hasSummary {
                     Text("non indexée")

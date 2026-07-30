@@ -75,13 +75,13 @@ struct MenuBarContentView: View {
             Text("Recording since \(startedAt.formatted(date: .omitted, time: .standard))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        case .processing(let step, let fraction):
+        case .processing(let step, let fraction, let detail):
             Button(startButtonTitle) {
                 Task { await appState.toggleRecording() }
             }
             HStack {
                 ProgressView(value: fraction)
-                Text(step)
+                Text(detail ?? step)
                     .font(.caption)
             }
         }
