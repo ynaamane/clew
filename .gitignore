@@ -37,3 +37,4 @@ swift/.build/
 
 # Playwright MCP scratch output
 .playwright-mcp/
+scripts/ui-evidence/ui-evidence

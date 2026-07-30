@@ -29,6 +29,8 @@ public final class PipelineRunner: PipelineRunning {
     private let tokenStore: TokenSource
     private var process: Process?
 
+    var inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
+
     public init(binary: URL, tokenStore: TokenSource = KeychainTokenStore()) {
         self.binary = binary
         self.tokenStore = tokenStore
@@ -47,10 +49,11 @@ public final class PipelineRunner: PipelineRunning {
         process.executableURL = binary
         process.arguments = ["--progress", "json"] + arguments
 
-        var env = ProcessInfo.processInfo.environment
+        var env = inheritedEnvironment
         if let token = tokenStore.loadHuggingFaceToken() {
             env["HF_TOKEN"] = token
         }
+        env["PATH"] = ChildProcessPath.resolve(inheritedPath: env["PATH"] ?? "")
         process.environment = env
 
         let stderrPipe = Pipe()
