@@ -10,67 +10,70 @@ struct MeetingInspector: View {
     @State private var tracks: [AudioTrackPresence] = []
 
     var body: some View {
-        Form {
-            if let summary {
-                Section("Résumé") {
-                    Text(summary.prose)
-                        .font(.callout)
-                }
-                if let keyPoints = keyPointsWithAnchors, !keyPoints.isEmpty {
-                    Section("Points clés") {
-                        ForEach(Array(keyPoints.enumerated()), id: \.offset) { _, keyPoint in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(keyPoint.text)
-                                    .font(.callout)
-                                evidenceRow(for: keyPoint)
+        ZStack {
+            Form {
+                if let summary {
+                    Section("Résumé") {
+                        Text(summary.prose)
+                            .font(.callout)
+                    }
+                    if let keyPoints = keyPointsWithAnchors, !keyPoints.isEmpty {
+                        Section("Points clés") {
+                            ForEach(Array(keyPoints.enumerated()), id: \.offset) { _, keyPoint in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(keyPoint.text)
+                                        .font(.callout)
+                                    evidenceRow(for: keyPoint)
+                                }
                             }
                         }
                     }
-                }
-                Section("Actions") {
-                    if summary.actionItems.isEmpty {
-                        Text(summary.actionItemsPlaceholder)
+                    Section("Actions") {
+                        if summary.actionItems.isEmpty {
+                            Text(summary.actionItemsPlaceholder)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                        } else {
+                            ForEach(Array(summary.actionItems.enumerated()), id: \.offset) { _, item in
+                                Text(item)
+                                    .font(.callout)
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        Text("Pas encore de résumé — cette réunion n'est pas indexée par la recherche.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                            .italic()
-                    } else {
-                        ForEach(Array(summary.actionItems.enumerated()), id: \.offset) { _, item in
-                            Text(item)
+                    }
+                }
+
+                if let transcript, !transcript.speakers.isEmpty {
+                    Section("Voix") {
+                        ForEach(transcript.speakers, id: \.self) { speaker in
+                            Text(speaker)
                                 .font(.callout)
                         }
                     }
                 }
-            } else {
-                Section {
-                    Text("Pas encore de résumé — cette réunion n'est pas indexée par la recherche.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
 
-            if let transcript, !transcript.speakers.isEmpty {
-                Section("Voix") {
-                    ForEach(transcript.speakers, id: \.self) { speaker in
-                        Text(speaker)
-                            .font(.callout)
+                Section("Pistes audio") {
+                    ForEach(tracks, id: \.filename) { track in
+                        HStack {
+                            Text(track.filename)
+                                .font(.callout)
+                            Spacer()
+                            Text(track.displayStatus)
+                                .foregroundStyle(track.hasContent ? .green : .secondary)
+                                .font(.caption)
+                        }
                     }
                 }
             }
-
-            Section("Pistes audio") {
-                ForEach(tracks, id: \.filename) { track in
-                    HStack {
-                        Text(track.filename)
-                            .font(.callout)
-                        Spacer()
-                        Text(track.displayStatus)
-                            .foregroundStyle(track.hasContent ? .green : .secondary)
-                            .font(.caption)
-                    }
-                }
-            }
+            .formStyle(.grouped)
+            .background(.background)
         }
-        .formStyle(.grouped)
         .glassEffect()
         .task(id: meeting.id) {
             summary = loadSummary()

@@ -21,16 +21,19 @@ struct LibraryWindow: View {
     var body: some View {
         NavigationSplitView {
             ZStack(alignment: .top) {
-                List(selection: $selectedFilter) {
-                    ForEach(sections) { section in
-                        Section(section.title) {
-                            ForEach(section.items) { item in
-                                Label(item.title, systemImage: item.filter.symbolName)
-                                    .badge(BadgeText.badgeText(for: item))
-                                    .tag(item.filter)
+                ZStack {
+                    List(selection: $selectedFilter) {
+                        ForEach(sections) { section in
+                            Section(section.title) {
+                                ForEach(section.items) { item in
+                                    Label(item.title, systemImage: item.filter.symbolName)
+                                        .badge(BadgeText.badgeText(for: item))
+                                        .tag(item.filter)
+                                }
                             }
                         }
                     }
+                    .background(.background)
                 }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
                 .glassEffect()
