@@ -43,11 +43,17 @@ needs a mechanism before it becomes a defect.
    envelope strip were reported "absent" because **nothing in that column was rendering at all.**
    So selecting a meeting by default is not cosmetic: it reveals two features already paid for.
 6. **Five rows read "Sans titre"** — slugless directories throw away the time they do have.
-7. ~~**The search field landed in the DETAIL column, not the list header.**~~ **Misread.** It is
-   attached to the list column (`LibraryWindow.swift:113`, on `MeetingListColumn`) with
-   `placement: .toolbar`, which hoists it into the WINDOW toolbar — so it renders top-right,
-   away from "Réunions", exactly as the screenshot shows. The container is right and the
-   placement is wrong; that is a one-argument change, not a move between columns.
+7. **The search field renders top-right, marooned from "Réunions"** — the observation stands; the
+   first diagnosis and the first FIX proposal were both wrong. It is not in the detail column: it
+   is attached to the list column (`LibraryWindow.swift:113`) with `placement: .toolbar`, which
+   hoists it into the window toolbar. And it is **not a one-argument change** — I rendered
+   `.toolbar`, `.sidebar` and `.automatic` side by side off-screen and all three produced
+   **byte-identical** output (55218b ×3, `/tmp/win-spike/pl-*.png`), i.e. on macOS
+   `NavigationSplitView` puts a `.searchable` field in the toolbar whatever you ask for. Putting a
+   search box in the list-column header the way the mockup does (`mockup.html:112`, inside
+   `.list-hdr`) therefore means **not using `.searchable`** for it — a plain `TextField` in a
+   header view above the `List`. That is a real change with a real trade-off (losing the system
+   search affordances, `⌘F`), so it needs a decision, not a patch.
 
 What DOES match: the amber/green pills (`2 non ancrés`, `3 actions`) are the mockup's style,
 summary excerpts render, search exists, and "non vérifiée" appears correctly on unchecked
@@ -107,9 +113,12 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` (`LibraryWindow.swift:36`) onto a
    container so it backs the rail instead of clipping into an oval that overflows its column. Now
    the top item, and the only § 0 finding independently reproduced.
-3. **Give the search field the right placement** — it is already on the list column
-   (`LibraryWindow.swift:113`) but `placement: .toolbar` hoists it into the window toolbar, away
-   from "Réunions". A placement argument, not a move.
+3. **Decide what to do about the search field** — NOT a placement argument. `.toolbar`, `.sidebar`
+   and `.automatic` all render byte-identically on macOS `NavigationSplitView` (measured, § 0
+   finding 7): the field always goes to the toolbar. Matching the mockup's in-header search box
+   means replacing `.searchable` with a plain `TextField` in a header above the `List`, which
+   costs the system search affordances and `⌘F`. Worth asking whether the toolbar field is
+   actually WORSE before paying that — it is where macOS apps normally put search.
 4. ~~**Render speaker avatars.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:129`.
 5. ~~**Draw the envelope strip.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:15-19`.
    (Both were invisible only because no meeting is selected — see item 6.)
