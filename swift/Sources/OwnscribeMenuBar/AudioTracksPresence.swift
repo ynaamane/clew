@@ -53,25 +53,38 @@ enum AudioTracksPresence {
         guard let file = try? AVAudioFile(forReading: url) else { return false }
 
         let format = file.processingFormat
-        let frameCount = AVAudioFrameCount(file.length)
-        guard frameCount > 0 else { return false }
+        let totalFrames = AVAudioFrameCount(file.length)
+        guard totalFrames > 0 else { return false }
 
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: min(frameCount, 48000)) else { return false }
-
-        try? file.read(into: buffer)
-
-        guard let floatData = buffer.floatChannelData else { return false }
-
-        let framesToCheck = Int(buffer.frameLength)
+        let threshold: Float = 0.001
+        let chunkSize: AVAudioFrameCount = 48000
         let channelCount = Int(format.channelCount)
 
-        for channel in 0..<channelCount {
-            let channelData = floatData[channel]
-            for frame in 0..<framesToCheck {
-                if abs(channelData[frame]) > 0.001 {
-                    return true
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkSize) else { return false }
+
+        var framePosition: AVAudioFramePosition = 0
+
+        while framePosition < file.length {
+            let framesToRead = min(chunkSize, AVAudioFrameCount(file.length - framePosition))
+
+            file.framePosition = framePosition
+
+            guard (try? file.read(into: buffer, frameCount: framesToRead)) != nil else { return false }
+
+            guard let floatData = buffer.floatChannelData else { return false }
+
+            let framesToCheck = Int(buffer.frameLength)
+
+            for channel in 0..<channelCount {
+                let channelData = floatData[channel]
+                for frame in 0..<framesToCheck {
+                    if abs(channelData[frame]) > threshold {
+                        return true
+                    }
                 }
             }
+
+            framePosition += AVAudioFramePosition(framesToRead)
         }
 
         return false
