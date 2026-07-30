@@ -171,14 +171,23 @@ final class DesignRenderTests: XCTestCase {
            Real capture (/tmp/ui-ev/window.png) shows same row as (225,226,226) light grey.
            Materials/vibrancy do not composite off-screen.
 
-        3. Any other compositor-dependent effects: translucency, vibrancy, materials
+        3. Badges on selected sidebar rows: invisible or missing
+           Evidence: Fixture data shows badge=9 for "Toutes les réunions" but the
+           rendered selected row (black pill artifact) shows no badge. The badge is
+           either not drawn or drawn in a color invisible against the black background.
+           Consequence of the black selection artifact above.
+
+        4. Any other compositor-dependent effects: translucency, vibrancy, materials
 
         ✓  CAN VERIFY (and this harness is trustworthy for):
            - Layout, spacing, type scale, colour, text content, truncation
            - Light vs dark appearance switching (genuinely differ)
-           - Sidebar badges, section headers, meeting rows, toolbar, empty states
+           - Sidebar badges on UNSELECTED rows, section headers, meeting rows, toolbar, empty states
 
-        Compare against ground truth: /tmp/ui-ev/window.png
+        📋 Ground truth comparison (expected badges from /tmp/ui-ev/window.png):
+           Expected: [9, 1+, 1+, 5] for Bibliothèque section items
+           Visible in render: [missing on selected row, 1+, 1+, 5]
+           Missing: "9" badge on "Toutes les réunions" (first item, selected/black)
 
         """
         print(warning)
