@@ -35,9 +35,15 @@ final class UnanchoredClaimBadgeTests: XCTestCase {
             "a meeting whose claims all have evidence is the quiet case and must not be decorated")
     }
 
-    func testTheCountKeepsItsInflectionMarkup() {
-        XCTAssertEqual(
-            state(unanchored: 1).rowText, "^[1 non ancré](inflect: true)",
-            "SwiftUI does the pluralisation; asserting the rendered string here would pass on markup that never inflects")
+    func testTheCountIsPluralisedWithoutLeakingMarkup() {
+        XCTAssertEqual(state(unanchored: 1).rowText, "1 non ancré")
+        XCTAssertEqual(state(unanchored: 3).rowText, "3 non ancrés")
+
+        for count in [1, 3] {
+            let text = state(unanchored: count).rowText ?? ""
+            XCTAssertFalse(
+                text.contains("^["),
+                "This assertion used to REQUIRE the markup, which locked the bug in place: SwiftUI resolves ^[…](inflect:) only in a literal or LocalizedStringKey, never in a String variable handed to Text(_:). The sibling site rendered it verbatim to the user.")
+        }
     }
 }

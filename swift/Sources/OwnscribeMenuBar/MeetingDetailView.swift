@@ -70,13 +70,12 @@ struct MeetingDetailView: View {
     }
 
     private var headerDetail: String {
-        var parts = [meeting.displayDate]
-        if let transcript {
-            if transcript.duration > 0 { parts.append(Self.durationText(transcript.duration)) }
-            if !transcript.language.isEmpty { parts.append(transcript.language) }
-            if !transcript.speakers.isEmpty { parts.append("^[\(transcript.speakers.count) voix](inflect: true)") }
-        }
-        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+        MeetingHeaderDetail.text(
+            date: meeting.displayDate,
+            duration: transcript?.duration,
+            language: transcript?.language ?? "",
+            speakerCount: transcript?.speakers.count
+        )
     }
 
     @ViewBuilder
@@ -109,10 +108,6 @@ struct MeetingDetailView: View {
     }
 
 
-    static func durationText(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
 }
 
 private struct UtteranceRow: View {

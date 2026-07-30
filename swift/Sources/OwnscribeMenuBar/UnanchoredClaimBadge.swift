@@ -13,7 +13,7 @@ enum UnanchoredClaimBadge: Equatable {
         switch self {
         case .neverChecked: return "non vérifiée"
         case .allAnchored: return nil
-        case .unanchored(let count): return "^[\(count) non ancré](inflect: true)"
+        case .unanchored(let count): return count == 1 ? "1 non ancré" : "\(count) non ancrés"
         }
     }
 }
