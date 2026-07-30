@@ -81,20 +81,16 @@ struct LibraryWindow: View {
         .task {
             appState.refreshRecentMeetings()
             appState.refreshCliAvailability()
-
-            if selectedMeeting == nil, let first = appState.recentMeetings.first {
-                selectedMeeting = first
-            }
+            let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: appState.recentMeetings)
+            selectedMeeting = resolved
         }
         .onChange(of: appState.recentMeetings) { _, newMeetings in
-            if selectedMeeting == nil, let first = newMeetings.first {
-                selectedMeeting = first
-            }
+            let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: newMeetings)
+            selectedMeeting = resolved
         }
         .onChange(of: shownMeetings) { _, newShown in
-            if let current = selectedMeeting, !newShown.contains(current) {
-                selectedMeeting = newShown.first
-            }
+            let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: newShown)
+            selectedMeeting = resolved
         }
         .onChange(of: appState.phase) { _, newPhase in
             if case .failed = newPhase {
