@@ -173,6 +173,39 @@ The capture resolves the window id **by owner** and passes it to `screencapture 
 cannot capture the screen. Activate the app first — `screencapture -l` fails on a window that
 is not frontmost ("could not create image from window").
 
+**⚠️ THAT PATH REQUIRES AN UNLOCKED SCREEN, so it is unavailable most of the time.** Measured
+the same afternoon it was written: with the screen locked
+(`ioreg -n Root -d1 -r | grep CGSSessionScreenIsLocked` → `Yes`) the library window still
+exists but reports `onscreen=no`, its `AXWindow` count drops to **0**, and `screencapture -l`
+refuses it. A loop that silently needs someone sitting at the machine is not an autonomous
+review loop.
+
+**The off-screen renderer is the replacement — and its BLIND SPOTS are the load-bearing part
+of this section.** It builds an `NSWindow` off-screen, hosts the real `LibraryWindow`, and
+reads pixels with `cacheDisplay`, so it works locked. What it can and cannot see was measured,
+not assumed:
+
+| Verifiable off-screen | NOT verifiable off-screen |
+|---|---|
+| Layout, spacing, column widths | **Liquid Glass / `glassEffect`** |
+| Type scale, weights, truncation | Real translucency and vibrancy |
+| Text content, badge values | **Selection highlights** |
+| Light vs dark appearance | Anything the compositor draws |
+
+The two numbers behind the right-hand column, because "it looked fine" is exactly the trap:
+`glassEffect` on the `List`, `glassEffect` on a container, and **no glass at all** render
+**byte-identical** off-screen (md5 `613f4c7e77be8ae7bfb878d0b77bde8c` for all three; only
+`.background(.bar)` differed). And a selected row samples **(0,0,0)** off-screen where the
+real window is **(225,226,226)** — so a black pill in a render is an artifact, not a bug.
+
+**Consequence, stated plainly: a glass change renders IDENTICALLY whether it works or not.**
+Never certify glass, translucency or selection styling on an off-screen render. That would be
+the same substitution this section exists to prevent — the available evidence standing in for
+the required kind.
+
+Also dead, measured, do not retry: SwiftUI's `ImageRenderer` draws `List` as a yellow
+no-entry placeholder and `glassEffect` as nothing at all.
+
 This closes the *absence* half of a design review: an agent can now name what is missing,
 what colour the window actually is, and whether an effect renders as intended. The first such
 review (2026-07-30) found seven gaps, recorded in `TODO.md § 0`, including the window being
