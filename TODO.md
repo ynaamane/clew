@@ -140,9 +140,17 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
-9. **Sidebar labels truncate at the mockup's own ideal width** — `Avec acti…`, `Non ancr…`,
-   `Non index…` at `ideal: 216` (`LibraryWindow.swift:35`), which is the mockup's `--sidebar` value.
-   The icon plus badge eats the room the labels need. Measure what they need rather than guessing.
+9. **Sidebar labels truncate — and the cause is NOT the label length.** Measured with `NSFont`
+   rather than guessed: the longest label, `Toutes les réunions`, is **117pt**, a row spends ~73pt on
+   inset + icon + gaps + badge, so it needs **~190pt** against a column the AX tree reports at
+   **196pt**. They fit. The real cause is that AppKit **persists the split position** — `defaults read
+   com.ownscribe.menubar` holds `"NSSplitView Subview Frames library…" = ("0,0,216,660", …)` and a
+   saved frame **overrides** `navigationSplitViewColumnWidth`, so raising `ideal` does nothing on any
+   install that has already opened the window. Fix is to clear or stop honouring the saved frame,
+   which is a real decision (it also discards the user's own resize). **Shortening the labels was
+   tried and reverted** (`d7bbf16`): it fixed nothing and turned `Non ancrées` into `Ancres`, i.e.
+   named the PRESENCE of anchors on the row that selects meetings whose claims LACK evidence. No test
+   asserted any sidebar label, so the inversion passed the whole suite; two guards added.
 10. **The CLI-missing banner is unreadable** — a 200-character message inside the 216pt sidebar
     `ZStack` wraps to ~20 lines and overlaps the sidebar items. Visible whenever the CLI is absent.
 11. **The inspector shows a bare `—` under every key point** where the mockup has a timestamp chip.
