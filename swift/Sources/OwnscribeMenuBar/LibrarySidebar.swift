@@ -40,6 +40,7 @@ public struct LibrarySidebarItem: Identifiable, Hashable {
     public let title: String
     public let filter: LibraryFilter
     public let count: Int?
+    public let hasUnknowns: Bool
     public let children: [LibrarySidebarItem]
 
     public var speakerName: String? {
@@ -59,16 +60,19 @@ public struct LibrarySidebar {
         for meetings: [MeetingSummary],
         enrolledSpeakers: [String]
     ) -> [LibrarySidebarSection] {
+        let allHaveActionData = meetings.allSatisfy { $0.actionItemCount != nil }
+        let allHaveAnchoringData = meetings.allSatisfy { $0.unanchoredClaimCount != nil }
+
         let library = [
-            item("all", "Toutes les réunions", .all, LibraryFilter.all.apply(to: meetings).count),
-            item("actions", "Avec actions", .withActions, LibraryFilter.withActions.apply(to: meetings).count),
-            item("unanchored", "Non ancrées", .unanchored, LibraryFilter.unanchored.apply(to: meetings).count),
-            item("notIndexed", "Non indexées", .notIndexed, LibraryFilter.notIndexed.apply(to: meetings).count),
+            item("all", "Toutes les réunions", .all, LibraryFilter.all.apply(to: meetings).count, false),
+            item("actions", "Avec actions", .withActions, LibraryFilter.withActions.apply(to: meetings).count, !allHaveActionData),
+            item("unanchored", "Non ancrées", .unanchored, LibraryFilter.unanchored.apply(to: meetings).count, !allHaveAnchoringData),
+            item("notIndexed", "Non indexées", .notIndexed, LibraryFilter.notIndexed.apply(to: meetings).count, false),
         ]
 
         let people = enrolledSpeakers.map { name in
-            item("speaker-\(name)", name, .speaker(name), nil)
-        } + [item("enroll", "Enrôler…", .enroll, nil)]
+            item("speaker-\(name)", name, .speaker(name), nil, false)
+        } + [item("enroll", "Enrôler…", .enroll, nil, false)]
 
         return [
             LibrarySidebarSection(id: "library", title: "Bibliothèque", items: library),
@@ -76,7 +80,7 @@ public struct LibrarySidebar {
         ]
     }
 
-    private static func item(_ id: String, _ title: String, _ filter: LibraryFilter, _ count: Int?) -> LibrarySidebarItem {
-        LibrarySidebarItem(id: id, title: title, filter: filter, count: count, children: [])
+    private static func item(_ id: String, _ title: String, _ filter: LibraryFilter, _ count: Int?, _ hasUnknowns: Bool) -> LibrarySidebarItem {
+        LibrarySidebarItem(id: id, title: title, filter: filter, count: count, hasUnknowns: hasUnknowns, children: [])
     }
 }

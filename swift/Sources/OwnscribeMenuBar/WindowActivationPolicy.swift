@@ -1,30 +1,34 @@
 import AppKit
 
 @MainActor
-public struct WindowActivationPolicy {
-    private static var openWindows = 0
+public final class WindowActivationPolicy {
+    private var openWindows = 0
+    private let applyPolicy: (NSApplication.ActivationPolicy) -> Void
 
-    public static var desiredPolicy: NSApplication.ActivationPolicy {
+    public static let shared = WindowActivationPolicy()
+
+    public init(applyPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = { policy in
+        guard NSApplication.shared.activationPolicy() != policy else { return }
+        NSApplication.shared.setActivationPolicy(policy)
+    }) {
+        self.applyPolicy = applyPolicy
+    }
+
+    public var desiredPolicy: NSApplication.ActivationPolicy {
         openWindows > 0 ? .regular : .accessory
     }
 
-    public static func windowDidOpen() {
+    public func windowDidOpen() {
         openWindows += 1
         apply()
     }
 
-    public static func windowDidClose() {
+    public func windowDidClose() {
         openWindows = max(0, openWindows - 1)
         apply()
     }
 
-    static func resetForTesting() {
-        openWindows = 0
-    }
-
-    private static func apply() {
-        let policy = desiredPolicy
-        guard NSApplication.shared.activationPolicy() != policy else { return }
-        NSApplication.shared.setActivationPolicy(policy)
+    private func apply() {
+        applyPolicy(desiredPolicy)
     }
 }

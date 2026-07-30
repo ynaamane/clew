@@ -3,47 +3,43 @@ import XCTest
 
 @MainActor
 final class WindowActivationPolicyTests: XCTestCase {
-    override func setUp() {
-        WindowActivationPolicy.resetForTesting()
-    }
-
-    override func tearDown() {
-        WindowActivationPolicy.resetForTesting()
-    }
-
     func testOpeningAWindowLeavesAccessoryModeSoItCanTakeFocus() {
-        WindowActivationPolicy.windowDidOpen()
+        let policy = WindowActivationPolicy(applyPolicy: { _ in })
+        policy.windowDidOpen()
 
         XCTAssertEqual(
-            WindowActivationPolicy.desiredPolicy, .regular,
+            policy.desiredPolicy, .regular,
             "An LSUIElement app stays .accessory, where a window cannot take keyboard focus properly; opening one must switch to .regular")
     }
 
     func testClosingTheLastWindowReturnsToAccessory() {
-        WindowActivationPolicy.windowDidOpen()
-        WindowActivationPolicy.windowDidClose()
+        let policy = WindowActivationPolicy(applyPolicy: { _ in })
+        policy.windowDidOpen()
+        policy.windowDidClose()
 
         XCTAssertEqual(
-            WindowActivationPolicy.desiredPolicy, .accessory,
+            policy.desiredPolicy, .accessory,
             "With no window left the app must go back to being a menu bar extra with no Dock icon")
     }
 
     func testClosingOneOfSeveralWindowsStaysRegular() {
-        WindowActivationPolicy.windowDidOpen()
-        WindowActivationPolicy.windowDidOpen()
+        let policy = WindowActivationPolicy(applyPolicy: { _ in })
+        policy.windowDidOpen()
+        policy.windowDidOpen()
 
-        WindowActivationPolicy.windowDidClose()
+        policy.windowDidClose()
 
-        XCTAssertEqual(WindowActivationPolicy.desiredPolicy, .regular)
+        XCTAssertEqual(policy.desiredPolicy, .regular)
     }
 
     func testCloseWithoutOpenNeverDrivesTheCountNegative() {
-        WindowActivationPolicy.windowDidClose()
-        WindowActivationPolicy.windowDidClose()
-        WindowActivationPolicy.windowDidOpen()
+        let policy = WindowActivationPolicy(applyPolicy: { _ in })
+        policy.windowDidClose()
+        policy.windowDidClose()
+        policy.windowDidOpen()
 
         XCTAssertEqual(
-            WindowActivationPolicy.desiredPolicy, .regular,
+            policy.desiredPolicy, .regular,
             "A stray close must not leave the counter negative, or a later open would fail to switch to .regular")
     }
 }

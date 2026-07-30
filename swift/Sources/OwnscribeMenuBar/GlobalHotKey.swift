@@ -93,16 +93,4 @@ public final class GlobalHotKeyRegistration {
 
         return registerStatus == noErr
     }
-
-    public func unregister() {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
-        }
-        if let eventHandler {
-            RemoveEventHandler(eventHandler)
-            self.eventHandler = nil
-        }
-        onPress = nil
-    }
 }
