@@ -48,16 +48,27 @@ public struct MeetingSummary: Identifiable, Hashable {
 
     private static func isLLMRefusal(_ slug: String) -> Bool {
         let lower = slug.lowercased()
-        let refusalPatterns = [
-            "sorry",
-            "please",
-            "provide",
-            "transcript",
-            "need",
-            "cannot",
-            "could-you",
+
+        let startRefusals = [
+            "sorry-but",
+            "sorry-i",
+            "i-cannot",
+            "i-need",
+            "i-am-sorry",
         ]
-        return refusalPatterns.contains { lower.contains($0) }
+
+        if startRefusals.contains(where: { lower.hasPrefix($0) }) {
+            return true
+        }
+
+        let midRefusals = [
+            "please-provide",
+            "could-you",
+            "transcript-of-the",
+            "more-information",
+        ]
+
+        return midRefusals.contains { lower.contains($0) } && slug.split(separator: "-").count >= 6
     }
 
     public var displayDate: String {
