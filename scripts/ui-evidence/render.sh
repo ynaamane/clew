@@ -31,6 +31,9 @@ swift build > /dev/null 2>&1
 
 BUILD_DIR="$(swift build --show-bin-path)"
 
+# Collect all OwnscribeCapture object files
+CAPTURE_OBJS=("$BUILD_DIR"/OwnscribeCapture.build/*.o)
+
 # Now compile MenuBar sources + renderer with access to the OwnscribeCapture module
 swiftc -O \
   -target arm64-apple-macos26.0 \
@@ -40,12 +43,12 @@ swiftc -O \
   -module-name RenderOffscreen \
   Sources/OwnscribeMenuBar/*.swift \
   "$HERE/render-offscreen.swift" \
+  "${CAPTURE_OBJS[@]}" \
   -o "$HERE/render-offscreen" \
   -framework CoreAudio \
   -framework AudioToolbox \
   -framework AppKit \
-  -framework SwiftUI \
-  -Xlinker "$BUILD_DIR"/OwnscribeCapture.build/*.o 2>&1 | head -50
+  -framework SwiftUI 2>&1 | head -50
 
 if [[ ! -x "$HERE/render-offscreen" ]]; then
   printf 'Compilation failed — no binary produced.\n' >&2

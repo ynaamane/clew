@@ -63,7 +63,7 @@ struct NoOpMuteDevice: AudioMuteDevice {
 }
 
 var standardError = FileHandle.standardError
-@retroactive extension FileHandle: TextOutputStream {
+extension FileHandle: TextOutputStream {
     public func write(_ string: String) {
         let data = Data(string.utf8)
         self.write(data)
