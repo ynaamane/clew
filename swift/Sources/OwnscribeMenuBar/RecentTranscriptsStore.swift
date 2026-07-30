@@ -28,10 +28,25 @@ public struct MeetingSummary: Identifiable, Hashable {
         let slug = parts.count >= 3 ? String(parts[2]) : (parts.count == 1 ? String(parts[0]) : "")
 
         guard !slug.isEmpty, !Self.isLLMRefusal(slug) else {
-            return displayTime
+            return firstTranscriptLine() ?? displayTime
         }
 
         return slug.replacingOccurrences(of: "-", with: " ").capitalizedFirstLetter
+    }
+
+    private func firstTranscriptLine() -> String? {
+        let transcriptURL = directory.appendingPathComponent("transcript.md")
+        guard let doc = try? TranscriptDocument(contentsOf: transcriptURL),
+              let first = doc.utterances.first(where: { !$0.isBackchannel }) else {
+            return nil
+        }
+
+        let maxLength = 60
+        let trimmed = first.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= maxLength {
+            return trimmed
+        }
+        return String(trimmed.prefix(maxLength)).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     private var displayTime: String {

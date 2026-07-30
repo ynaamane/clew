@@ -16,10 +16,10 @@ final class MeetingDisplayTests: XCTestCase {
         XCTAssertEqual(shown, "Project technical review key points")
     }
 
-    func testTitleShowsTimeWhenThereIsNoSlug() {
+    func testTitleShowsTimeWhenThereIsNoSlugAndNoTranscript() {
         let shown = meeting("2026-07-29_1537").displayTitle
 
-        XCTAssertTrue(shown.contains("15:37"), "Should show time for slugless directory, got \(shown)")
+        XCTAssertTrue(shown.contains("15:37"), "Should show time when no slug and no transcript, got \(shown)")
         XCTAssertFalse(shown.contains("Sans titre"), "Must not fabricate 'Sans titre', got \(shown)")
     }
 
