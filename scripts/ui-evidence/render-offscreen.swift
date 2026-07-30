@@ -57,51 +57,54 @@ func renderLibraryWindow(dark: Bool, outputPath: String, meetingsDir: URL) -> (s
 // No-op mute device for isolation
 struct NoOpMuteDevice: AudioMuteDevice {
     func readInputMute() -> Bool? { nil }
-    func writeInputMute(_ muted: Bool) -> Bool { false }
-}
-
-@MainActor
-func main() {
-    guard CommandLine.arguments.count == 3 else {
-        print("Usage: swift render-offscreen.swift <output-dir> <meetings-home-dir>")
-        exit(1)
-    }
-
-    let outputDir = CommandLine.arguments[1]
-    let meetingsHome = URL(fileURLWithPath: CommandLine.arguments[2])
-
-    // Create output dir
-    try? FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
-
-    NSApplication.shared.setActivationPolicy(.prohibited)  // Never appear in Dock/on screen
-
-    let lightPath = "\(outputDir)/library-light.png"
-    let darkPath = "\(outputDir)/library-dark.png"
-
-    let lightResult = renderLibraryWindow(dark: false, outputPath: lightPath, meetingsDir: meetingsHome)
-    let darkResult = renderLibraryWindow(dark: true, outputPath: darkPath, meetingsDir: meetingsHome)
-
-    if lightResult.success {
-        print("LIGHT: \(lightResult.message)")
-    } else {
-        print("LIGHT_FAILED: \(lightResult.message)", to: &standardError)
-    }
-
-    if darkResult.success {
-        print("DARK: \(darkResult.message)")
-    } else {
-        print("DARK_FAILED: \(darkResult.message)", to: &standardError)
-    }
-
-    exit((lightResult.success && darkResult.success) ? 0 : 2)
+    func setInputMute(_ muted: Bool) -> Bool { false }
+    func isBluetooth() -> Bool { false }
+    func nominalSampleRate() -> Double? { nil }
 }
 
 var standardError = FileHandle.standardError
-extension FileHandle: TextOutputStream {
+@retroactive extension FileHandle: TextOutputStream {
     public func write(_ string: String) {
         let data = Data(string.utf8)
         self.write(data)
     }
 }
 
-main()
+@main
+@MainActor
+struct RenderOffscreenMain {
+    static func main() {
+        guard CommandLine.arguments.count == 3 else {
+            print("Usage: render-offscreen <output-dir> <meetings-home-dir>")
+            exit(1)
+        }
+
+        let outputDir = CommandLine.arguments[1]
+        let meetingsHome = URL(fileURLWithPath: CommandLine.arguments[2])
+
+        // Create output dir
+        try? FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
+
+        NSApplication.shared.setActivationPolicy(.prohibited)  // Never appear in Dock/on screen
+
+        let lightPath = "\(outputDir)/library-light.png"
+        let darkPath = "\(outputDir)/library-dark.png"
+
+        let lightResult = renderLibraryWindow(dark: false, outputPath: lightPath, meetingsDir: meetingsHome)
+        let darkResult = renderLibraryWindow(dark: true, outputPath: darkPath, meetingsDir: meetingsHome)
+
+        if lightResult.success {
+            print("LIGHT: \(lightResult.message)")
+        } else {
+            print("LIGHT_FAILED: \(lightResult.message)", to: &standardError)
+        }
+
+        if darkResult.success {
+            print("DARK: \(darkResult.message)")
+        } else {
+            print("DARK_FAILED: \(darkResult.message)", to: &standardError)
+        }
+
+        exit((lightResult.success && darkResult.success) ? 0 : 2)
+    }
+}
