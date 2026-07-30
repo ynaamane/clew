@@ -24,92 +24,12 @@ public struct MeetingSummary: Identifiable, Hashable {
     }
 
     public var displayTitle: String {
-        let parts = directory.lastPathComponent.split(separator: "_", maxSplits: 2, omittingEmptySubsequences: false)
-        let slug = parts.count >= 3 ? String(parts[2]) : (parts.count == 1 ? String(parts[0]) : "")
-
-        guard !slug.isEmpty, !Self.isLLMRefusal(slug) else {
-            return firstTranscriptLine() ?? displayTime
-        }
-
-        return slug.replacingOccurrences(of: "-", with: " ").capitalizedFirstLetter
-    }
-
-    private func firstTranscriptLine() -> String? {
-        let transcriptURL = directory.appendingPathComponent("transcript.md")
-        guard let doc = try? TranscriptDocument(contentsOf: transcriptURL),
-              let first = doc.utterances.first(where: { !$0.isBackchannel }) else {
-            return nil
-        }
-
-        let maxLength = 60
-        let trimmed = first.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.count <= maxLength {
-            return trimmed
-        }
-        return String(trimmed.prefix(maxLength)).trimmingCharacters(in: .whitespaces) + "…"
-    }
-
-    private var displayTime: String {
-        let parts = directory.lastPathComponent.split(separator: "_")
-        guard parts.count >= 2 else { return "" }
-
-        let timeComponent = String(parts[1])
-        guard timeComponent.count == 4 else { return "" }
-
-        let hour = String(timeComponent.prefix(2))
-        let minute = String(timeComponent.suffix(2))
-        return "\(hour):\(minute)"
-    }
-
-    private static func isLLMRefusal(_ slug: String) -> Bool {
-        let lower = slug.lowercased()
-
-        let firstPersonStarts = [
-            "i-m-",
-            "i-cannot-",
-            "i-need-",
-            "i-don-t-",
-            "i-apologize-",
-            "sorry-but-",
-            "sorry-i-",
-            "i-am-sorry-",
-        ]
-
-        if firstPersonStarts.contains(where: { lower.hasPrefix($0) }) {
-            return true
-        }
-
-        let unambiguousRefusals = [
-            "please-provide",
-            "could-you",
-            "transcript-of-the",
-            "more-information",
-        ]
-
-        return unambiguousRefusals.contains { lower.contains($0) }
+        MeetingRowTitle.resolve(directory: directory).title
     }
 
     public var displayDate: String {
-        let name = directory.lastPathComponent
-        let parts = name.split(separator: "_")
-        guard parts.count >= 2, let day = Self.folderDateFormatter.date(from: "\(parts[0])_\(parts[1])") else {
-            return ""
-        }
-        return Self.readableDateFormatter.string(from: day)
+        MeetingRowTitle.resolve(directory: directory).subtitle
     }
-
-    private static let folderDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd_HHmm"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    private static let readableDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "d MMM · HH:mm"
-        return f
-    }()
 }
 
 extension String {
