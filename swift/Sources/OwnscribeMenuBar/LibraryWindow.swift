@@ -57,8 +57,8 @@ struct LibraryWindow: View {
         .navigationTitle("Réunions")
         .toolbar {
             ToolbarItemGroup {
-                if case .processing(let step, _) = appState.phase {
-                    Label(step, systemImage: "circle.lefthalf.filled")
+                if case .processing(let step, _, let detail) = appState.phase {
+                    Label(detail ?? step, systemImage: "circle.lefthalf.filled")
                         .foregroundStyle(.orange)
                 }
                 if case .failed = appState.phase {
