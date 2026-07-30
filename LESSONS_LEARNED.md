@@ -113,6 +113,76 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
   deliberate `Int?` three commits after it was chosen. **When a type encodes "unknown", grep every
   render site for `??` before believing the guarantee holds.**
 
+## The environment a Finder-launched app inherits is NOT your shell's (2026-07-30)
+
+- **The app recorded a meeting it could never transcribe.** An 8-second real test capture
+  succeeded — 48 kHz, `mic.wav` written, peak −17.8 dBFS — and the pipeline then exited 1 six
+  seconds later with `Pipeline process exited with status 1`, reason logged as `<private>` by our
+  own privacy redaction. Reproduced with `env -i PATH=/usr/bin:/bin`:
+  **`Error: ffmpeg is not installed`**. `ffmpeg` lives in `/opt/homebrew/bin`; an app launched from
+  Finder inherits launchd's minimal PATH, and `PipelineRunner` passed it straight to the child. So
+  transcription worked from a terminal and could NEVER work from the app — and the failure lands
+  *after* the audio exists, which is the expensive moment. Fixed by resolving the child's PATH
+  (`ChildProcessPath`), not by special-casing ffmpeg: any external tool the CLI shells out to has
+  the same exposure.
+- **My first test for it proved nothing, and that is the transferable part.** It asserted against
+  `ProcessInfo`'s PATH, which in a terminal-run suite ALREADY contains Homebrew — so resolved and
+  inherited were identical and removing the fix left the test green. The bug and the bad test had
+  the *same* root cause: both assumed the developer's environment. The fix was a seam that injects
+  launchd's PATH and a test that drives the real child process and asserts on what the CHILD
+  observed. Same mutation then killed 2.
+- **Generalisation:** when a defect is "works for me, not in production", the test must reproduce
+  the *environment*, not just the code path. Ask what production does NOT have that you do.
+
+## An agent could not see the window, and it was our bug, not a permission (2026-07-30)
+
+- **Asked what needed granting, the measured answer was nothing.** `AXIsProcessTrusted()` → `true`
+  and `screencapture -l` already produced a PNG. Both permissions were long since granted. The
+  blocker was the app: there was **no programmatic route to its own window**. SwiftUI's
+  `MenuBarExtra(.window)` popover exposes NOTHING to accessibility (`AXPress` on the menu bar item
+  returns success; the subtree is just `AXMenuBarItem "Audio Waveform"`), the bundle declared no
+  URL scheme, the app menu offered only About/Settings/Services, and `⌘0` was declared on a
+  `Button` **inside** the popover so it could not fire while the popover was closed.
+- **So every design review in this project's history required a human with a mouse** — which is
+  also a real keyboard-accessibility defect, not merely an agent inconvenience. Three attempts
+  failed before the right fix: `AXPress` on the popover (opens, exposes nothing), `⌘0` via
+  `CGEvent.postToPid` (the shortcut does not exist outside the popover), and an invented selector
+  (`NSApp.sendAction` on a name nothing implements — would have failed silently). All three were
+  thrown away rather than dressed up.
+- **The fix that worked:** `ownscribe://library` handled at AppKit level via `NSAppleEventManager`,
+  plus an app-menu command carrying `⌘0` at app scope. Deliberately NOT `.onOpenURL` on a scene: a
+  handler attached to the popover would only exist while the popover is rendered — the identical
+  trap one layer up. And the `CFBundleURLTypes` declaration is the load-bearing half, because macOS
+  routes a scheme only to a bundle that claims it: the Swift code alone is inert. A test asserts the
+  shipped plist declares what the router handles, and `build-app.sh` prints the scheme so a missing
+  declaration cannot ship quietly.
+- **Expo was evaluated and rejected** for this: it targets iOS/Android/web and explicitly not
+  desktop, so it offers nothing to a native SwiftUI Mac app. What the research DID establish is the
+  convention four independent tools converged on (Screenslop, Loupe, Peekaboo, JourneyTester):
+  **never review Apple UI from source — capture screenshot + accessibility tree + logs, critique,
+  fix, re-capture.** `scripts/ui-evidence/` implements the capture half with Apple APIs only.
+
+## A test can pass while the function it names is fully sabotaged (2026-07-30)
+
+- **21 green tests, zero coverage.** Four badge tests computed `count` and `hasUnknowns`
+  themselves and passed them to `badgeText`, never calling `LibrarySidebar.sections` — the
+  function production calls. Proof: sabotaging `sections()` to always claim the data was complete
+  left **all 21 tests green**. Rewritten to go through `sections()`, the same sabotage kills 2.
+  The tell is a test that constructs production's INPUT rather than production's input source.
+- **A new function with tests and no callers is not a fix.** `UnanchoredClaimBadge` shipped with 4
+  green tests, **zero production callers**, and logic returning nil for BOTH `nil` and `0` — it
+  relocated the very merge it was written to remove. Same shape as `silence_timeout`, which was
+  plumbed through four layers into a callback nobody assigned. Trace a feature to its consumer.
+- **Five agents were killed mid-task by an API stream stall, and every one of the six lots needed
+  correction before it could be trusted** — including two that reported "complete, tests green".
+  Their work survived only because it was on disk. Two consequences: tell builders to commit
+  partial progress every 15–20 minutes, and never merge a dead agent's output on the strength of
+  its own report.
+- **A reviewer's worktree can predate the code under review.** The design lot branched before five
+  merges, so its "334 tests green" measured a tree without them, and its `MeetingRow` edit
+  reintroduced the `nil`/`0` collapse fixed hours earlier. Check the branch point before believing
+  any count from a worktree.
+
 ## The suite can DEFEND a bug (2026-07-29)
 
 - **`SpeakerAvatarStyleTests.speakerEndingIn0GetsBlue` asserted the collision as intended

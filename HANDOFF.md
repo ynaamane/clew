@@ -1,31 +1,67 @@
 # HANDOFF — reprendre le projet dans ce repo
 
-Contexte de construction (2026-07-23 → 07-27), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
+Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
 
 ## Où en est le projet
 
-**629 Python + 343 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
-6 tests matériel à la demande. Rien n'est retenu en local — mais vérifie avec
-`git log --oneline origin/main..main | wc -l` au lieu de croire cette phrase : elle a affirmé
-« tout est poussé » pendant que 14 commits attendaient, et la première correction a épinglé un hash
-périmé au commit suivant. Un fait mutable appartient à une commande, pas à une phrase.
+**636 Python + 413 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
+les tests matériel à la demande. Mesuré le **2026-07-30** sur l'arbre fusionné après huit lots —
+mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier quatre fois, et
+« écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
+« tout est poussé » : lance `git log --oneline origin/main..main | wc -l`. Un fait mutable
+appartient à une commande, pas à une phrase.
 
-Mesuré le 2026-07-29 sur l'arbre fusionné, pas recopié. Le compte Swift demande d'additionner
-**deux** frameworks : `swift test` imprime un total XCTest (`Executed 324 tests, with 4 tests
-skipped and 0 failures` → 320 qui passent) *et* une ligne séparée `Test run with 23 tests` pour
-swift-testing. Un relecteur indépendant a trouvé ce chiffre périmé à **322** dans quatre endroits
-de ces deux fichiers alors que je venais de mesurer 340 : écrire le nombre est une étape séparée de
-le mesurer, et elle se rate seule. Tout « 276 Swift » plus haut dans l'historique de ce fichier ne comptait que XCTest.
-Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
-détruit le chiffre sur le disque. Et lis le code de sortie depuis une **variable capturée**, jamais
-au bout d'un pipeline : au premier passage de ce lot le harness a annoncé « exit 0 » alors que
-`CHECK=1` était dans la sortie, et l'échec était réel — la porte anti-péremption de BUG5
-(`bin/ownscribe-audio` plus vieux qu'un source Swift). `bash swift/build.sh` la referme.
+Le compte Swift demande d'additionner **deux** frameworks : `swift test` imprime un total XCTest
+(`Executed 371 tests, with 4 tests skipped` → 367 qui passent) *et* une ligne séparée
+`Test run with 46 tests` pour swift-testing. Tout « 276 Swift » ou « 343 Swift » plus haut dans
+l'historique ne comptait que XCTest. Ne lis jamais le total via `tail` : ça tronque le résumé, et
+dans une redirection `> fichier` ça détruit le chiffre sur le disque. Un échec peut n'apparaître
+que dans **un** des deux formats : le 2026-07-30 une vraie mutation tuée affichait
+« Executed 0 tests » côté XCTest pendant que le rouge était côté swift-testing.
 
-Après ce run complet : `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0**. Aucun
-test n'a touché le micro.
+Lis le code de sortie depuis une **variable capturée**, jamais au bout d'un pipeline : deux fois
+le harness a annoncé « exit 0 » alors qu'une porte avait ÉCHOUÉ dans la sortie — la porte
+anti-péremption de BUG5 (`bin/ownscribe-audio` plus vieux qu'un source Swift), que
+`bash swift/build.sh` referme. Elle saute à **chaque** édition Swift, y compris menu-bar.
 
-**⚠️ LE DESIGN N'EST PAS BON. Rejeté par l'utilisateur le 2026-07-28 après avoir ouvert l'app.**
+Après le run complet : `/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0**.
+Aucun test n'a touché le micro.
+
+## Ce qui a changé le 2026-07-30 (à lire en premier)
+
+**Je peux enfin voir la fenêtre moi-même, sans action de l'utilisateur.** C'était le blocage
+central de tout ce projet : chaque revue de design dépendait d'un humain avec une souris.
+
+- **Les permissions étaient DÉJÀ accordées** — `AXIsProcessTrusted()` → `true`,
+  `screencapture -l` produit un PNG. Rien à activer. Le blocage était **l'app**.
+- **Il n'existait aucune route pour ouvrir la fenêtre sans clic.** Le popover
+  `MenuBarExtra(.window)` de SwiftUI n'expose RIEN à l'accessibilité (`AXPress` réussit, le
+  sous-arbre est juste `AXMenuBarItem "Audio Waveform"`), aucun `CFBundleURLTypes`, et `⌘0`
+  était déclaré sur un `Button` **à l'intérieur** du popover donc inerte quand il est fermé.
+  C'était aussi un vrai trou d'accessibilité clavier.
+- **Corrigé** (`7a3abf2`) : `open "ownscribe://library"` ouvre la fenêtre, plus une commande de
+  menu portant `⌘0` au niveau app. Le handler est installé via `NSAppleEventManager` au niveau
+  AppKit — un `.onOpenURL` sur une scène n'existerait que pendant que la scène est rendue, soit
+  le même piège une couche plus haut.
+- **L'outil de revue** : `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev` →
+  screenshot **ciblé sur la fenêtre** + arbre d'accessibilité. Il résout le window-id **par
+  propriétaire** puis le passe à `screencapture -l`, donc il ne peut structurellement pas
+  capturer l'écran (la seule tentative plein écran avait attrapé du contenu confidentiel).
+  Note : `screencapture -l` échoue si la fenêtre n'est pas au premier plan — activer l'app d'abord.
+
+**⚠️ LE DESIGN N'EST PAS BON — et il a MAINTENANT été regardé (2026-07-30).** Sept écarts
+observés, dans `TODO.md § 0`. Le premier explique probablement tout : **la fenêtre est CLAIRE
+alors que la maquette validée est SOMBRE**. Le second : le `glassEffect()` est posé sur la
+`List` au lieu du conteneur, donc la sidebar se découpe en capsule ovale qui déborde.
+Rien ne sert de mesurer l'espacement avant de régler le thème.
+
+Ce que l'arbre AX ne donne pas encore : **0 ligne** sur notre fenêtre, parce que SwiftUI
+n'expose presque rien sans `.accessibilityIdentifier`. Les sept constats sont donc visuels,
+pas chiffrés.
+
+## L'historique de la faute sur le design (gardé, parce qu'elle a été commise deux fois)
+
+**Rejeté par l'utilisateur le 2026-07-28 après avoir ouvert l'app.**
 
 Et la manière dont cette ligne est arrivée là compte plus que le design lui-même, parce que
 **la même faute a été commise deux fois dans la même journée**.

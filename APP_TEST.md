@@ -155,14 +155,36 @@ mistake ship twice on 2026-07-28: the design was declared "matching the
 validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
-**No test in this repo can verify appearance.** As of 2026-07-29 that is 343
-green Swift tests (320 XCTest + 23 swift-testing) and 629 Python; three
-`glassEffect` call sites; the right symbols in the binary. Every one of those
-proves the code RUNS. They are all silent on whether the window reads well. The
-count going up changes nothing about that — which is the whole point of this
-section, so do not read a bigger number as progress on this pass.
+**No test in this repo can verify appearance.** Re-measure before quoting, but as of
+2026-07-30 that is **413 green Swift** (367 XCTest + 46 swift-testing) and **636 Python**;
+`glassEffect` call sites; the right symbols in the binary. Every one of those proves the
+code RUNS. They are all silent on whether the window reads well. The count going up changes
+nothing about that — which is the whole point of this section, so do not read a bigger
+number as progress on this pass.
 
-Open `⌘0` from the menu bar and judge against `design/direction-b-glass.png`
+**UPDATE 2026-07-30 — an agent CAN now look, which changes the workflow but not the rule.**
+
+```bash
+open "ownscribe://library"                                   # opens the window, no mouse needed
+bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev # window-scoped PNG + AX tree
+```
+
+The capture resolves the window id **by owner** and passes it to `screencapture -l`, so it
+cannot capture the screen. Activate the app first — `screencapture -l` fails on a window that
+is not frontmost ("could not create image from window").
+
+This closes the *absence* half of a design review: an agent can now name what is missing,
+what colour the window actually is, and whether an effect renders as intended. The first such
+review (2026-07-30) found seven gaps, recorded in `TODO.md § 0`, including the window being
+LIGHT where the mockup is DARK — something no test would ever have said.
+
+What it does NOT close: **whether it reads well is still yours.** An image tells an agent
+what is on screen, not whether the result is good. And the AX tree currently returns **0
+lines** for our window, because SwiftUI exposes almost nothing without
+`.accessibilityIdentifier` — so findings are visual, not measured, until identifiers are
+added to the interactive views.
+
+Open `⌘0` (or the URL above) and judge against `design/direction-b-glass.png`
 and `design/mockup.html`:
 
 - [ ] Does the whole window read as one deliberate design, or as default

@@ -255,8 +255,15 @@ separate steps.
 
 What the app adds over the CLI:
 
-- **A three-column library window** (⌘0): filters, meeting list, transcript with an inspector.
-  Meetings come from `~/ownscribe/` (or `[output] dir` in the config).
+- **A three-column library window**: filters, meeting list, transcript with an inspector.
+  Meetings come from `~/ownscribe/` (or `[output] dir` in the config). Open it three ways — ⌘0,
+  the app menu, or `open "ownscribe://library"`. The URL route exists because until 2026-07-30 the
+  window could only be reached by clicking the menu bar extra, and SwiftUI's `MenuBarExtra(.window)`
+  popover exposes nothing to accessibility: a keyboard-only user was locked out, and so was any
+  automated visual check.
+- **A search field** over the library, composing with the sidebar filter (typing inside "Avec
+  actions" narrows that filter rather than replacing it), and a two-line summary excerpt per row so
+  the list says what a meeting was about.
 - **A record button and a global hotkey** (⌘⇧M) for the system-wide mic mute. The mute is verified
   by reading the device back, and the menu bar shows three distinct states — not muted, muted and
   verified, muted but **unverified** in amber — because a hardware-refused mute once displayed as

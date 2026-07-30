@@ -1,5 +1,42 @@
 # Build notes — meeting-scribe (forked from paberr/ownscribe)
 
+## 2026-07-30 — the day the design finally got LOOKED at, and two production-only bugs surfaced
+
+Eight lots landed. What matters is not the count but that **five builders were killed mid-task by an
+API stream stall and every one of the six lots needed correction before it could be trusted** —
+including two that reported "complete, tests green". Their work survived only because it was on disk.
+
+Two bugs that only existed in production, both invisible to the suite by construction:
+
+- **`ffmpeg is not installed`.** Found by a real 8-second test recording: audio captured fine (48 kHz,
+  peak −17.8 dBFS), then the pipeline exited 1. A Finder-launched app inherits launchd's minimal PATH,
+  without `/opt/homebrew/bin`. Transcription worked from a terminal and could never work from the app,
+  failing *after* the audio existed. My first test for it was green with the fix removed, because it
+  read `ProcessInfo`'s PATH — which in a terminal-run suite already has Homebrew. The bug and the bad
+  test shared a root cause: both assumed the developer's environment.
+- **The window could not be opened without a mouse.** Asked what permission to grant, the measured
+  answer was none — `AXIsProcessTrusted()` was already true. The blocker was ours: SwiftUI's
+  `MenuBarExtra(.window)` popover exposes nothing to accessibility, no URL scheme was declared, and
+  `⌘0` lived on a Button *inside* the popover. A keyboard-only user was as locked out as an agent.
+  Fixed with `ownscribe://library` at AppKit level plus an app-scope menu command.
+
+That unblocked the **first real visual review in this project's history**. Seven gaps, top of
+`TODO.md`. The first one — the window renders LIGHT while the validated mockup is DARK — is the kind
+of thing 413 green tests will never say, and it plausibly explains the user's two earlier rejections
+on its own. The second: `.glassEffect()` sits on the `List`, so the sidebar clips into an oval that
+overflows its column.
+
+Method, for reuse: `open "ownscribe://library"` →
+`bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev` → Read the PNG. Window-scoped by
+owner, so it cannot capture the screen. Researched first: Expo was rejected (iOS/Android/web, not
+desktop), but four independent tools — Screenslop, Loupe, Peekaboo, JourneyTester — had converged on
+the same rule: *never review Apple UI from source; capture screenshot + AX tree + logs, critique,
+fix, re-capture.*
+
+Still unmeasured: the AX tree returns **0 lines** for our window because SwiftUI exposes almost
+nothing without `.accessibilityIdentifier`. Adding those is the next design step, before any more
+layout iteration.
+
 ## Origin
 
 Forked via `git clone https://github.com/paberr/ownscribe` (MIT), commit `afc1d18` (`Fix audio dir cleanup and rename edge cases`) on 2026-07-23. `.git` history kept. Working branch: `meeting-scribe-build`. No upstream remote push planned — this is a personal fork, diverging intentionally (privacy defaults inverted, new enrollment/naming layer, Canary A/B).

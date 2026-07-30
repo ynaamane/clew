@@ -52,29 +52,59 @@ sources, which turns part of the question into presence/absence facts that need 
 - **Badges were bare coloured text, not the mockup's filled pills.** Built as one component with
   amber / green / grey variants at the mockup's padding, radius and weight.
 
-**What this does NOT settle.** These three were absent; the other five checks in `APP_TEST.md`
-§ Design pass are judgement — whether the whole reads as one design, transcript legibility, the type
-scale, whether the glass sits behind the content or fights it, density versus the mockup. **No
-automated proof can close those, and nobody has looked at the rendered window.** Open ⌘0 and name
-which of them fails, and how.
+**What this does NOT settle.** These three were absent. The window HAS now been looked at (§ 0
+above), which turned the judgement checks in `APP_TEST.md` § Design pass from unanswerable into
+partly answered — but **whether it reads well is still yours**, and an image cannot supply that.
 
-Do not accept "the tests are green" as progress here, from me or anyone: 396 green tests say nothing
+Do not accept "the tests are green" as progress here, from me or anyone: 413 green tests say nothing
 about how the window reads. That substitution has already been made twice.
 
-### 2. Blocking, needs one real recording
+### 2. THE NEXT DESIGN BATCH, in this order (all code, no waiting on anyone)
 
-Three things can only be closed by recording a short real meeting through the app:
+Derived from the § 0 review. Ordered by how much each one explains:
 
-- **`resume` now writes `anchors.json` + `envelope.json`** (fixed today, mutation-verified). No
-  meeting on disk has usable anchors — one of six has the file and its `anchors` object is `{}` — so
-  the evidence chips have never rendered against real data in the app.
-- **The clickable chip → scroll**: logic is verified against the real 27-July meeting via
-  `/tmp/ms-fixture`, but the window reads `~/ownscribe`, so a fresh recording is the only way to see
-  it.
-- **The mic permission prompt** (fixed today): the app never asked for microphone access, so the
-  record button could not work on a machine where the answer was still `.notDetermined`. It now
-  requests, and names which permission is missing with the exact Settings path. Whether the prompt
-  actually appears for you is a one-launch check.
+1. **Make the window honour Dark mode** — the single largest gap. Take the values from the mockup's
+   `@media (prefers-color-scheme: dark)` block. Everything else is cosmetic until this is right.
+2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` and onto a container so it backs
+   the rail instead of clipping into an oval that overflows its column.
+3. **Move the search field into the list-column header**, where the mockup puts it, so the title and
+   the search box stop living in different columns.
+4. **Render speaker avatars** — `SpeakerAvatarStyle` exists, is well tested, and nothing calls it at
+   a visible site.
+5. **Draw the envelope strip** in the detail header — `EnvelopeStrip` exists; one meeting on disk has
+   `envelope.json`, so there is real data to render.
+6. **Give summary-less meetings a title** instead of five rows reading "Sans titre".
+7. **Add `.accessibilityIdentifier` to the interactive views.** This is what turns the next review
+   from visual into MEASURED: the AX tree returns 0 lines today, so spacing and type scale cannot be
+   checked numerically. Do this before iterating further on layout.
+
+After each: `open "ownscribe://library"` then
+`bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev` and LOOK at the PNG. Activate the app
+first — `screencapture -l` fails on a window that is not frontmost.
+
+### 3. Needs one real recording — one item left, and it is smaller than it was
+
+- **The clickable evidence chip → scroll**: logic is verified against the real 27-July meeting via
+  `/tmp/ms-fixture`, but the window reads `~/ownscribe` and no meeting there has usable anchors, so
+  a fresh recording is the only way to see it in the app.
+
+Closed on 2026-07-30 by a real 8-second test recording, which is the argument for making them:
+
+- ~~**Whether the mic permission prompt appears.**~~ The record button worked; audio captured at
+  48 kHz, `mic.wav` written, peak −17.8 dBFS (room tone, no speech — the user did not speak, as
+  intended).
+- ~~**Whether `resume` writes `anchors.json` + `envelope.json`.**~~ It does. All four artifacts
+  produced.
+- **But the recording exposed a worse bug, now fixed** (`a455646`): the pipeline exited 1 six
+  seconds after stop with `ffmpeg is not installed`. A Finder-launched app inherits launchd's
+  minimal PATH, which has no `/opt/homebrew/bin`, so **transcription worked from a terminal and
+  could never work from the app** — and the failure lands after the audio exists. Fixed by
+  resolving the child's PATH rather than special-casing ffmpeg.
+- **Cosmetic fallout, NOT fixed:** an empty transcript makes the summariser reply "I'm sorry, but I
+  need the transcript…", and that reply becomes the directory name — one meeting on disk is now
+  called `2026-07-30_1141_sure-please-provide-the-transcript-of-the-meeting`, and it shows in the
+  window as a meeting title. Guard the slug against a refusal/apology, or fall back to the
+  timestamp when the transcript is empty.
 
 ### 3. The 2026-07-29 sweep list — 6 of 8 CLOSED on 2026-07-30, 2 still open
 
@@ -148,16 +178,17 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 636 Python + 396 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 636 Python + 413 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
-Measured 2026-07-30 on the merged tree after six lots landed: `bash scripts/check.sh` → **`CHECK=0`
-read from a captured variable, 0 failed gates**, including the release build. Swift → **350 XCTest
-(`Executed 354 tests, with 4 tests skipped and 0 failures`) + 46 swift-testing = 396**. Python
+Measured 2026-07-30 on the merged tree after eight lots landed: `bash scripts/check.sh` → **`CHECK=0`
+read from a captured variable, 0 failed gates**, including the release build. Swift → **367 XCTest
+(`Executed 371 tests, with 4 tests skipped and 0 failures`) + 46 swift-testing = 413**. Python
 **inside check.sh** → **636 passed, 7 deselected** (`check.sh:23` runs `-m "not hardware"`).
 `/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run, so nothing
 reached the real input device.
 
-The BUG5 staleness gate fired on the first attempt — correctly, since five lots edited Swift sources —
+The BUG5 staleness gate fired on the first attempt of two separate runs — correctly, since the lots
+edited Swift sources —
 and the harness reported **exit code 0 while a gate had FAILED inside**, which is exactly why the exit
 status must be captured into a variable and read from the log rather than taken from the runner. Fixed
 with `bash swift/build.sh`.

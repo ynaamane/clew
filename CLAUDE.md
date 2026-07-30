@@ -25,6 +25,21 @@ Default on every non-trivial change — not a per-task ask:
   for the REQUIRED one: a passing suite, N `glassEffect` call sites and a symbol in the binary prove
   the code RUNS, never how it READS. Write "unverified" when nobody has looked. Correcting a
   claim-without-evidence with a different claim-without-evidence is not a correction.
+- **You CAN look at the window yourself — do it before claiming anything about appearance.**
+  `open "ownscribe://library"` then `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`,
+  then Read the PNG. The capture resolves the window id by OWNER and passes it to `screencapture -l`,
+  so it cannot capture the screen; activate the app first, because `screencapture -l` fails on a
+  window that is not frontmost. The first real review (2026-07-30) found seven gaps a green suite
+  never would, starting with the window being LIGHT where the validated mockup is DARK. Two limits:
+  the AX tree returns 0 lines until `.accessibilityIdentifier` is added, so findings are visual and
+  not measured; and whether it READS well is still the user's call.
+- **The environment a Finder-launched app inherits is not your shell's.** The app recorded a real
+  meeting it could never transcribe: `ffmpeg` lives in `/opt/homebrew/bin`, launchd's PATH does not
+  include it, and `PipelineRunner` passed that PATH through — so transcription worked from a terminal
+  and failed from the app, *after* the audio existed. Worse, the first test for the fix asserted
+  against `ProcessInfo`'s PATH, which in a terminal-run suite already has Homebrew, so it stayed
+  green with the fix removed. When a defect is "works for me, not in production", the test must
+  reproduce the ENVIRONMENT, not just the code path.
 - **Run the full suite as the LAST action before reporting done.** Both a builder and I reported green on a red tree in the same batch: the checks were real, they just predated the final edit. And when auditing a working tree someone else is editing, check the file mtime before believing a failure — five phantom reds in one evening, including a whole-module collection error that self-resolved in 35 seconds.
 - **Trace a feature to its consumer.** `silence_timeout` was correctly plumbed through four layers into a callback nobody had assigned, so the app never auto-stopped while every individual link looked right.
 - **No new code comments** (self-documenting names; the "why" goes in commits / NOTES.md / LESSONS_LEARNED.md). Commit to `main`; no hardcoded secrets/tokens.
