@@ -7,13 +7,15 @@ struct LibraryWindow: View {
     @State private var selectedFilter: LibraryFilter = .all
     @State private var selectedMeeting: MeetingSummary?
     @State private var showBannerDetail = false
+    @State private var searchQuery: String = ""
 
     private var sections: [LibrarySidebarSection] {
         LibrarySidebar.sections(for: appState.recentMeetings, enrolledSpeakers: appState.enrolledSpeakers)
     }
 
     private var shownMeetings: [MeetingSummary] {
-        selectedFilter.apply(to: appState.recentMeetings)
+        let filtered = selectedFilter.apply(to: appState.recentMeetings)
+        return MeetingSearchFilter.filter(filtered, query: searchQuery)
     }
 
     var body: some View {
@@ -45,7 +47,7 @@ struct LibraryWindow: View {
                 }
             }
         } content: {
-            MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting)
+            MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting, searchQuery: $searchQuery)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 292, max: 380)
         } detail: {
             if let meeting = selectedMeeting {
@@ -100,6 +102,7 @@ struct LibraryWindow: View {
 private struct MeetingListColumn: View {
     let meetings: [MeetingSummary]
     @Binding var selection: MeetingSummary?
+    @Binding var searchQuery: String
 
     var body: some View {
         List(meetings, selection: $selection) { meeting in
@@ -107,6 +110,7 @@ private struct MeetingListColumn: View {
                 .tag(meeting)
         }
         .navigationTitle("Réunions")
+        .searchable(text: $searchQuery, placement: .toolbar, prompt: "Rechercher dans les réunions…")
     }
 }
 
