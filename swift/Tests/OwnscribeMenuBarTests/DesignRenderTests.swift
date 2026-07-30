@@ -36,21 +36,21 @@ final class DesignRenderTests: XCTestCase {
 
     private func copyMeetingsToTemp() -> URL {
         let liveDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("ownscribe")
-        let tempDir = URL(fileURLWithPath: "/tmp/ownscribe-render-isolated")
+        let tempHome = URL(fileURLWithPath: "/tmp/ownscribe-render-isolated")
+        let tempMeetingsDir = tempHome.appendingPathComponent("ownscribe")
 
-        try? FileManager.default.removeItem(at: tempDir)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: tempHome)
+        try? FileManager.default.createDirectory(at: tempMeetingsDir, withIntermediateDirectories: true)
 
         if FileManager.default.fileExists(atPath: liveDir.path) {
             let contents = try? FileManager.default.contentsOfDirectory(at: liveDir, includingPropertiesForKeys: nil)
-            for (index, dir) in (contents ?? []).prefix(3).enumerated() {
-                guard index < 3 else { break }
-                let dest = tempDir.appendingPathComponent(dir.lastPathComponent)
+            for dir in contents ?? [] {
+                let dest = tempMeetingsDir.appendingPathComponent(dir.lastPathComponent)
                 try? FileManager.default.copyItem(at: dir, to: dest)
             }
         }
 
-        return tempDir
+        return tempHome
     }
 
     private func renderLibraryWindow(dark: Bool, outputPath: String, meetingsDir: URL) -> (success: Bool, message: String) {
@@ -59,7 +59,7 @@ final class DesignRenderTests: XCTestCase {
 
         appState.systemCaptureFactory = nil
         appState.micCaptureFactory = { nil }
-        appState.pipelineRunnerFactory = { nil }
+        appState.pipelineRunnerFactory = { StubPipelineRunner() }
 
         let view = LibraryWindow().environment(appState).frame(width: 1190, height: 660)
 
@@ -190,4 +190,8 @@ private struct NoOpMuteDevice: AudioMuteDevice {
     func setInputMute(_ muted: Bool) -> Bool { false }
     func isBluetooth() -> Bool { false }
     func nominalSampleRate() -> Double? { nil }
+}
+
+private struct StubPipelineRunner: PipelineRunning {
+    func run(arguments: [String], onEvent: @escaping @Sendable (ProgressEvent) -> Void) async throws {}
 }
