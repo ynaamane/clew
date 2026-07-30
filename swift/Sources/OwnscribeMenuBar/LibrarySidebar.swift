@@ -64,10 +64,10 @@ public struct LibrarySidebar {
         let allHaveAnchoringData = meetings.allSatisfy { $0.unanchoredClaimCount != nil }
 
         let library = [
-            item("all", "Toutes les réunions", .all, LibraryFilter.all.apply(to: meetings).count, false),
-            item("actions", "Avec actions", .withActions, LibraryFilter.withActions.apply(to: meetings).count, !allHaveActionData),
-            item("unanchored", "Non ancrées", .unanchored, LibraryFilter.unanchored.apply(to: meetings).count, !allHaveAnchoringData),
-            item("notIndexed", "Non indexées", .notIndexed, LibraryFilter.notIndexed.apply(to: meetings).count, false),
+            item("all", "Toutes", .all, LibraryFilter.all.apply(to: meetings).count, false),
+            item("actions", "Actions", .withActions, LibraryFilter.withActions.apply(to: meetings).count, !allHaveActionData),
+            item("unanchored", "Ancres", .unanchored, LibraryFilter.unanchored.apply(to: meetings).count, !allHaveAnchoringData),
+            item("notIndexed", "Sans index", .notIndexed, LibraryFilter.notIndexed.apply(to: meetings).count, false),
         ]
 
         let people = enrolledSpeakers.map { name in

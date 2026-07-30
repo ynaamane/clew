@@ -33,7 +33,7 @@ struct LibraryWindow: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 280)
                 .glassEffect()
 
                 if let banner = currentBanner, showBannerDetail || banner.severity == .warning {
