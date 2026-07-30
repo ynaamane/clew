@@ -55,7 +55,29 @@ final class LibrarySidebarTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(
             widest, 20,
-            "The sidebar renders at 196pt (measured from the AX tree, not the 216pt ideal), and a row spends ~73pt on inset, icon, gaps and badge. \"Toutes les réunions\" is the longest at 19 characters / 117pt and fits. Truncation observed in a render is more likely the persisted NSSplitView frame in user defaults overriding navigationSplitViewColumnWidth than a label that is too long — shortening labels was tried first and fixed nothing.")
+            "\"Toutes les réunions\" is the longest at 19 characters / 117pt, and a row spends ~73pt on inset, icon, gaps and badge, so it needs ~190pt of the 216pt column. The labels fit. Truncation in a render means the column width is not reaching the column — see testColumnWidthIsAppliedToTheSidebarContainerNotTheListInsideIt — not that a label is too long. Shortening them was tried, fixed nothing, and inverted one label's meaning.")
+    }
+
+    func testColumnWidthIsAppliedToTheSidebarContainerNotTheListInsideIt() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/OwnscribeMenuBar/LibraryWindow.swift"),
+            encoding: .utf8)
+
+        let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let widthLine = try XCTUnwrap(
+            lines.firstIndex { $0.contains("navigationSplitViewColumnWidth(min: 180") },
+            "the sidebar column width declaration moved or was removed")
+        let closingBrace = try XCTUnwrap(
+            lines.firstIndex { $0.hasPrefix("            }") },
+            "could not locate the end of the sidebar ZStack")
+
+        XCTAssertGreaterThan(
+            widthLine, closingBrace,
+            "navigationSplitViewColumnWidth sits INSIDE the sidebar's ZStack, on the List, so the width never reaches the column that NavigationSplitView measures — the sidebar collapses and every label truncates. It must be applied to the ZStack itself, after its closing brace. Isolated by rendering the same List with and without the ZStack: labels are whole without it and clipped with it, at the identical 216pt ideal.")
     }
 
     func testAllMeetingsCountsEverything() {

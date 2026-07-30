@@ -33,7 +33,6 @@ struct LibraryWindow: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 280)
                 .glassEffect()
 
                 if let banner = currentBanner, showBannerDetail || banner.severity == .warning {
@@ -47,6 +46,7 @@ struct LibraryWindow: View {
                     }
                 }
             }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
         } content: {
             MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting, searchQuery: $searchQuery)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 292, max: 380)
