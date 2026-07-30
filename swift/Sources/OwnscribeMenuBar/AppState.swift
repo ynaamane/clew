@@ -23,12 +23,6 @@ public final class AppState {
             }
         }
     }
-
-    #if DEBUG
-    internal func setPhaseForTesting(_ newPhase: Phase) {
-        phase = newPhase
-    }
-    #endif
     public private(set) var recentMeetings: [MeetingSummary] = []
     public private(set) var isMuted: Bool = false
     public private(set) var muteWarning: String?
