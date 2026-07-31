@@ -34,15 +34,18 @@ public final class AppState {
     private let recordingController = RecordingController()
     private let muteDevice: AudioMuteDevice
     private let hotKeyRegistration = GlobalHotKeyRegistration()
+    private let terminationSignals: TerminationSignalHandlers
     private let homeDir: URL
     private var pipelineRunner: PipelineRunning?
 
     public init(
         homeDir: URL = FileManager.default.homeDirectoryForCurrentUser,
-        muteDevice: AudioMuteDevice = DefaultInputAudioMuteDevice()
+        muteDevice: AudioMuteDevice = DefaultInputAudioMuteDevice(),
+        terminationSignals: TerminationSignalHandlers? = nil
     ) {
         self.homeDir = homeDir
         self.muteDevice = muteDevice
+        self.terminationSignals = terminationSignals ?? TerminationSignalHandlers()
         self.pipelineRunner = PipelineRunner.makeDefault(homeDir: homeDir)
         seedMuteStateFromHardware()
         applyConfigSettings()
@@ -103,18 +106,9 @@ public final class AppState {
         }
     }
 
-    private var terminationSignalSources: [DispatchSourceSignal] = []
-
     private func registerTerminationSignalHandlers() {
-        for sig in [SIGTERM, SIGINT] {
-            signal(sig, SIG_IGN)
-            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-            source.setEventHandler { [weak self] in
-                self?.restoreUnmutedOnQuit()
-                NSApplication.shared.terminate(nil)
-            }
-            source.resume()
-            terminationSignalSources.append(source)
+        terminationSignals.register { [weak self] in
+            self?.restoreUnmutedOnQuit()
         }
     }
 
