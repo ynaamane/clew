@@ -64,6 +64,12 @@ struct LibraryWindow: View {
                 if case .processing(let step, _, let detail) = appState.phase {
                     Label(detail ?? step, systemImage: "circle.lefthalf.filled")
                         .foregroundStyle(.orange)
+                    Button {
+                        appState.cancelProcessing()
+                    } label: {
+                        Label("Annuler", systemImage: "stop.circle")
+                    }
+                    .accessibilityIdentifier("library.cancelButton")
                 }
                 if case .failed = appState.phase {
                     Button {

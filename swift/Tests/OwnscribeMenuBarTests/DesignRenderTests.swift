@@ -204,4 +204,5 @@ private struct NoOpMuteDevice: AudioMuteDevice {
 
 private struct StubPipelineRunner: PipelineRunning {
     func run(arguments: [String], onEvent: @escaping @Sendable (ProgressEvent) -> Void) async throws {}
+    func cancel() {}
 }

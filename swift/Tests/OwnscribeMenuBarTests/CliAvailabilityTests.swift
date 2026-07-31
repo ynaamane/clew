@@ -147,6 +147,7 @@ final class CliAvailabilityTests: XCTestCase {
 
 private final class FakePipelineRunner: PipelineRunning {
     func run(arguments: [String], onEvent: @escaping @Sendable (ProgressEvent) -> Void) async throws {}
+    func cancel() {}
 }
 
 private final class StubSystemCapture: SystemAudioCapturing {

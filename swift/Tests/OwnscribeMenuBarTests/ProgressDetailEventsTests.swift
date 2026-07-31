@@ -98,6 +98,8 @@ private final class EventEmittingRunner: PipelineRunning {
         }
         afterStreaming()
     }
+
+    func cancel() {}
 }
 
 private final class StubProgressSystemCapture: SystemAudioCapturing {

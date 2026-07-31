@@ -279,6 +279,32 @@ public final class AppState {
         }
     }
 
+    public enum CancelDecision: Equatable {
+        case cancel
+        case refuse
+    }
+
+    static func cancelDecision(for currentPhase: Phase) -> CancelDecision {
+        guard case .processing = currentPhase else { return .refuse }
+        return .cancel
+    }
+
+    static func phaseAfterCancellation() -> Phase {
+        .idle
+    }
+
+    public var isProcessing: Bool {
+        Self.cancelDecision(for: phase) == .cancel
+    }
+
+    public func cancelProcessing() {
+        guard Self.cancelDecision(for: phase) == .cancel else { return }
+
+        AppLogger.pipeline.info("Cancellation requested by the user")
+        pipelineRunner?.cancel()
+        phase = Self.phaseAfterCancellation()
+    }
+
     static func terminalPhase(after currentPhase: Phase, completedWith directory: URL) -> Phase? {
         guard case .processing = currentPhase else { return nil }
         return .done(directory: directory)

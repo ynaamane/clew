@@ -7,6 +7,8 @@ public protocol PipelineRunning {
         arguments: [String],
         onEvent: @escaping @Sendable (ProgressEvent) -> Void
     ) async throws
+
+    func cancel()
 }
 
 @MainActor
