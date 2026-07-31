@@ -155,8 +155,8 @@ mistake ship twice on 2026-07-28: the design was declared "matching the
 validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
-**No test in this repo can verify appearance.** Re-measure before quoting, but as of
-2026-07-30 that is **413 green Swift** (367 XCTest + 46 swift-testing) and **636 Python**;
+**No test in this repo can verify appearance.** Re-measure before quoting, but as of the end of
+2026-07-30 that is **431 green Swift** (385 XCTest + 46 swift-testing) and **637 Python**;
 `glassEffect` call sites; the right symbols in the binary. Every one of those proves the
 code RUNS. They are all silent on whether the window reads well. The count going up changes
 nothing about that — which is the whole point of this section, so do not read a bigger

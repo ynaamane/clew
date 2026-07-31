@@ -1,8 +1,34 @@
 # TODO — meeting-scribe
 
-## WHAT IS ACTUALLY LEFT (2026-07-30)
+## WHAT IS ACTUALLY LEFT (2026-07-30, end of day)
 
 Everything below this block is history and traps worth keeping. This is the open list.
+
+### THE SHORT ANSWER — 7 items, in order
+
+**Needs YOU (1)** — nobody else can do these:
+1. **Does the window read well?** `bash swift/build-app.sh && open "ownscribe://library"`. The
+   installed bundle is older than the code, and the glass is invisible to every harness here
+   (§ 2.2). Never let an agent run `build-app.sh`: it `rm -rf`s the bundle and its TCC grants.
+
+**Code, no waiting (5)**:
+2. **Search field** — decide, don't patch (§ 2.3). `.searchable` always lands in the toolbar on
+   macOS; matching the mockup costs `⌘F`.
+3. **CLI-missing banner unreadable** — 200 chars in a 216pt rail, wraps to ~20 lines (§ 2.10).
+4. **Inspector shows a column of bare `—`** where the mockup has timestamp chips (§ 2.11).
+5. **`PipelineRunner.cancel()` has no caller** — a multi-minute transcription cannot be stopped
+   (§ 4).
+6. **`registerTerminationSignalHandlers` has zero tests** — the SIGTERM path to
+   `restoreUnmutedOnQuit`, the highest-blast function in the app (§ 4). Do this one carefully.
+7. **`.accessibilityIdentifier` on interactive views** — turns reviews from visual into addressable
+   (§ 2.8). Lowest priority; the AX tree already gives 55 lines with pixel frames.
+
+**Needs one real recording (1)**: the clickable evidence chip → scroll (§ 3).
+
+Closed today: the review harness that works with a locked screen, the ffmpeg PATH bug, the
+keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the
+refusal-as-title guard, default meeting selection, and four of the seven design "findings" that
+turned out to be wrong.
 
 ### 0. THE DESIGN HAS NOW BEEN LOOKED AT (2026-07-30) — and it is wrong, as you said
 
@@ -26,12 +52,14 @@ needs a mechanism before it becomes a defect.
    was dark when it was mocked up. **Do not hardcode dark** — that would override an explicit
    user setting and break the light half of an auto-switching Mac.
 2. **The sidebar is visually deformed** — a huge rounded white blob, an oval wider than its
-   column, bleeding past the bottom edge, with the selected row rendered as a black pill. Cause:
-   `.glassEffect()` sits on the `List` (`LibraryWindow.swift:36`) rather than on a container, so
-   it clips itself into a capsule instead of backing the rail. **CONFIRMED by independent
-   reproduction** off-screen from the real view tree, so this one has a mechanism, not just a
-   sighting. The mockup treats the rail as a container background
+   column, bleeding past the bottom edge. Cause: `.glassEffect()` sat on the `List` rather than on
+   a container, so it clipped itself into a capsule instead of backing the rail. **CONFIRMED by
+   independent reproduction** off-screen from the real view tree, so this one has a mechanism, not
+   just a sighting. The mockup treats the rail as a container background
    (`mockup.html:95` — `background: var(--bg-sidebar); backdrop-filter: blur(28px)`).
+   **Code fixed** (`f0e7bd6`) and **still visually UNVERIFIED, by construction** — see § 2.2.
+   *The black selected pill in the same screenshot is an off-screen artifact, NOT a defect:*
+   sampled at **(0,0,0)** in a render against **(225,226,226)** in the real window.
 3. ~~**Speaker avatars are absent.**~~ **WRONG — they are built and wired.**
    `MeetingDetailView.swift:129` renders an 18pt coloured disc via `SpeakerAvatarStyle`
    (`:141-150`).
@@ -42,7 +70,7 @@ needs a mechanism before it becomes a defect.
    `LibraryEmptyState` and everything in `MeetingDetailView` is off-screen. Avatars and the
    envelope strip were reported "absent" because **nothing in that column was rendering at all.**
    So selecting a meeting by default is not cosmetic: it reveals two features already paid for.
-6. **Five rows read "Sans titre"** — slugless directories throw away the time they do have.
+6. ~~**Five rows read "Sans titre"**~~ — **DONE** (`d018728`), see § 2.7.
 7. **The search field renders top-right, marooned from "Réunions"** — the observation stands; the
    first diagnosis and the first FIX proposal were both wrong. It is not in the detail column: it
    is attached to the list column (`LibraryWindow.swift:113`) with `placement: .toolbar`, which
@@ -69,11 +97,9 @@ elements can be read but not reliably ADDRESSED.
 `ioreg -n Root -d1 -r | grep CGSSessionScreenIsLocked` → `Yes`; the library window then reports
 `onscreen=no`, `AXWindow` count drops to **0**, and `screencapture -l` refuses it. So the
 documented review loop silently requires the user to be sitting at an unlocked machine, which is
-the opposite of reviewing autonomously. Replacement being built (task #34): an off-screen
-`NSWindow` + `NSHostingView` + `cacheDisplay`, which works locked, renders both appearances via
-`NSAppearance`, and reproduces the finding-2 deformation. **Dead end, measured, do not retry:**
-SwiftUI's `ImageRenderer` draws `List` as a yellow no-entry placeholder and `glassEffect` as
-nothing — useless for precisely the two things under review.
+the opposite of reviewing autonomously. **Replacement DONE and in use** — `§ 2.0`. **Dead end,
+measured, do not retry:** SwiftUI's `ImageRenderer` draws `List` as a yellow no-entry placeholder
+and `glassEffect` as nothing — useless for precisely the two things under review.
 
 ### 1. The design — three ABSENT elements built on 2026-07-30; the rest still needs your eyes
 
@@ -113,9 +139,16 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    `^[1 voix](inflect: true)` verbatim, guarded by a test that asserted the broken string.
 1. ~~**Make the window honour Dark mode.**~~ **STRUCK — it already does; the machine is in light
    mode.** See § 0 finding 1. Hardcoding dark would override the user's auto-switch setting.
-2. **Fix the sidebar glass** — move `.glassEffect()` off the `List` (`LibraryWindow.swift:36`) onto a
-   container so it backs the rail instead of clipping into an oval that overflows its column. Now
-   the top item, and the only § 0 finding independently reproduced.
+2. **Fix the sidebar glass** — **CODE DONE, VISUALLY UNVERIFIED, and that gap is permanent here.**
+   `.glassEffect()` now sits on the container with `.scrollContentBackground(.hidden)` so the List's
+   own opaque background cannot cover it (`f0e7bd6`; the first attempt painted
+   `.background(.background)` **over** the glass, which would have shipped LESS glass than before
+   while reading as a correct fix — and no render could have caught it). The transcript keeps its
+   opaque background per the HIG content-layer rule. Both invariants are now guarded mechanically by
+   `GlassPlacementTests` (mutations: opaque-background-over-glass → 2 red, glass-on-transcript → 1 red).
+   **What no harness here can answer is whether the rail READS as glass** — glass, no-glass and
+   glass-on-container render byte-identically off-screen. That needs your eye on an unlocked screen,
+   after `bash swift/build-app.sh`.
 3. **Decide what to do about the search field** — NOT a placement argument. `.toolbar`, `.sidebar`
    and `.automatic` all render byte-identically on macOS `NavigationSplitView` (measured, § 0
    finding 7): the field always goes to the toolbar. Matching the mockup's in-header search box
@@ -130,13 +163,20 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    a **still-valid selection stays UNCHANGED** so a finishing pipeline cannot yank you out of what you
    are reading. Confirmed by render: the right column now shows résumé, points clés, actions, pistes,
    the waveform AND the speaker avatars, i.e. items 4 and 5 above were revealed rather than built.
-7. **Give slugless meetings a real title** — IN PROGRESS, one round still open. `ba9e6ad` added the
-   fallback chain slug → first non-backchannel transcript line (60 chars) → time, and the LLM-refusal
-   guard is DONE and verified (1/14 false positives, 0/7 false negatives; `3dffe4d`). What remains is
-   legibility: five of nine rows have no transcript, so they render as a bare clock time with the
-   **same time repeated in the subtitle directly beneath** (`15:37` over `29 Jul · 15:37`). "Sans
-   titre" was uninformative; this is redundant, which scans worse. Fix in flight: when the title IS
-   the time, the subtitle shows the date alone.
+7. ~~**Give slugless meetings a real title.**~~ **DONE** — three rounds, and each round's first
+   version was wrong in a way its own tests could not see.
+   `MeetingRowTitle.resolve(directory:) -> Pair` returns title AND subtitle from ONE decision, so
+   they cannot drift: slug → first non-backchannel transcript line (60 chars) → bare time, and when
+   the title IS the time the subtitle drops it (`29 Jul`, not `29 Jul · 15:37`). Confirmed by reading
+   a render, not by the test count.
+   **The LLM-refusal guard is the part worth remembering** (`3dffe4d`): its first version
+   substring-matched bare common words (`transcript`, `need`, `please`) and **erased 7 of 10
+   legitimate titles** — in an app whose meetings are often *about* transcripts. Both its tests
+   passed, because both only asserted the true-positive direction. Now **1/14 false positives, 0/7
+   false negatives**, anchored and multi-word, with the keep-list in the tests. Known limit:
+   `i-m-feeling-lucky-launch` is still erased by the `i-m-` prefix. The real defence is the **Python**
+   guard on the RAW title before `_slugify` — slugification destroys the punctuation a structural test
+   needs, so the Swift side is a narrow backstop for the one bad directory already on disk.
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
@@ -190,13 +230,14 @@ Closed on 2026-07-30 by a real 8-second test recording, which is the argument fo
   minimal PATH, which has no `/opt/homebrew/bin`, so **transcription worked from a terminal and
   could never work from the app** — and the failure lands after the audio exists. Fixed by
   resolving the child's PATH rather than special-casing ffmpeg.
-- **Cosmetic fallout, NOT fixed:** an empty transcript makes the summariser reply "I'm sorry, but I
-  need the transcript…", and that reply becomes the directory name — one meeting on disk is now
-  called `2026-07-30_1141_sure-please-provide-the-transcript-of-the-meeting`, and it shows in the
-  window as a meeting title. Guard the slug against a refusal/apology, or fall back to the
-  timestamp when the transcript is empty.
+- ~~**Cosmetic fallout:**~~ **FIXED** (`3dffe4d`, `d018728`). An empty transcript made the summariser
+  reply "I'm sorry, but I need the transcript…" and that reply became the directory name —
+  `2026-07-30_1141_sure-please-provide-the-transcript-of-the-meeting` is still on disk and is
+  deliberately NOT renamed (real user data). The generator now guards the RAW title before
+  `_slugify`, and the window hides the refusal on the legacy directory. Details and the
+  false-positive trap: § 2.7.
 
-### 3. The 2026-07-29 sweep list — 6 of 8 CLOSED on 2026-07-30, 2 still open
+### 4. The 2026-07-29 sweep list — 6 of 8 CLOSED on 2026-07-30, 2 still open
 
 Fixed, each mutation-verified. Five builders were killed mid-task by an API stream stall; their work
 survived only because it was on disk, and **every one of the six lots needed correction before it
@@ -257,7 +298,7 @@ could be trusted**
   relocated the merge it was meant to remove. Same shape as `silence_timeout`. Trace a feature to its
   consumer.
 
-### 4. Deferred by earlier decision, unchanged
+### 5. Deferred by earlier decision, unchanged
 
 Per-speaker envelope lanes · live transcript preview while recording · live vumeters in the menu bar
 (`AudioLevels.computePeakLevel` already computes the value and only writes it to `stderr`) ·
@@ -268,14 +309,24 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 636 Python + 413 Swift green, all 10 gates green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 431 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
-Measured 2026-07-30 on the merged tree after eight lots landed: `bash scripts/check.sh` → **`CHECK=0`
-read from a captured variable, 0 failed gates**, including the release build. Swift → **367 XCTest
-(`Executed 371 tests, with 4 tests skipped and 0 failures`) + 46 swift-testing = 413**. Python
-**inside check.sh** → **636 passed, 7 deselected** (`check.sh:23` runs `-m "not hardware"`).
+Measured at the END of 2026-07-30, after the render harness and the day's fixes:
+`bash scripts/check.sh` → **`CHECK=0` read from a captured variable, 0 failed gates**, including the
+release build. Swift → **385 XCTest (`Executed 394 tests, with 9 tests skipped and 0 failures`) + 46
+swift-testing = 431**. Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**
+(`check.sh:23` runs `-m "not hardware"`).
 `/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run, so nothing
 reached the real input device.
+
+**Both totals move between runs for ENVIRONMENT reasons — check before calling it a regression.**
+The 9 Swift skips are the hardware-gated tests (`RealHardwareMuteTests`,
+`RecordingControllerMergeFailureTests`, `AnchorEvidenceRealMeetingTests`, `EnvelopeDocumentTests`)
+**plus** the new `DesignRenderTests`, deliberately behind `OWNSCRIBE_RENDER_UI=1` so the default
+suite does not pay for a render. And Python prints `638 passed` or `637 passed, 1 skipped` depending
+on whether `/tmp/ms-fixture` still exists: `tests/test_anchoring_context_contains_token.py:24` skips
+itself when a `/tmp` sweep has removed the real-meeting fixture. A Python count is meaningless
+without its invocation AND the state of `/tmp`.
 
 The BUG5 staleness gate fired on the first attempt of two separate runs — correctly, since the lots
 edited Swift sources —

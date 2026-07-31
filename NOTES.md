@@ -861,3 +861,68 @@ branched from the commit *before* all five deliveries: two production files abse
 missing file reads exactly like a test going red. Caught by comparing its `git log -1` to mine while
 it worked, not from anything it reported. It recovered by extracting a pristine tree with
 `git archive` when `git reset --hard` was correctly denied against the shared checkout.
+
+---
+
+## 2026-07-30, late — the day the design could finally be SEEN, and four "findings" died
+
+The morning's win was that an agent could look at the window at all. The afternoon's lesson was
+that looking is necessary and nowhere near sufficient.
+
+**The review loop was blocked within hours of being written.** `screencapture -l` cannot photograph
+a window on a locked screen: the window still exists, but it reports `onscreen=no`, its `AXWindow`
+count drops to 0, and the capture is refused. So the "autonomous" loop silently required a human
+sitting at an unlocked machine. Replacement: an off-screen `NSWindow` + `NSHostingView` +
+`cacheDisplay`, living in the TEST target so it can `@testable import OwnscribeMenuBar` — the same
+mechanism 59 other test files already use, and the answer to a blocker an agent spent two hours on
+by trying to compile 45 sources standalone. Capture `contentView.superview` (`NSThemeFrame`), or the
+titlebar and the entire search field are absent from the image.
+
+**Four of seven design findings did not survive re-checking, including priority 1.** "The window is
+LIGHT, the mockup is DARK" was a fact about the MACHINE — light mode, auto-switching on, and no
+`preferredColorScheme` anywhere in the app, so it was obeying correctly. Hardcoding dark would have
+overridden an explicit user setting. Two more (avatars, envelope strip) were built and wired but
+invisible because *nothing* in the detail column rendered: no meeting is selected by default. One
+finding explained two others. The only survivor was the one REPRODUCED rather than merely seen.
+A screenshot superimposes a system state and a code state and says nothing about which produced what.
+
+**The harness paid for itself on its first correct reading, and it was a bug no suite could catch.**
+The header printed `^[1 voix](inflect: true)` verbatim: SwiftUI resolves inflection markup only in a
+literal or `LocalizedStringKey`, never in a `String` handed to `Text(_:)`. A named test —
+`testTheCountKeepsItsInflectionMarkup` — **asserted the broken string**, reasoning that "SwiftUI does
+the pluralisation", so a correct fix turned it red. Second instance of a test encoding a bug as a
+requirement, after `speakerEndingIn0GetsBlue` asserted a colour collision. The tell both times: a
+rationale that explains why the wrong output is right.
+
+**Know a harness's blind spots as precisely as its powers, and PRINT them.** Off-screen,
+`glassEffect` on a List, on a container, and *no glass at all* produce **byte-identical** output
+(one md5 for all three); the selected row paints opaque black over its own icon, label and badge.
+Two consequences inside one hour: a "missing badge" was nearly filed as a production defect (it was
+present and obscured), and a glass fix added `.background(.background)` **over** the glass — shipping
+strictly less glass while reading as a correct fix, invisibly. The invariants are now guarded
+mechanically (`GlassPlacementTests`) precisely because the appearance cannot be.
+
+**A filter against bad content destroyed good content, and its tests agreed with it.** A guard meant
+to stop an LLM apology becoming a meeting title matched bare words (`transcript`, `need`, `please`)
+and erased **7 of 10** legitimate titles — in an app whose meetings are often about transcripts. Both
+its tests passed: both asserted only that refusals are caught. A filter needs tests in BOTH
+directions. What fixed it was structural rather than lexical — a refusal is a SENTENCE, a title is a
+PHRASE — and it has to run on the RAW title, since slugification destroys the punctuation the
+structural test depends on.
+
+**Three diagnoses for one truncation, and I authored the second wrong one.** The sidebar labels
+clipped. Blamed on label length (measured false: 117pt longest, 216pt column), then on AppKit's
+persisted split frame (real, but the renderer has no such default and clipped identically). The
+actual cause: `.navigationSplitViewColumnWidth` applied to the `List` *inside* the sidebar's
+`ZStack`, so `NavigationSplitView` measured a container carrying no width preference. What settled
+it was an A/B changing exactly ONE variable — same List, same `ideal: 216`, once bare and once
+wrapped. My first A/B varied two things and pointed at the banner, which is the exact mistake I had
+corrected in an agent an hour earlier. The shortening attempt also relabelled `Non ancrées` to
+`Ancres` — naming the PRESENCE of anchors on the row that selects claims LACKING evidence — and no
+test asserted any sidebar label, so the inversion passed the whole suite.
+
+**Explaining a red gate away is how BUG5 shipped.** The staleness gate fired and was dismissed as
+"scoped to the audio target per `Package.swift:19`". `check.sh:34` is
+`find swift/Sources -name '*.swift' -newer "$shipped"` — no target scoping at all, so any Swift edit
+fires it, by design. The over-broad scan is the point: one rebuild costs less than reasoning about
+which target holds which file and being wrong once. The hypothesis is testable in one command.

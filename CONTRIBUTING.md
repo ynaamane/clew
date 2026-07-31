@@ -41,6 +41,21 @@ Read its exit code from a **captured variable**, not off the end of a pipeline:
 `bash scripts/check.sh > log 2>&1; EXIT=$?` then grep the log. A trailing `grep` makes the shell
 report the grep's success, which has hidden a real failure here more than once.
 
+Both test totals move between runs for environment reasons, so check before calling it a regression:
+the Swift skips include the hardware-gated suites **and** `DesignRenderTests` (behind
+`OWNSCRIBE_RENDER_UI=1`), and Python prints `638 passed` or `637 passed, 1 skipped` depending on
+whether `/tmp/ms-fixture` survived the last `/tmp` sweep.
+
+**If your change touches the window, render it and look at it:**
+
+```bash
+bash scripts/ui-evidence/render.sh /tmp/ui-render   # off-screen, works with the screen locked
+```
+
+Then read the PNGs. A green suite is not a design check, and this repo has shipped that mistake
+twice. Read the harness's own CANNOT-VERIFY output too — it is blind to Liquid Glass and to the
+selected row, so never certify those on a render (`APP_TEST.md`).
+
 The individual suites:
 
 ```bash

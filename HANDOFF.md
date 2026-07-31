@@ -4,20 +4,30 @@ Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**636 Python + 413 Swift verts**, les 10 portes de `scripts/check.sh` au vert (`CHECK=0`), plus
-les tests matériel à la demande. Mesuré le **2026-07-30** sur l'arbre fusionné après huit lots —
-mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier quatre fois, et
-« écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
+**637 Python + 431 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
+0 porte en échec), plus les tests matériel à la demande. Mesuré le **2026-07-30 en fin de
+session** — mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier cinq fois,
+et « écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
 « tout est poussé » : lance `git log --oneline origin/main..main | wc -l`. Un fait mutable
 appartient à une commande, pas à une phrase.
 
 Le compte Swift demande d'additionner **deux** frameworks : `swift test` imprime un total XCTest
-(`Executed 371 tests, with 4 tests skipped` → 367 qui passent) *et* une ligne séparée
-`Test run with 46 tests` pour swift-testing. Tout « 276 Swift » ou « 343 Swift » plus haut dans
-l'historique ne comptait que XCTest. Ne lis jamais le total via `tail` : ça tronque le résumé, et
-dans une redirection `> fichier` ça détruit le chiffre sur le disque. Un échec peut n'apparaître
-que dans **un** des deux formats : le 2026-07-30 une vraie mutation tuée affichait
-« Executed 0 tests » côté XCTest pendant que le rouge était côté swift-testing.
+(`Executed 394 tests, with 9 tests skipped` → 385 qui passent) *et* une ligne séparée
+`Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift » ou « 413 Swift »
+plus haut dans l'historique ne comptait que XCTest, ou datait d'avant les derniers lots.
+Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
+détruit le chiffre sur le disque. Un échec peut n'apparaître que dans **un** des deux formats :
+le 2026-07-30 une vraie mutation tuée affichait « Executed 0 tests » côté XCTest pendant que le
+rouge était côté swift-testing.
+
+**Les deux totaux bougent d'un run à l'autre pour des raisons d'ENVIRONNEMENT, pas de code** —
+sachez-le avant de crier à la régression. Les 9 sauts Swift comprennent les tests matériel
+(`RealHardwareMuteTests`, `RecordingControllerMergeFailureTests`) **et** le nouveau
+`DesignRenderTests`, qui est volontairement derrière `OWNSCRIBE_RENDER_UI=1`. Et Python affiche
+`637 passed, 1 skipped` ou `638 passed` selon que `/tmp/ms-fixture` existe :
+`tests/test_anchoring_context_contains_token.py:24` se saute lui-même quand la fixture de la vraie
+réunion a été effacée par un nettoyage de `/tmp`. Un chiffre Python sans son invocation ET sans
+l'état de `/tmp` ne veut rien dire.
 
 Lis le code de sortie depuis une **variable capturée**, jamais au bout d'un pipeline : deux fois
 le harness a annoncé « exit 0 » alors qu'une porte avait ÉCHOUÉ dans la sortie — la porte
@@ -49,15 +59,45 @@ central de tout ce projet : chaque revue de design dépendait d'un humain avec u
   capturer l'écran (la seule tentative plein écran avait attrapé du contenu confidentiel).
   Note : `screencapture -l` échoue si la fenêtre n'est pas au premier plan — activer l'app d'abord.
 
-**⚠️ LE DESIGN N'EST PAS BON — et il a MAINTENANT été regardé (2026-07-30).** Sept écarts
-observés, dans `TODO.md § 0`. Le premier explique probablement tout : **la fenêtre est CLAIRE
-alors que la maquette validée est SOMBRE**. Le second : le `glassEffect()` est posé sur la
-`List` au lieu du conteneur, donc la sidebar se découpe en capsule ovale qui déborde.
-Rien ne sert de mesurer l'espacement avant de régler le thème.
+**⚠️ ET LA BOUCLE CI-DESSUS EXIGE UN ÉCRAN DÉVERROUILLÉ — elle a été bloquée le jour même.**
+`ioreg -n Root -d1 -r | grep CGSSessionScreenIsLocked` → `Yes` : la fenêtre existe mais se déclare
+`onscreen=no`, son compte `AXWindow` tombe à **0**, et `screencapture -l` la refuse. Une boucle
+« autonome » qui exige quelqu'un devant la machine ne l'est pas.
 
-Ce que l'arbre AX ne donne pas encore : **0 ligne** sur notre fenêtre, parce que SwiftUI
-n'expose presque rien sans `.accessibilityIdentifier`. Les sept constats sont donc visuels,
-pas chiffrés.
+**Le remplaçant fonctionne écran verrouillé** :
+
+```bash
+bash scripts/ui-evidence/render.sh /tmp/ui-render   # library-light.png + library-dark.png
+```
+
+Un `NSWindow` hors-écran + `NSHostingView` + `cacheDisplay`, dans la cible de TEST pour pouvoir
+faire `@testable import OwnscribeMenuBar` (la voie `swiftc` autonome bute sur un timeout du
+type-checker et pousse vers une réplique écrite à la main — exactement comme un harnais finit par
+valider un design que l'app n'a pas). Capture `contentView.superview` (**NSThemeFrame**), sinon la
+barre de titre et tout le champ de recherche sont absents de l'image.
+
+**Connais ses angles morts avant de lui faire confiance** — ils sont imprimés à chaque run et
+détaillés dans `APP_TEST.md` : `glassEffect` rend des octets **identiques** avec verre,
+sans verre et verre-sur-conteneur (un seul md5 pour les trois), et la ligne sélectionnée est
+peinte en noir opaque **par-dessus son icône, son libellé et son badge** — donc un badge présent
+dans l'app est absent du rendu. Ne certifie jamais le verre ni un matériau sur un rendu.
+Voie morte mesurée, ne pas réessayer : `ImageRenderer` dessine `List` en carré jaune d'interdiction.
+
+**⚠️ LE DESIGN N'EST TOUJOURS PAS VALIDÉ, mais la liste a beaucoup changé : QUATRE des sept
+écarts étaient FAUX.** Détail dans `TODO.md § 0`. Le premier, classé priorité 1 — « la fenêtre est
+claire, la maquette est sombre » — était un fait sur **la machine** : elle est en mode clair,
+l'app n'a aucun `preferredColorScheme`, donc elle obéissait correctement, et « corriger » aurait
+écrasé le réglage auto de l'utilisateur. Deux autres (avatars, bande d'enveloppe) étaient déjà
+codés et invisibles parce qu'**aucune réunion n'était sélectionnée** : rien ne rendait dans cette
+colonne. Le seul écart qui a survécu est celui qui a été **REPRODUIT**, pas seulement vu.
+
+**Regarder est nécessaire et ne suffit pas.** Une capture superpose un état système et un état de
+code, et ne dit pas lequel produit quoi. Avant de coder sur un constat visuel, nomme le mécanisme.
+
+Ce que l'arbre AX donne, contrairement à ce que ce fichier disait : **55 lignes**, avec le texte de
+chaque ligne et ses cadres en pixels (`@433,322 174x16`) — de quoi mesurer l'espacement. Ce qui
+manque, c'est `.accessibilityIdentifier` sur les vues *interactives*, donc on peut LIRE les
+éléments mais pas les ADRESSER de façon stable.
 
 ## L'historique de la faute sur le design (gardé, parce qu'elle a été commise deux fois)
 

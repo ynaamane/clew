@@ -286,6 +286,27 @@ Two caveats worth knowing before you build:
   cert** — a new cert is a new identity and every System Audio Recording / Microphone grant resets.
   See `BUILD.md`.
 
+### Looking at the window without a mouse
+
+Two paths, and the second is the one that keeps working:
+
+```bash
+open "ownscribe://library"                                    # then, app frontmost, screen unlocked:
+bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev  # window-scoped PNG + AX tree
+
+bash scripts/ui-evidence/render.sh /tmp/ui-render             # off-screen; works with the screen LOCKED
+```
+
+`capture.sh` resolves the window id **by owner** and passes it to `screencapture -l`, so it cannot
+capture the screen — but it fails on a locked screen and on a window that is not frontmost.
+`render.sh` hosts the real `LibraryWindow` in an off-screen `NSWindow` and reads its pixels, in both
+light and dark appearances.
+
+**Read its CANNOT-VERIFY output before trusting a render.** It answers layout, type scale, text and
+appearance; it is blind to Liquid Glass (glass, no-glass and glass-on-container render
+byte-identically) and to the selected row, which comes out opaque black over its own label and badge.
+Anything about materials still needs a human looking at a real screen. `APP_TEST.md` has the details.
+
 ## Configuration
 
 Config is stored at `~/.config/ownscribe/config.toml`. Run `ownscribe config` to create and edit it.
