@@ -33,6 +33,13 @@ print('swift-testing:', re.findall(r'Test run with (\d+) tests', log))
 "
 ```
 
+**A `grep` for the bundle total can select a PER-SUITE line instead.** `Executed 431 tests, with
+9 tests skipped` (the bundle) and `Executed 3 tests, with 3 tests skipped` (one env-gated suite)
+both match the same pattern, and both appear twice. `grep -E 'Executed [0-9]+ tests' log | tail -1`
+can hand you **3** as "the suite" with nothing to indicate it is wrong. Cross-check instead:
+count the individual `Test Case '-[...]' passed|failed` lines, and confirm
+`passed + skipped == the bundle number`. Two methods agreeing is the check; one grep is not.
+
 **Never pipe the run through `tail -N`.** The XCTest bundle total is followed by hundreds of
 lines of per-test output, so `tail -8` shows only the swift-testing block — 19 tests — and a
 `tail` inside a `> file` redirect writes the *truncated* text to disk, destroying the number
@@ -124,6 +131,19 @@ Four false-result modes, all observed here:
 
 Shell cwd persists between calls. Use absolute paths — a relative `cp` after a `cd swift`
 silently voided a mutation.
+
+**Separate an assertion failure from a compile error before believing a red.** A mutation that
+fails to compile produces a red that proves nothing about the guard. Grep every `error:` line on
+each mutation run and check they are assertions: on one run here all 9 `error:` lines were
+assertions, which is what made that kill real. And the harness will report **"exit code 0"** for
+a chain whose trailing `echo` succeeded — on every run of one audit — so the mutation's true
+status lives only in a captured variable (`MUT_EXIT=$?`), never in what the harness announces.
+
+**Auditing a tree someone else is committing to means every snapshot may already be stale.** Two
+readings in one session were correct when taken and wrong when reported: an `AppState` mtime, and
+a "1 uncommitted / 1 unpushed" that had both landed by the time the message arrived. Before
+reporting tree state as a finding, re-read it in the same breath — `git rev-parse HEAD origin/main`
+and `git status --porcelain` cost nothing.
 
 **A survived mutation, reported, is worth more than a passed one.** One agent predicted its
 call-site mutation would go red, ran it, got green, and published that against its own
