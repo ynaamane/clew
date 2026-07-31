@@ -77,6 +77,17 @@ look did.
   injected seam, ask whether one test exercises the REAL default**: if `?? { real thing }` can
   become `?? { }` with the suite green, none does. That test restores the disposition it found —
   leaving `SIGTERM` ignored would make the test runner unkillable by `kill`.
+  *And chasing that last caveat found something bigger: **the suite already does it, 39 times.***
+  An `AppState` built WITHOUT the injected seam moves this process's dispositions from `[0, 0]` to
+  `[1, 1]` — SIGTERM **and** SIGINT ignored — because `init` runs the shipped `signal(sig, SIG_IGN)`.
+  So `xctest` becomes unkillable by `kill` and needs SIGKILL. Proven by flipping the new test's own
+  `AppState` to `terminationSignals: nil` and watching it fail with exactly that pair, so it is a
+  reproduction rather than a reading. **13 files still do this**, pinned by name and count in
+  `TestRunnerSignalHygieneTests` — a NAMED gap, not a fix: those suites are sound, converting them
+  is a mechanical sweep, and pinning the number means it cannot grow unnoticed. The general form:
+  **a production default that is right for the APP can be wrong for the TEST PROCESS**, and a green
+  suite says nothing about what the suite did to the machine it ran on (the mic-hijack precedent is
+  the same class — 0 `PauseIO/ResumeIO` before a run, 7920 after).
 
 Closed 2026-07-30: the review harness that works with a locked screen, the ffmpeg PATH bug, the
 keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the
@@ -362,12 +373,12 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 637 Python + 466 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 468 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
 Measured at the END of 2026-07-31, after the seven-item batch: `bash scripts/check.sh` →
 **`CHECK=0` read from a captured variable, 10 gates ok / 0 FAILED**, including the release build.
-Swift → **420 XCTest (`Executed 429 tests, with 9 tests skipped and 0 failures`) + 46
-swift-testing = 466**.
+Swift → **422 XCTest (`Executed 431 tests, with 9 tests skipped and 0 failures`) + 46
+swift-testing = 468**.
 Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**.
 `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run and after
 every mutation run, so nothing reached the real input device.

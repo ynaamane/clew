@@ -164,8 +164,17 @@ stay green.
 
 So for any injected seam, ask: **is there one test that exercises the REAL default?** If a
 `?? { real thing }` can be replaced by `?? { }` with the suite still green, the answer is no.
-And when such a test mutates process-wide state, restore what it found — a test leaving
-`SIGTERM` ignored makes the runner unkillable by `kill` for the rest of the process.
+
+**And the flip side, which is live here: a production default that is right for the APP can be
+wrong for the TEST PROCESS.** `AppState.init` runs `signal(SIGTERM, SIG_IGN)`, correct for a
+shipping app. Measured in the suite: an `AppState` built without the injected seam moves this
+process's dispositions from `[0, 0]` to `[1, 1]` — SIGTERM *and* SIGINT ignored — so the xctest
+runner becomes unkillable by `kill` and needs SIGKILL. **13 test files** still do it
+(`TestRunnerSignalHygieneTests` pins the count and names them). Any test that mutates
+process-wide state must restore what it found.
+
+A green suite says nothing about what the suite did to the machine it ran on. The mic-hijack
+precedent is the same class: 0 `PauseIO/ResumeIO` cycles before a run, 7920 after.
 
 ## Never `git commit --amend` in this working tree
 
