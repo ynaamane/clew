@@ -7,11 +7,13 @@ public struct BannerState: Equatable {
     }
 
     public let message: String
+    public let headline: String?
     public let severity: Severity
     public let isDismissible: Bool
 
-    public init(message: String, severity: Severity, isDismissible: Bool) {
+    public init(message: String, headline: String? = nil, severity: Severity, isDismissible: Bool) {
         self.message = message
+        self.headline = headline
         self.severity = severity
         self.isDismissible = isDismissible
     }
@@ -40,7 +42,8 @@ public struct BannerState: Equatable {
 
         if !isCliAvailable {
             return BannerState(
-                message: "Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio.",
+                message: "L'audio sera enregistré mais pas transcrit — le CLI ownscribe est absent. Restaurez-le, puis lancez ./rec.sh redo <répertoire> pour transcrire cette réunion depuis son audio conservé.",
+                headline: "CLI absent : audio enregistré seulement",
                 severity: .warning,
                 isDismissible: false
             )

@@ -10,7 +10,7 @@ struct InlineBanner: View {
                 .font(.title3)
                 .foregroundStyle(foregroundColor)
 
-            Text(state.message)
+            Text(state.headline ?? state.message)
                 .font(.callout)
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)

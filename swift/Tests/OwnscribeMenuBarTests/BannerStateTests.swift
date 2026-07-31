@@ -108,4 +108,36 @@ final class BannerStateTests: XCTestCase {
         XCTAssertEqual(result?.severity, .error)
         XCTAssertEqual(result?.isDismissible, true, "Error takes precedence and is dismissible")
     }
+
+    func testCliMissingBannerIsProduced() {
+        let result = BannerState.bannerState(
+            phase: .idle,
+            muteWarning: nil,
+            muteIndicator: .notMuted,
+            isCliAvailable: false
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.severity, .warning)
+        XCTAssertEqual(result?.isDismissible, false)
+    }
+
+    func testCliMissingHeadlineFitsTheSidebarWidth() {
+        let result = BannerState.bannerState(
+            phase: .idle,
+            muteWarning: nil,
+            muteIndicator: .notMuted,
+            isCliAvailable: false
+        )
+
+        guard let headline = result?.headline else {
+            XCTFail("CLI missing banner should have a headline")
+            return
+        }
+
+        XCTAssertLessThanOrEqual(
+            headline.count, 40,
+            "The banner appears in the sidebar (216pt width minus 12pt padding on each side = 192pt available). At .callout size, approximately 5pt per character, 40 characters ≈ 200pt, leaving a small margin for the icon and spacing. The headline must fit without wrapping to avoid overlapping sidebar items beneath it. LibraryWindow.swift:49 sets the column width; InlineBanner.swift:14 renders the headline at .callout."
+        )
+    }
 }
