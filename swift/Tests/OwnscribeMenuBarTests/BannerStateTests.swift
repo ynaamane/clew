@@ -137,7 +137,31 @@ final class BannerStateTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(
             headline.count, 40,
-            "The banner appears in the sidebar (216pt width minus 12pt padding on each side = 192pt available). At .callout size, approximately 5pt per character, 40 characters ≈ 200pt, leaving a small margin for the icon and spacing. The headline must fit without wrapping to avoid overlapping sidebar items beneath it. LibraryWindow.swift:49 sets the column width; InlineBanner.swift:14 renders the headline at .callout."
+            "The banner appears in the sidebar (216pt width minus 12pt padding on each side = 192pt available). At .callout size, approximately 5pt per character, 40 characters ≈ 200pt, leaving a small margin for the icon and spacing. The headline must fit without wrapping to avoid overlapping sidebar items beneath it. LibraryWindow.swift:49 sets the column width; InlineBanner renders the headline at .callout."
+        )
+    }
+
+    func testCliMissingRecoveryInstructionIsReachable() {
+        let result = BannerState.bannerState(
+            phase: .idle,
+            muteWarning: nil,
+            muteIndicator: .notMuted,
+            isCliAvailable: false
+        )
+
+        guard let banner = result else {
+            XCTFail("CLI missing should produce a banner")
+            return
+        }
+
+        XCTAssertTrue(
+            banner.message.contains("./rec.sh redo"),
+            "The recovery instruction './rec.sh redo <répertoire>' must be present in the message field AND InlineBanner.swift:13-32 must render BOTH headline AND message when headline != nil. This test verifies the data exists; the rendering contract is documented here but cannot be tested without instantiating a View (deadlock risk per swift-suite-hygiene.md). Manual verification: when headline is set, InlineBanner shows headline in .callout semibold, then message in .caption secondary below it. Mutation: changing InlineBanner to render only 'headline ?? message' orphans the recovery instruction."
+        )
+
+        XCTAssertNotNil(
+            banner.headline,
+            "This test guards the specific case where a headline is set. If headline is nil, the rendering path changes and this guard is meaningless."
         )
     }
 }

@@ -10,11 +10,26 @@ struct InlineBanner: View {
                 .font(.title3)
                 .foregroundStyle(foregroundColor)
 
-            Text(state.headline ?? state.message)
-                .font(.callout)
-                .foregroundStyle(.primary)
+            if let headline = state.headline {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(headline)
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+
+                    Text(state.message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(state.message)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             if state.isDismissible, let onDismiss {
                 Button {
@@ -33,6 +48,7 @@ struct InlineBanner: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(backgroundColor)
         }
+        .accessibilityIdentifier("banner")
     }
 
     private var iconName: String {
