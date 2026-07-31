@@ -264,6 +264,42 @@ final class TerminationSignalHandlerTests: XCTestCase {
         XCTAssertEqual(device.setInputMuteCalls, [false], "the surviving handler must still unmute")
     }
 
+    func testTheRealDefaultsActuallyReachTheKernelAndNotJustTheSeam() {
+        func disposition(_ signalNumber: Int32) -> Int {
+            var current = sigaction()
+            sigaction(signalNumber, nil, &current)
+            return unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self)
+        }
+
+        let ignore = 1
+        var restore: [Int32: Int] = [:]
+        for signalNumber in TerminationSignalHandlers.terminationSignals {
+            restore[signalNumber] = disposition(signalNumber)
+        }
+        defer {
+            for (signalNumber, previous) in restore where previous != ignore {
+                signal(signalNumber, SIG_DFL)
+            }
+        }
+
+        var madeSources: [Int32] = []
+        let handlers = TerminationSignalHandlers(
+            makeSource: { signalNumber in
+                madeSources.append(signalNumber)
+                return FakeTerminationSignalSource(signalNumber: signalNumber, recorder: SignalWiringRecorder())
+            },
+            onTerminate: {})
+
+        handlers.register(restoreUnmuted: {})
+
+        XCTAssertEqual(madeSources, TerminationSignalHandlers.terminationSignals)
+        for signalNumber in TerminationSignalHandlers.terminationSignals {
+            XCTAssertEqual(
+                disposition(signalNumber), ignore,
+                "signal \(signalNumber): the SHIPPED ignoreDefaultDisposition must reach the kernel. Every other test here injects that closure, so all of them would pass if the production default were `{ _ in }` — this one reads the disposition back through sigaction(2) instead of trusting the seam. Verified independently: SIG_IGN bitcasts to 1, SIG_DFL to 0. Without it the default disposition kills the process before the unmute handler runs, which is the exact failure the whole file exists to prevent.")
+        }
+    }
+
     func testTheProductionDefaultsAreTheRealSignalWiring() {
         let handlers = TerminationSignalHandlers()
 
