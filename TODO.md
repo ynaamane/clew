@@ -69,6 +69,14 @@ look did.
   sources-only build reported success. **A sources-only build is not evidence the suite can run.**
   And a `@MainActor` default value in a `nonisolated` parameter list does not compile — the
   defaults must move inside `init` as nil-coalesced values.
+  *One real hole found afterwards, by the lane, and worth generalising:* all ten of those tests
+  **injected** `ignoreDefaultDisposition`, so replacing the shipped default with `{ _ in }` turned
+  **zero** of them red — the seam was asserting itself. Closed with a test that reads the
+  disposition back through `sigaction(2)` (`SIG_IGN` → 1, `SIG_DFL` → 0, verified independently
+  before being encoded), which kills that mutation while the other ten stay green. **For any
+  injected seam, ask whether one test exercises the REAL default**: if `?? { real thing }` can
+  become `?? { }` with the suite green, none does. That test restores the disposition it found —
+  leaving `SIGTERM` ignored would make the test runner unkillable by `kill`.
 
 Closed 2026-07-30: the review harness that works with a locked screen, the ffmpeg PATH bug, the
 keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the
@@ -354,12 +362,12 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 637 Python + 465 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 466 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
 Measured at the END of 2026-07-31, after the seven-item batch: `bash scripts/check.sh` →
 **`CHECK=0` read from a captured variable, 10 gates ok / 0 FAILED**, including the release build.
-Swift → **419 XCTest (`Executed 428 tests, with 9 tests skipped and 0 failures`) + 46
-swift-testing = 465**.
+Swift → **420 XCTest (`Executed 429 tests, with 9 tests skipped and 0 failures`) + 46
+swift-testing = 466**.
 Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**.
 `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run and after
 every mutation run, so nothing reached the real input device.

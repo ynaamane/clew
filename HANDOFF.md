@@ -4,7 +4,7 @@ Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**637 Python + 465 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
+**637 Python + 466 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
 0 porte en échec), plus les tests matériel à la demande. Mesuré le **2026-07-31 en fin de
 session** — mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier cinq fois,
 et « écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
@@ -12,7 +12,7 @@ et « écrire le nombre » est une étape distincte de « le mesurer » qui se r
 appartient à une commande, pas à une phrase.
 
 Le compte Swift demande d'additionner **deux** frameworks : `swift test` imprime un total XCTest
-(`Executed 428 tests, with 9 tests skipped` → 419 qui passent) *et* une ligne séparée
+(`Executed 429 tests, with 9 tests skipped` → 420 qui passent) *et* une ligne séparée
 `Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift », « 413 Swift »,
 « 431 Swift », « 448 Swift » ou « 458 Swift » plus haut dans l'historique ne comptait que XCTest, ou datait
 d'avant les derniers lots.

@@ -149,6 +149,24 @@ So when a claim is genuinely about the view, prefer a source guard over declarin
 unverifiable — and write the mutation into the failure message, because the next person's
 instinct will be to "simplify" the very line the guard exists to keep.
 
+## An injected seam can end up asserting itself
+
+When every test for a behaviour **injects** the thing it is testing, the production default is
+unguarded — and the whole suite passes if that default is silently a no-op. Measured:
+`TerminationSignalHandlers` had ten tests, all injecting `ignoreDefaultDisposition`, and
+replacing the shipped default with `{ _ in }` turned **zero** of them red. The seam was
+asserting itself.
+
+The fix is one test that reaches past the seam to the real effect — here, reading the signal
+disposition back through `sigaction(2)` (`SIG_IGN` bitcasts to **1**, `SIG_DFL` to **0**;
+verified on this machine before being encoded). It kills that mutation while the other ten
+stay green.
+
+So for any injected seam, ask: **is there one test that exercises the REAL default?** If a
+`?? { real thing }` can be replaced by `?? { }` with the suite still green, the answer is no.
+And when such a test mutates process-wide state, restore what it found — a test leaving
+`SIGTERM` ignored makes the runner unkillable by `kill` for the rest of the process.
+
 ## Never `git commit --amend` in this working tree
 
 Three lanes commit to one checkout. `--amend` acts on whatever HEAD is **now**, not on the
