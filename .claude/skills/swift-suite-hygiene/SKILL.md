@@ -131,6 +131,46 @@ prediction. That honest report was worth more than two "COMPLETE" claims I had t
 myself. An agent that reports only green results has not run the mutation that would
 embarrass it.
 
+## A view-host test is not the only way to reach a render
+
+"This can only be verified by instantiating the View, and that deadlocks, so it is untestable"
+is **half** right and it let a live bug through. The rendering contract is readable from the
+SOURCE, which is what `GlassPlacementTests`, `LibrarySidebarTests` and
+`SearchPlacementDecisionTests` already do — read the `.swift` file, assert on what it contains.
+
+The bug it missed: `Text(state.headline ?? state.message)` renders the headline INSTEAD of the
+message, so for the one banner state that sets a headline the recovery instruction became
+unreachable data — the user saw "CLI absent" and nothing said `./rec.sh redo` exists. The
+data-level test `banner.message.contains("./rec.sh redo")` stayed **green** the whole time: the
+string was in the struct, and no view path could display it. Same shape as
+`UnanchoredClaimBadge` shipping with 4 green tests and 0 callers.
+
+So when a claim is genuinely about the view, prefer a source guard over declaring it
+unverifiable — and write the mutation into the failure message, because the next person's
+instinct will be to "simplify" the very line the guard exists to keep.
+
+## Never `git commit --amend` in this working tree
+
+Three lanes commit to one checkout. `--amend` acts on whatever HEAD is **now**, not on the
+commit you think you are fixing: amending to correct a number in my own commit rewrote a
+peer lane's commit message, because its commit had landed in the seconds between. The code
+survived, the authorship did not; restored with `git reset --soft <parent>` + a fresh commit.
+
+Same family as the `git add -A` ban — any command that acts implicitly on "current state" acts
+on someone else's work here. Check `git log --oneline -1` before amending, or just don't.
+
+## Adding a protocol requirement is a free census of your fakes
+
+Putting `cancel()` on `PipelineRunning` broke **3** test fakes at compile time
+(`FakePipelineRunner`, `StubPipelineRunner`, `EventEmittingRunner`). That is the protocol doing
+its job, and it is strictly better than the alternative that was tried first: calling through
+`(pipelineRunner as? PipelineRunner)?.cancel()`. The cast compiles, the seam appears to exist,
+and **no test fake can ever observe the call** — a spy would prove the phase changed while the
+child process kept transcribing for minutes.
+
+When a new behaviour must be observable in tests, put it on the protocol and fix the fallout.
+A conditional downcast at a seam is how a feature becomes unobservable.
+
 ## Tested helper, untested call site
 
 `BadgeText.badgeText(for:)` is well covered, but `grep -rn "LibraryWindow" swift/Tests/` is

@@ -59,8 +59,8 @@ selected row, so never certify those on a render (`APP_TEST.md`).
 The individual suites:
 
 ```bash
-uv run pytest -v                    # all tests (635 currently)
-uv run pytest -v -m "not hardware"  # what check.sh runs (629) — the count differs, so quote the flag
+uv run pytest -v                    # all tests
+uv run pytest -v -m "not hardware"  # what check.sh runs (637 + 1 skipped) — the count differs, so quote the flag
 uv run pytest tests/test_search.py::TestRankMeetings::test_speaker_boost   # single test, path form
 uv run pytest -v -k "TestRankMeetings and test_speaker_boost"              # -k needs `and`, NOT `::`
 cd swift && swift test              # the Swift suite
@@ -85,6 +85,19 @@ calling a test done, break the thing it defends in the **production** function a
 red. Tests here have passed against the code they claimed to cover — a bare `XCTAssert(true)`, a spy
 asserted instead of the real child process, and six tests that re-implemented the reader they were
 testing, so stubbing that reader to `return nil` left all six green.
+
+Report the kill **rate**, not "killed": a mutation that turns 7 of 8 tests red looks identical to
+one that turns 1 red, and the difference tells you how much of the suite actually depends on the
+behaviour. And measure it rather than predicting it — a mutation claim written from reasoning
+landed in a commit message here on 2026-07-31 with the wrong arithmetic.
+
+Two guards that are NOT reachable by a unit test, and the technique that reaches them anyway:
+a SwiftUI render (instantiating a `View` deadlocks this project) and a declaration's POSITION in a
+file. Both are readable from the **source** — `GlassPlacementTests`, `LibrarySidebarTests` and
+`SearchPlacementDecisionTests` open the `.swift` file and assert on what it contains. "Only a
+view-host test could catch this, so it is untestable" is how a live bug shipped: the banner rendered
+`headline ?? message`, which orphaned the recovery instruction, while the data-level test stayed
+green because the string was present in the struct.
 
 ## Verifying HF-gated / real-audio behavior
 

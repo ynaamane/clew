@@ -4,17 +4,18 @@ Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**637 Python + 431 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
-0 porte en échec), plus les tests matériel à la demande. Mesuré le **2026-07-30 en fin de
+**637 Python + 448 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
+0 porte en échec), plus les tests matériel à la demande. Mesuré le **2026-07-31 en fin de
 session** — mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier cinq fois,
 et « écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
 « tout est poussé » : lance `git log --oneline origin/main..main | wc -l`. Un fait mutable
 appartient à une commande, pas à une phrase.
 
 Le compte Swift demande d'additionner **deux** frameworks : `swift test` imprime un total XCTest
-(`Executed 394 tests, with 9 tests skipped` → 385 qui passent) *et* une ligne séparée
-`Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift » ou « 413 Swift »
-plus haut dans l'historique ne comptait que XCTest, ou datait d'avant les derniers lots.
+(`Executed 411 tests, with 9 tests skipped` → 402 qui passent) *et* une ligne séparée
+`Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift », « 413 Swift » ou
+« 431 Swift » plus haut dans l'historique ne comptait que XCTest, ou datait d'avant les derniers
+lots.
 Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
 détruit le chiffre sur le disque. Un échec peut n'apparaître que dans **un** des deux formats :
 le 2026-07-30 une vraie mutation tuée affichait « Executed 0 tests » côté XCTest pendant que le
@@ -37,7 +38,42 @@ anti-péremption de BUG5 (`bin/ownscribe-audio` plus vieux qu'un source Swift), 
 Après le run complet : `/usr/bin/log show --last 10m | grep -cE 'PauseIO|ResumeIO'` → **0**.
 Aucun test n'a touché le micro.
 
-## Ce qui a changé le 2026-07-30 (à lire en premier)
+## Ce qui a changé le 2026-07-31 (à lire en premier)
+
+Cinq des sept items ouverts fermés, chacun mutation-vérifié. Il reste **deux** choses, et aucune
+ne se ferme en écrivant du code ici : ton œil sur la fenêtre (le verre rend des octets identiques
+avec ou sans lui hors-écran, donc il n'a qu'un seul juge possible), et un vrai enregistrement pour
+la puce de preuve cliquable.
+
+- **Le champ de recherche est une décision, pas un patch** — et le SDK a tranché ce que les pixels
+  suggéraient : `SearchToolbarBehavior.minimize` est `@available(macOS, unavailable)`, donc
+  `.automatic` est la seule valeur que la plateforme accepte. Il n'y a jamais eu de levier. La
+  décision est épinglée dans un test plutôt que laissée en prose, là où elle allait être
+  re-débattue une troisième fois.
+- **Le bandeau CLI**, 200 caractères dans un rail de 216pt, est devenu un titre de 39 caractères
+  plus le texte de récupération, en français. La première correction rendait `headline ?? message`,
+  ce qui rendait `./rec.sh redo` **inatteignable** alors qu'un test au niveau des données restait
+  vert : la chaîne existait dans la struct et aucun chemin de vue ne l'affichait. Même forme que
+  `UnanchoredClaimBadge` livré avec 4 tests verts et zéro appelant.
+- **`cancel()` est enfin appelé.** Une transcription de plusieurs minutes s'arrête. Refusé pendant
+  `.recording` — une réunion en cours est irremplaçable — et sans effet depuis un état terminal.
+  `cancel()` est passé sur le protocole `PipelineRunning` : le `as? PipelineRunner` compilait et
+  rendait l'appel **inobservable** par tous les fakes, donc un espion aurait prouvé que la phase
+  changeait pendant que le process enfant continuait à transcrire.
+- **10 identifiants d'accessibilité** là où il y en avait 0. Une revue peut désormais *adresser*
+  les contrôles, pas seulement lire du texte. Le bouton d'enregistrement était le cas à réfléchir :
+  son titre change avec l'état (Enregistrer / Arrêter), donc l'adresser par titre le perd au moment
+  précis où on voudrait appuyer sur stop.
+- **La colonne de `—` nus** de l'inspecteur devient `(aucune correspondance)`, avec les trois états
+  d'ancrage gardés comme deux-à-deux distincts et non vides.
+
+Deux erreurs de process de ma part, notées parce qu'elles se répètent facilement :
+`git commit --amend` dans cet arbre partagé a réécrit le message de commit d'une lane voisine
+(HEAD avait bougé entre-temps ; restauré par `reset --soft`), et un chiffre de mutation est parti
+dans un message de commit par raisonnement au lieu d'être mesuré. Les deux sont maintenant dans
+`.claude/skills/swift-suite-hygiene/SKILL.md`.
+
+## Ce qui a changé le 2026-07-30
 
 **Je peux enfin voir la fenêtre moi-même, sans action de l'utilisateur.** C'était le blocage
 central de tout ce projet : chaque revue de design dépendait d'un humain avec une souris.

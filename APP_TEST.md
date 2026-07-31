@@ -156,7 +156,7 @@ validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
 **No test in this repo can verify appearance.** Re-measure before quoting, but as of the end of
-2026-07-30 that is **431 green Swift** (385 XCTest + 46 swift-testing) and **637 Python**;
+2026-07-31 that is **448 green Swift** (402 XCTest + 46 swift-testing) and **637 Python**;
 `glassEffect` call sites; the right symbols in the binary. Every one of those proves the
 code RUNS. They are all silent on whether the window reads well. The count going up changes
 nothing about that — which is the whole point of this section, so do not read a bigger
@@ -241,10 +241,21 @@ review (2026-07-30) found seven gaps, recorded in `TODO.md § 0`, including the 
 LIGHT where the mockup is DARK — something no test would ever have said.
 
 What it does NOT close: **whether it reads well is still yours.** An image tells an agent
-what is on screen, not whether the result is good. And the AX tree currently returns **0
-lines** for our window, because SwiftUI exposes almost nothing without
-`.accessibilityIdentifier` — so findings are visual, not measured, until identifiers are
-added to the interactive views.
+what is on screen, not whether the result is good.
+
+**UPDATE 2026-07-31 — the AX tree is now addressable.** An earlier version of this line said the
+tree returns "0 lines"; that was wrong twice over. It returned **55 lines** with pixel frames
+(`@433,322 174x16`), enough to measure spacing; what was missing was a stable *handle* on the
+controls, because **0** `.accessibilityIdentifier` calls existed in `swift/Sources/`. Ten now do:
+`library.sidebar`, `library.meetingList`, `library.search`, `library.recordButton`,
+`library.cancelButton`, `meeting.transcript`, `meeting.envelope`, `meeting.backchannelToggle`,
+`inspector.form`, `banner`. `scripts/ui-evidence/main.swift:66` already printed `#identifier`
+when present, so they appear in the tree with no harness change.
+
+The one that needed thought is the record button: its TITLE changes with state
+(`Enregistrer` / `Arrêter`), so a script addressing it by title silently stops finding it the
+moment a recording starts — exactly when you would want to press stop. The identifier is stable
+while the title is not.
 
 Open `⌘0` (or the URL above) and judge against `design/direction-b-glass.png`
 and `design/mockup.html`:
@@ -270,8 +281,15 @@ and `design/mockup.html`:
       speaker.)*
 - [ ] The envelope strip: is it informative, or decoration?
 - [ ] Inspector states read correctly — `(pas encore vérifié)` reads as
-      "not checked yet", `—` reads as "no evidence found", and the two are
-      not confusable.
+      "not checked yet", `(aucune correspondance)` reads as "anchoring ran and
+      matched nothing", and the two are not confusable. *(Changed 2026-07-31: the
+      second state was a bare `—`, which was correct data that READ as broken.
+      Both on-disk meetings with an `anchors.json` have **0 tokens** in it, so this
+      is the common path on real data, not an edge case. The three states are now
+      guarded as pairwise-distinct and non-empty; what no test can tell you is
+      whether the new wording actually reads as neutral rather than as a warning —
+      a key point legitimately having no anchor is normal, e.g. an English summary
+      word cannot anchor to its French equivalent in the transcript.)*
 - [ ] **Click an anchor timestamp chip** (`Gary→08:30`) — it should scroll the
       transcript to that utterance, and reveal it if the backchannel toggle
       was hiding it. New in `a5a2056`. Two things only you can judge: whether

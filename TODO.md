@@ -1,31 +1,54 @@
 # TODO — meeting-scribe
 
-## WHAT IS ACTUALLY LEFT (2026-07-30, end of day)
+## WHAT IS ACTUALLY LEFT (2026-07-31)
 
 Everything below this block is history and traps worth keeping. This is the open list.
 
-### THE SHORT ANSWER — 7 items, in order
+### THE SHORT ANSWER — 2 items
 
-**Needs YOU (1)** — nobody else can do these:
+Five of the seven items below were closed on 2026-07-31. What remains cannot be closed by
+writing code here.
+
+**Needs YOU (1)** — nobody else can do this:
 1. **Does the window read well?** `bash swift/build-app.sh && open "ownscribe://library"`. The
-   installed bundle is older than the code, and the glass is invisible to every harness here
-   (§ 2.2). Never let an agent run `build-app.sh`: it `rm -rf`s the bundle and its TCC grants.
+   installed bundle predates today's batch, and the glass is invisible to every harness here —
+   `glassEffect`, no-glass and glass-on-container render **byte-identically** off-screen, so the
+   rail's appearance has exactly one possible judge (§ 2.2). Never let an agent run
+   `build-app.sh`: it `rm -rf`s the bundle and the TCC grants keyed to a cert that must never be
+   recreated.
 
-**Code, no waiting (5)**:
-2. **Search field** — decide, don't patch (§ 2.3). `.searchable` always lands in the toolbar on
-   macOS; matching the mockup costs `⌘F`.
-3. **CLI-missing banner unreadable** — 200 chars in a 216pt rail, wraps to ~20 lines (§ 2.10).
-4. **Inspector shows a column of bare `—`** where the mockup has timestamp chips (§ 2.11).
-5. **`PipelineRunner.cancel()` has no caller** — a multi-minute transcription cannot be stopped
-   (§ 4).
-6. **`registerTerminationSignalHandlers` has zero tests** — the SIGTERM path to
-   `restoreUnmutedOnQuit`, the highest-blast function in the app (§ 4). Do this one carefully.
-7. **`.accessibilityIdentifier` on interactive views** — turns reviews from visual into addressable
-   (§ 2.8). Lowest priority; the AX tree already gives 55 lines with pixel frames.
+**Needs one real recording (1)**: the clickable evidence chip → scroll (§ 3). Re-measured today —
+both `anchors.json` files on disk have an `anchors` object with **0 tokens**, so the window has
+nothing to click.
 
-**Needs one real recording (1)**: the clickable evidence chip → scroll (§ 3).
+**Closed 2026-07-31**, each mutation-verified:
+- **Search field** (§ 2.3) — decided, not patched, and the SDK settled it: `.minimize` is
+  `@available(macOS, unavailable)`, so `.automatic` is the only value the platform accepts. There
+  was never a lever. `.searchable` stays; the decision is pinned in a test instead of prose. Found
+  while writing it: `.navigationTitle("Réunions")` was declared twice.
+- **CLI banner unreadable** (§ 2.10) — split into a 39-char headline plus the full recovery text,
+  and translated to French. The first fix rendered `headline ?? message`, which made
+  `./rec.sh redo` unreachable while a data-level test stayed green; a source guard now kills that
+  exact line.
+- **Inspector's column of bare `—`** (§ 2.11) — now `(aucune correspondance)`, with the three
+  anchor states guarded as pairwise-distinct and non-empty. Only the presentation string changed;
+  every state assertion stayed as strong.
+- **`PipelineRunner.cancel()` had no caller** (§ 4) — wired to an "Annuler" button beside the
+  progress label. Refused while `.recording` (a live meeting is irreplaceable) and a no-op from
+  terminal phases. `cancel()` moved onto the `PipelineRunning` protocol, because the
+  `as? PipelineRunner` cast made the call unobservable to every fake.
+- **`.accessibilityIdentifier` on interactive views** (§ 2.8) — 10 identifiers; 0 existed before.
+  Reviews can now address controls, not only read text.
 
-Closed today: the review harness that works with a locked screen, the ffmpeg PATH bug, the
+**Still open from § 4, and deliberately not rushed:**
+- **`registerTerminationSignalHandlers` has zero tests** — the SIGTERM path to
+  `restoreUnmutedOnQuit`, the highest-blast function in the app (a failure leaves the user's mic
+  muted system-wide, silently, during real calls). A lane was assigned it and produced nothing on
+  disk; it needs a seam where both the unmute AND the `NSApplication.terminate` are injectable,
+  built as a new type with its own tests, then delegated to from `AppState` — the delegation is
+  the step that makes it real, not bookkeeping.
+
+Closed 2026-07-30: the review harness that works with a locked screen, the ffmpeg PATH bug, the
 keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the
 refusal-as-title guard, default meeting selection, and four of the seven design "findings" that
 turned out to be wrong.
@@ -309,7 +332,27 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 637 Python + 431 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 448 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+
+Measured at the END of 2026-07-31, after the five-item batch: `bash scripts/check.sh` →
+**`CHECK=0` read from a captured variable, 0 failed gates**, including the release build. Swift →
+**402 XCTest (`Executed 411 tests, with 9 tests skipped and 0 failures`) + 46 swift-testing = 448**.
+Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**.
+`/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run and after
+every mutation run, so nothing reached the real input device.
+
+**The BUG5 staleness gate fired again, and the harness again reported "exit code 0" while
+`CHECK=1` sat in the log** — the run had genuinely failed on
+`bin/ownscribe-audio is OLDER than swift/Sources/OwnscribeMenuBar/AppState.swift`. Correct
+behaviour: the batch edited Swift sources. Closed with `bash swift/build.sh`, not with an argument
+about which target holds which file — that reasoning is what shipped BUG5 for three days. Read the
+exit status from a captured variable; the second run gave `CHECK=0`.
+
+Two process failures of mine from this batch, recorded because both are cheap to repeat:
+`git commit --amend` in this shared tree rewrote a peer lane's commit message (HEAD had moved in
+the seconds between; restored with `reset --soft`), and a mutation claim went into a commit
+message from reasoning rather than measurement — the real arithmetic was one new red per mutation,
+not "red in two tests". Both are now in `.claude/skills/swift-suite-hygiene/SKILL.md`.
 
 Measured at the END of 2026-07-30, after the render harness and the day's fixes:
 `bash scripts/check.sh` → **`CHECK=0` read from a captured variable, 0 failed gates**, including the
