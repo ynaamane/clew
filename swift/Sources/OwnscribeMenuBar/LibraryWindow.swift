@@ -47,6 +47,7 @@ struct LibraryWindow: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
+            .accessibilityIdentifier("library.sidebar")
         } content: {
             MeetingListColumn(meetings: shownMeetings, selection: $selectedMeeting, searchQuery: $searchQuery)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 292, max: 380)
@@ -77,6 +78,7 @@ struct LibraryWindow: View {
                 } label: {
                     Label(appState.isRecording ? "Arrêter" : "Enregistrer", systemImage: "record.circle")
                 }
+                .accessibilityIdentifier("library.recordButton")
             }
         }
         .task {
@@ -120,7 +122,9 @@ private struct MeetingListColumn: View {
             MeetingRow(meeting: meeting)
                 .tag(meeting)
         }
+        .accessibilityIdentifier("library.meetingList")
         .searchable(text: $searchQuery, placement: .toolbar, prompt: "Rechercher dans les réunions…")
+        .accessibilityIdentifier("library.search")
     }
 }
 

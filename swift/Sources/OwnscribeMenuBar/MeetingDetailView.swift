@@ -16,12 +16,14 @@ struct MeetingDetailView: View {
                         EnvelopeStrip(buckets: envelope.buckets)
                             .padding(.horizontal, 26)
                             .padding(.bottom, 14)
+                            .accessibilityIdentifier("meeting.envelope")
                     }
                     transcriptBody
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(.background)
+            .accessibilityIdentifier("meeting.transcript")
             .inspector(isPresented: .constant(true)) {
                 MeetingInspector(
                     meeting: meeting,
@@ -87,6 +89,7 @@ struct MeetingDetailView: View {
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .font(.caption)
+                        .accessibilityIdentifier("meeting.backchannelToggle")
                 }
                 ForEach(visibleUtterances) { utterance in
                     UtteranceRow(utterance: utterance)
