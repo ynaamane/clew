@@ -164,4 +164,21 @@ final class BannerStateTests: XCTestCase {
             "This test guards the specific case where a headline is set. If headline is nil, the rendering path changes and this guard is meaningless."
         )
     }
+
+    func testTheBannerViewRendersTheMessageAndNotOnlyTheHeadline() throws {
+        let banner = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/OwnscribeMenuBar/InlineBanner.swift"),
+            encoding: .utf8)
+
+        XCTAssertFalse(
+            banner.contains("state.headline ?? state.message"),
+            "`Text(state.headline ?? state.message)` renders the headline INSTEAD of the message, so for the CLI banner — the only state that sets a headline — the recovery instruction becomes unreachable data. It shipped exactly that way: the user saw \"CLI absent\" and nothing told them ./rec.sh redo exists. A `??` here silently drops the half of the message that says how to recover.")
+        XCTAssertTrue(
+            banner.contains("Text(state.message)"),
+            "InlineBanner must render state.message on every path. The headline is an addition to it, never a replacement — a user who clicks nothing must still learn how to recover.")
+    }
 }
