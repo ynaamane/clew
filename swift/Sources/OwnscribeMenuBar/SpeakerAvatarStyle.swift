@@ -24,13 +24,19 @@ enum SpeakerAvatarStyle {
     }
 
     static func displayLabel(for speaker: String) -> String {
-        if speaker == "Owner" || speaker == "Unknown" {
-            return speaker
-        }
+        if speaker == "Unknown" { return "?" }
         if speaker.hasPrefix("SPEAKER_"), let suffix = speaker.split(separator: "_").last {
             return String(suffix)
         }
-        return speaker
+
+        let initials = speaker
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .prefix(2)
+            .compactMap { $0.first }
+            .map { String($0).uppercased() }
+            .joined()
+
+        return initials.isEmpty ? "?" : initials
     }
 
     private static func hashColor(for name: String) -> Color {

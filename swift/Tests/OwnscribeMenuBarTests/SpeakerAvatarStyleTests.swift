@@ -50,16 +50,16 @@ import SwiftUI
         #expect(SpeakerAvatarStyle.displayLabel(for: "SPEAKER_10") == "10")
     }
 
-    @Test func displayLabelPreservesSpecialNames() {
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Owner") == "Owner")
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Unknown") == "Unknown")
+    @Test func displayLabelAbbreviatesSpecialNames() {
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Owner") == "O")
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Unknown") == "?")
     }
 
-    @Test func displayLabelPreservesEnrolledNames() {
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Léa_B") == "Léa_B")
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Marc_B") == "Marc_B")
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Marie_Claire") == "Marie_Claire")
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Sam") == "Sam")
+    @Test func displayLabelAbbreviatesEnrolledNames() {
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Léa_B") == "LB")
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Marc_B") == "MB")
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Marie_Claire") == "MC")
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Sam") == "N")
     }
 
     @Test func colorDistinguishesSPEAKERPattern() {
