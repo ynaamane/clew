@@ -156,7 +156,7 @@ validated direction" on the strength of a green test suite, twice, with
 nobody having looked. Rejected on sight both times.
 
 **No test in this repo can verify appearance.** Re-measure before quoting, but as of the end of
-2026-07-31 that is **458 green Swift** (412 XCTest + 46 swift-testing) and **637 Python**;
+2026-07-31 that is **465 green Swift** (419 XCTest + 46 swift-testing) and **637 Python**;
 `glassEffect` call sites; the right symbols in the binary. Every one of those proves the
 code RUNS. They are all silent on whether the window reads well. The count going up changes
 nothing about that — which is the whole point of this section, so do not read a bigger

@@ -21,6 +21,17 @@ writing code here.
 both `anchors.json` files on disk have an `anchors` object with **0 tokens**, so the window has
 nothing to click.
 
+**And the batch was closed once BEFORE anyone had looked, which found one more bug.** I reported
+seven items done without rendering the window this session, then ran
+`bash scripts/ui-evidence/render.sh` and read both PNGs. The speaker avatar was drawing a whole
+word inside an 18pt disc: `Unknown` spilled OUTSIDE the circle in dark mode and clipped to `kno`
+in light mode, and every enrolled name did the same (`Marie_Claire`, 12 characters). Now initials
+(`?`, `O`, `N`, `MC`), with `SPEAKER_NN` keeping its digits. **Two old tests asserted the
+overflowing output** — third instance in this repo of a test encoding a bug as a requirement, and
+the tell was the same as the other two: the name `displayLabelPreservesSpecialNames` makes the
+wrong output sound like a feature. A green suite of 458 tests had nothing to say about it; one
+look did.
+
 **Closed 2026-07-31**, each mutation-verified:
 - **Search field** (§ 2.3) — decided, not patched, and the SDK settled it: `.minimize` is
   `@available(macOS, unavailable)`, so `.automatic` is the only value the platform accepts. There
@@ -343,12 +354,12 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 637 Python + 458 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 465 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
 Measured at the END of 2026-07-31, after the seven-item batch: `bash scripts/check.sh` →
 **`CHECK=0` read from a captured variable, 10 gates ok / 0 FAILED**, including the release build.
-Swift → **412 XCTest (`Executed 421 tests, with 9 tests skipped and 0 failures`) + 46
-swift-testing = 458**.
+Swift → **419 XCTest (`Executed 428 tests, with 9 tests skipped and 0 failures`) + 46
+swift-testing = 465**.
 Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**.
 `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run and after
 every mutation run, so nothing reached the real input device.
