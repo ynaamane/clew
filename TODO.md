@@ -6,7 +6,7 @@ Everything below this block is history and traps worth keeping. This is the open
 
 ### THE SHORT ANSWER — 2 items
 
-Five of the seven items below were closed on 2026-07-31. What remains cannot be closed by
+**All seven code items below were closed on 2026-07-31.** What remains cannot be closed by
 writing code here.
 
 **Needs YOU (1)** — nobody else can do this:
@@ -40,13 +40,24 @@ nothing to click.
 - **`.accessibilityIdentifier` on interactive views** (§ 2.8) — 10 identifiers; 0 existed before.
   Reviews can now address controls, not only read text.
 
-**Still open from § 4, and deliberately not rushed:**
-- **`registerTerminationSignalHandlers` has zero tests** — the SIGTERM path to
-  `restoreUnmutedOnQuit`, the highest-blast function in the app (a failure leaves the user's mic
-  muted system-wide, silently, during real calls). A lane was assigned it and produced nothing on
-  disk; it needs a seam where both the unmute AND the `NSApplication.terminate` are injectable,
-  built as a new type with its own tests, then delegated to from `AppState` — the delegation is
-  the step that makes it real, not bookkeeping.
+- **`registerTerminationSignalHandlers` had zero tests** (§ 4) — **CLOSED**, and it was the
+  highest-blast item in the batch: a failure leaves the user's mic muted system-wide, silently,
+  after the process is gone. Now `TerminationSignalHandlers`, with `makeSource`,
+  `ignoreDefaultDisposition` and `onTerminate` all injected, so no test raises a real signal or
+  terminates the runner. Three properties are pinned that were previously unguarded and fail
+  SILENTLY: the sources must be **retained** (a deallocated `DispatchSourceSignal` delivers
+  nothing, so dropping the array kills the path with every other test green), the disposition must
+  be ignored **before** resume (the default disposition kills the process before our handler
+  runs), and the unmute must run **before** terminate. The ownership guard is pinned on this path
+  too: a mute the USER made in System Settings survives a SIGTERM; a mute the app made does not.
+  Mutations 6/6: drop SIGINT → 7 red; terminate-first → 2; never resume → 2; stop retaining → 2;
+  skip `SIG_IGN` → 1; `AppState` never registers → 3.
+  *Two process notes worth keeping.* The test design came from a lane that wrote the RED half and
+  stopped, which left the tree in a state worth recognising: `swift build` was **green** while
+  `swift build --build-tests` failed, so the whole suite was un-runnable for every lane while a
+  sources-only build reported success. **A sources-only build is not evidence the suite can run.**
+  And a `@MainActor` default value in a `nonisolated` parameter list does not compile — the
+  defaults must move inside `init` as nil-coalesced values.
 
 Closed 2026-07-30: the review harness that works with a locked screen, the ffmpeg PATH bug, the
 keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the
@@ -332,11 +343,12 @@ lock · the AirPods mute case, irreducibly manual · MPS diarization until the t
 
 ---
 
-## Status: 637 Python + 448 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
+## Status: 637 Python + 458 Swift green, every gate green (`git log --oneline origin/main..main | wc -l` for what is held back).
 
-Measured at the END of 2026-07-31, after the five-item batch: `bash scripts/check.sh` →
-**`CHECK=0` read from a captured variable, 0 failed gates**, including the release build. Swift →
-**402 XCTest (`Executed 411 tests, with 9 tests skipped and 0 failures`) + 46 swift-testing = 448**.
+Measured at the END of 2026-07-31, after the seven-item batch: `bash scripts/check.sh` →
+**`CHECK=0` read from a captured variable, 10 gates ok / 0 FAILED**, including the release build.
+Swift → **412 XCTest (`Executed 421 tests, with 9 tests skipped and 0 failures`) + 46
+swift-testing = 458**.
 Python **inside check.sh** → **637 passed, 1 skipped, 7 deselected**.
 `/usr/bin/log show --last 5m | grep -cE 'PauseIO|ResumeIO'` → **0** after the full run and after
 every mutation run, so nothing reached the real input device.

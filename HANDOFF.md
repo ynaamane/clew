@@ -4,7 +4,7 @@ Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre l
 
 ## Où en est le projet
 
-**637 Python + 448 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
+**637 Python + 458 Swift verts**, toutes les portes de `scripts/check.sh` au vert (`CHECK=0`,
 0 porte en échec), plus les tests matériel à la demande. Mesuré le **2026-07-31 en fin de
 session** — mais ne crois pas ce nombre, re-mesure-le : il a été faux dans ce fichier cinq fois,
 et « écrire le nombre » est une étape distincte de « le mesurer » qui se rate seule. De même pour
@@ -12,10 +12,10 @@ et « écrire le nombre » est une étape distincte de « le mesurer » qui se r
 appartient à une commande, pas à une phrase.
 
 Le compte Swift demande d'additionner **deux** frameworks : `swift test` imprime un total XCTest
-(`Executed 411 tests, with 9 tests skipped` → 402 qui passent) *et* une ligne séparée
-`Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift », « 413 Swift » ou
-« 431 Swift » plus haut dans l'historique ne comptait que XCTest, ou datait d'avant les derniers
-lots.
+(`Executed 421 tests, with 9 tests skipped` → 412 qui passent) *et* une ligne séparée
+`Test run with 46 tests` pour swift-testing. Tout « 276 Swift », « 343 Swift », « 413 Swift »,
+« 431 Swift » ou « 448 Swift » plus haut dans l'historique ne comptait que XCTest, ou datait
+d'avant les derniers lots.
 Ne lis jamais le total via `tail` : ça tronque le résumé, et dans une redirection `> fichier` ça
 détruit le chiffre sur le disque. Un échec peut n'apparaître que dans **un** des deux formats :
 le 2026-07-30 une vraie mutation tuée affichait « Executed 0 tests » côté XCTest pendant que le
@@ -40,10 +40,10 @@ Aucun test n'a touché le micro.
 
 ## Ce qui a changé le 2026-07-31 (à lire en premier)
 
-Cinq des sept items ouverts fermés, chacun mutation-vérifié. Il reste **deux** choses, et aucune
-ne se ferme en écrivant du code ici : ton œil sur la fenêtre (le verre rend des octets identiques
-avec ou sans lui hors-écran, donc il n'a qu'un seul juge possible), et un vrai enregistrement pour
-la puce de preuve cliquable.
+**Les sept items de code sont fermés**, chacun mutation-vérifié. Il reste **deux** choses, et
+aucune ne se ferme en écrivant du code ici : ton œil sur la fenêtre (le verre rend des octets
+identiques avec ou sans lui hors-écran, donc il n'a qu'un seul juge possible), et un vrai
+enregistrement pour la puce de preuve cliquable.
 
 - **Le champ de recherche est une décision, pas un patch** — et le SDK a tranché ce que les pixels
   suggéraient : `SearchToolbarBehavior.minimize` est `@available(macOS, unavailable)`, donc
@@ -66,6 +66,19 @@ la puce de preuve cliquable.
   précis où on voudrait appuyer sur stop.
 - **La colonne de `—` nus** de l'inspecteur devient `(aucune correspondance)`, avec les trois états
   d'ancrage gardés comme deux-à-deux distincts et non vides.
+- **Le chemin SIGTERM vers l'unmute est enfin gardé** — l'item le plus à risque du lot : un échec
+  laisse le micro de l'utilisateur coupé pour tout le système, silencieusement, après la mort du
+  process. `TerminationSignalHandlers` injecte les trois effets (`makeSource`,
+  `ignoreDefaultDisposition`, `onTerminate`), donc aucun test ne lève un vrai signal ni ne tue le
+  runner. Trois propriétés qui échouaient **silencieusement** sont épinglées : les sources doivent
+  être **retenues** (un `DispatchSourceSignal` désalloué ne délivre plus rien, donc supprimer le
+  tableau tue le chemin avec toute la suite au vert), la disposition doit être ignorée **avant** le
+  resume, et l'unmute doit passer **avant** le terminate. Le garde de propriété est épinglé sur ce
+  chemin aussi : un mute que l'UTILISATEUR a fait dans Réglages Système survit à un SIGTERM.
+  Mutations 6/6. Le design des tests vient d'une lane qui a écrit la moitié ROUGE puis s'est
+  arrêtée — état à reconnaître : `swift build` était **vert** pendant que
+  `swift build --build-tests` échouait, donc la suite entière était injouable alors qu'un build de
+  sources seules annonçait le succès.
 
 Deux erreurs de process de ma part, notées parce qu'elles se répètent facilement :
 `git commit --amend` dans cet arbre partagé a réécrit le message de commit d'une lane voisine
