@@ -120,7 +120,6 @@ private struct MeetingListColumn: View {
             MeetingRow(meeting: meeting)
                 .tag(meeting)
         }
-        .navigationTitle("Réunions")
         .searchable(text: $searchQuery, placement: .toolbar, prompt: "Rechercher dans les réunions…")
     }
 }
