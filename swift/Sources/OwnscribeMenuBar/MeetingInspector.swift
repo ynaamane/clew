@@ -73,6 +73,7 @@ struct MeetingInspector: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("inspector.form")
         }
         .glassEffect()
         .task(id: meeting.id) {
