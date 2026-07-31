@@ -84,10 +84,15 @@ look did.
   `AppState` to `terminationSignals: nil` and watching it fail with exactly that pair, so it is a
   reproduction rather than a reading. **13 files still do this**, pinned by name and count in
   `TestRunnerSignalHygieneTests` — a NAMED gap, not a fix: those suites are sound, converting them
-  is a mechanical sweep, and pinning the number means it cannot grow unnoticed. The general form:
+  is a mechanical sweep, and — the stronger reason — the failure is **invisible to the suite by
+  construction**: all 39 sites pass today, and the damage only appears to whoever tries to `kill`
+  the runner. A pinned count is the only thing that makes a silent out-of-band cost visible, so the
+  test stays even after the sweep. **Blast radius measured, not assumed:** the parent shell reads
+  `[0, 0]` before AND after a full suite run, so the leak is confined to the `xctest` child and does
+  not escape to the machine — worth stating, because "the suite alters the machine" would overstate
+  it, unlike the mic hijack which genuinely reached the hardware. The general form:
   **a production default that is right for the APP can be wrong for the TEST PROCESS**, and a green
-  suite says nothing about what the suite did to the machine it ran on (the mic-hijack precedent is
-  the same class — 0 `PauseIO/ResumeIO` before a run, 7920 after).
+  suite says nothing about what the suite did to the process it ran in.
 
 Closed 2026-07-30: the review harness that works with a locked screen, the ffmpeg PATH bug, the
 keyboard-reachable window, the inflection markup leaked to the user, the sidebar column width, the

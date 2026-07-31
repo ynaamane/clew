@@ -26,7 +26,7 @@ final class TestRunnerSignalHygieneTests: XCTestCase {
 
         XCTAssertEqual(
             before, after,
-            "An AppState built with an injected termination seam must not touch the PROCESS's signal dispositions. This matters because 39 AppState constructions happen across this suite: every one that does NOT inject the seam runs the shipped signal(SIGTERM, SIG_IGN), which leaves the xctest runner ignoring SIGTERM — unkillable by `kill` for the rest of the run, and CI or a developer would have to SIGKILL it. The production default is correct FOR THE APP and wrong for a test process, which is exactly why the seam exists.")
+            "An AppState built with an injected termination seam must not touch the PROCESS's signal dispositions. This matters because 39 AppState constructions happen across this suite: every one that does NOT inject the seam runs the shipped signal(SIGTERM, SIG_IGN), which leaves the xctest runner ignoring SIGTERM — unkillable by `kill` for the rest of the run, so it needs SIGKILL. The blast radius stops there and is measured: the parent shell reads [0, 0] both before and after a full suite run, so this does NOT escape to the machine. The production default is correct FOR THE APP and wrong for a test process, which is exactly why the seam exists.")
         XCTAssertFalse(
             after.contains(ignore) && !before.contains(ignore),
             "the suite must not be the thing that ignores SIGTERM")

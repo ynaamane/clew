@@ -193,8 +193,14 @@ runner becomes unkillable by `kill` and needs SIGKILL. **13 test files** still d
 (`TestRunnerSignalHygieneTests` pins the count and names them). Any test that mutates
 process-wide state must restore what it found.
 
-A green suite says nothing about what the suite did to the machine it ran on. The mic-hijack
-precedent is the same class: 0 `PauseIO/ResumeIO` cycles before a run, 7920 after.
+**Blast radius, measured rather than assumed:** the parent shell reads `[0, 0]` both before and
+after a full suite run, so the leak is confined to the `xctest` child and does NOT escape to the
+machine. Worth stating, because "the suite alters the machine" would overstate it — unlike the
+mic hijack, which genuinely did reach the hardware (0 `PauseIO/ResumeIO` cycles before a run,
+7920 after, with the input forced to 24 kHz).
+
+The shared lesson is narrower and still holds: **a green suite says nothing about what the suite
+did to the process it ran in.** Neither of these shows up as a failing test.
 
 ## Never `git commit --amend` in this working tree
 
