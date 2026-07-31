@@ -20,7 +20,7 @@ public enum AnchorEvidenceDisplay: Equatable {
     public var placeholderText: String? {
         switch self {
         case .notYetVerified: return "(pas encore vérifié)"
-        case .noEvidenceFound: return "—"
+        case .noEvidenceFound: return "(aucune correspondance)"
         case .evidence: return nil
         }
     }

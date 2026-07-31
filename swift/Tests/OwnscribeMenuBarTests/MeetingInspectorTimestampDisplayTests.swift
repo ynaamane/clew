@@ -54,7 +54,7 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
         XCTAssertEqual(
             display, .noEvidenceFound,
             "Anchoring ran and found nothing for this claim — that is a dash, not an absence of checking")
-        XCTAssertEqual(display.placeholderText, "—")
+        XCTAssertEqual(display.placeholderText, "(aucune correspondance)")
         XCTAssertTrue(display.chips.isEmpty)
     }
 
@@ -122,7 +122,30 @@ final class MeetingInspectorTimestampDisplayTests: XCTestCase {
         XCTAssertEqual(
             display, .noEvidenceFound,
             "A token with zero usable occurrences has no chip to show; rendering nothing at all would leave the claim unlabelled")
-        XCTAssertEqual(display.placeholderText, "—")
+        XCTAssertEqual(display.placeholderText, "(aucune correspondance)")
+    }
+
+    func testThreeStatesProducePairwiseDistinctNonEmptyStrings() {
+        let notYetVerified = AnchorEvidenceDisplay.notYetVerified.placeholderText
+        let noEvidenceFound = AnchorEvidenceDisplay.noEvidenceFound.placeholderText
+        let evidenceHasNoPlaceholder = AnchorEvidenceDisplay.evidence([
+            AnchorEvidenceChip(token: "test", timestamp: "00:00")
+        ]).placeholderText
+
+        XCTAssertNotNil(notYetVerified, ".notYetVerified must render a string")
+        XCTAssertNotNil(noEvidenceFound, ".noEvidenceFound must render a string")
+        XCTAssertNil(evidenceHasNoPlaceholder, ".evidence has chips, no placeholder")
+
+        XCTAssertFalse(
+            notYetVerified!.isEmpty,
+            "An empty notYetVerified string looks like nothing was rendered")
+        XCTAssertFalse(
+            noEvidenceFound!.isEmpty,
+            "An empty noEvidenceFound string looks like nothing was rendered")
+
+        XCTAssertNotEqual(
+            notYetVerified, noEvidenceFound,
+            "Collapsing not-checked and checked-and-found-nothing is the exact failure Int? counts prevent elsewhere")
     }
 
     func testDisplayConsumesWhatTheDiskLoaderProduces() throws {
