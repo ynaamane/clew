@@ -1,25 +1,73 @@
 # TODO — meeting-scribe
 
-## WHAT IS ACTUALLY LEFT (2026-07-31)
+## WHAT IS ACTUALLY LEFT (2026-08-03)
 
-Everything below this block is history and traps worth keeping. This is the open list.
+Everything below this block is history and traps worth keeping. This is the open list, rewritten
+after a four-lane audit (design gap vs the validated mockup — 34 elements; claim audit of this
+file; installed-bundle currency; fresh `check.sh` run, CHECK=0, 10/10 gates) triggered by the
+design being rejected again on sight.
 
-### THE SHORT ANSWER — 2 items
+### WHY THE WINDOW LOOKED WRONG — three stacked causes, all measured
 
-**All seven code items below were closed on 2026-07-31.** What remains cannot be closed by
-writing code here.
+1. **The judged app predates every visual fix.** `/Applications/MeetingScribe.app` was built
+   2026-07-30 **12:18:46** (single mtime across binary + Info.plist); **22 commits** touching
+   `swift/Sources` came after, including every glass/sidebar/avatar/banner fix of Jul 30-31.
+   Hard proof: `nm -a` on the installed binary → **0** `accessibilityIdentifier` symbols, vs 10
+   in today's sources. The rejection was rendered on a build containing none of the batch.
+2. **No real meeting has the data the design is built around.** 7 of 9 dirs under `~/ownscribe/`
+   have no `anchors.json` / `envelope.json` at all (including both real meetings, 24 & 27 Jul);
+   the 2 that do carry `anchors: {}` — 0 tokens. So the RMS strip and anchored key points — the
+   mockup's two signature elements — currently render on NO real meeting. The off-screen render
+   proves the strip works where `envelope.json` exists (the selftest dir).
+3. **Real code gaps vs the validated mockup remain** — the biggest are items 4-8 below; the full
+   34-element table lives in the 2026-08-03 audit report (session), top-5 ranked by reach.
 
-**Needs YOU (1)** — nobody else can do this:
-1. **Does the window read well?** `bash swift/build-app.sh && open "ownscribe://library"`. The
-   installed bundle predates today's batch, and the glass is invisible to every harness here —
-   `glassEffect`, no-glass and glass-on-container render **byte-identically** off-screen, so the
-   rail's appearance has exactly one possible judge (§ 2.2). Never let an agent run
-   `build-app.sh`: it `rm -rf`s the bundle and the TCC grants keyed to a cert that must never be
-   recreated.
+### THE OPEN LIST
 
-**Needs one real recording (1)**: the clickable evidence chip → scroll (§ 3). Re-measured today —
-both `anchors.json` files on disk have an `anchors` object with **0 tokens**, so the window has
-nothing to click.
+**Needs YOU (2):**
+1. **Rebuild, then look**: `bash swift/build-app.sh && open "ownscribe://library"` — never an
+   agent (`rm -rf` + TCC grants keyed to a cert that must never be recreated). Judge against
+   `design/direction-b-glass.png`, ideally AFTER item 3 so the strip/anchors have data to show.
+2. **One ruling — accent color.** `mockup.html:12` declares Apple blue (`#0071e3`); the PNG you
+   validated is purple throughout (selection, pills, envelope, timestamps). The app declares NO
+   accent at all (zero `.tint`/`AccentColor` → system blue). One word — blue or purple — unblocks
+   the single widest-reaching visual change (one `.tint()` on the split view).
+
+**Code, ordered by visual impact:**
+3. **Backfill `envelope.json` + `anchors.json` for existing meetings** through the production
+   functions (`generate_envelope_from_file`, `anchor_summary_claims`, `save_anchors`) — a
+   `reprocess`-style path over dirs that already have transcript+summary. Cause 2 above: without
+   this, no build can look like the mockup on a real meeting.
+4. **Sidebar glass is STILL on the `List`** — `LibraryWindow.swift:36` chains `.glassEffect()`
+   onto the `List`; only the inspector puts it on its container (`MeetingInspector.swift:78`).
+   § 2.2's "CODE DONE" below is WRONG: `f0e7bd6` removed the background-over-glass, it never
+   moved the modifier. `GlassPlacementTests` pins the NEIGHBORHOOD (`scrollContentBackground`
+   within 6 lines above), never the modifier's TARGET — pin the target when fixing, and pass an
+   explicit rectangular shape (all 3 sites currently take `DefaultGlassEffectShape()`, and the
+   § 0 finding-2 deformed-oval reproduction was made against glass-on-List).
+5. **Turn grouping in the transcript** — `UtteranceRow` repeats the 18pt disc + speaker name on
+   EVERY utterance (`MeetingDetailView.swift:94-97`); both references group consecutive
+   utterances under one header. Structurally a chat log, and it is the surface that gets reread.
+6. **Inspector rail styling** — `.formStyle(.grouped)` (`MeetingInspector.swift:74`) draws inset
+   boxes where both references show a flat rail: uppercase tracked captions, hairline rules, the
+   `· 6/7 ancrés` ratio in the Points clés header (the count already exists in `MeetingCounts`).
+7. **List row meta + badge consistency** — rows show the date only; duration + voice count are
+   already composed by `MeetingHeaderDetail.swift:4-9` for the detail header. And "non indexée"
+   renders as bare secondary `Text` between two real pills (`LibraryWindow.swift:158-161`).
+8. **The Python LLM-refusal guard was never actually refined** — `pipeline.py:420-432` is still
+   the original bare-substring list (`"sorry"`, `"please provide"`, `"transcript of"`), untouched
+   since `328ad22`, and `TestGenerateTitleSlug` has zero keep-a-legitimate-title tests. § 2.7's
+   "1/14 FP, 0/7 FN" describes the Swift BACKSTOP only. This is the exact class that erased 7/10
+   titles, sitting on the side of the guard that runs first. TDD both directions.
+9. Smaller mockup deltas, roughly one commit each: `.navigationSubtitle` aggregate
+   (`42 réunions · 18 h 12 min`); the anchoring callout under the detail header ("6 des 7 points
+   clés sont ancrés…"); a tinted highlight on the scroll-target line; the backchannel fold as a
+   count-carrying pill instead of a stock `Toggle(.switch)`; a prominent record button; the
+   empty-state permission rows; a window-level background.
+
+**Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
+item 3's backfill may close this without a new recording if anchoring finds tokens on the
+27-July transcript.
 
 **And the batch was closed once BEFORE anyone had looked, which found one more bug.** I reported
 seven items done without rendering the window this session, then ran
@@ -126,7 +174,10 @@ needs a mechanism before it becomes a defect.
    independent reproduction** off-screen from the real view tree, so this one has a mechanism, not
    just a sighting. The mockup treats the rail as a container background
    (`mockup.html:95` — `background: var(--bg-sidebar); backdrop-filter: blur(28px)`).
-   **Code fixed** (`f0e7bd6`) and **still visually UNVERIFIED, by construction** — see § 2.2.
+   **Only HALF-fixed by `f0e7bd6`** (2026-08-03 audit): that commit removed the opaque
+   `.background(.background)` over the glass but **never moved `.glassEffect()` off the `List`**
+   — at HEAD it still sits there (`LibraryWindow.swift:36`), the exact configuration this finding
+   blames, while the inspector has it on its container. See the open list, item 4.
    *The black selected pill in the same screenshot is an off-screen artifact, NOT a defect:*
    sampled at **(0,0,0)** in a render against **(225,226,226)** in the real window.
 3. ~~**Speaker avatars are absent.**~~ **WRONG — they are built and wired.**
@@ -208,16 +259,22 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    `^[1 voix](inflect: true)` verbatim, guarded by a test that asserted the broken string.
 1. ~~**Make the window honour Dark mode.**~~ **STRUCK — it already does; the machine is in light
    mode.** See § 0 finding 1. Hardcoding dark would override the user's auto-switch setting.
-2. **Fix the sidebar glass** — **CODE DONE, VISUALLY UNVERIFIED, and that gap is permanent here.**
-   `.glassEffect()` now sits on the container with `.scrollContentBackground(.hidden)` so the List's
-   own opaque background cannot cover it (`f0e7bd6`; the first attempt painted
-   `.background(.background)` **over** the glass, which would have shipped LESS glass than before
-   while reading as a correct fix — and no render could have caught it). The transcript keeps its
-   opaque background per the HIG content-layer rule. Both invariants are now guarded mechanically by
-   `GlassPlacementTests` (mutations: opaque-background-over-glass → 2 red, glass-on-transcript → 1 red).
+2. **Fix the sidebar glass** — **NOT DONE, and this entry previously said "CODE DONE" — that was
+   an intention recorded as a delivery, third instance in this repo (2026-08-03 audit).**
+   What `f0e7bd6` actually did: removed the opaque `.background(.background)` that painted OVER
+   the glass (real, kept). What it never did: move `.glassEffect()` onto a container —
+   `LibraryWindow.swift:36` still chains it on the `List`, the configuration § 0 finding 2 blames
+   for the deformed oval rail, while `MeetingInspector.swift:78` correctly has it on its ZStack.
+   Why the suite never noticed: `GlassPlacementTests` asserts `.scrollContentBackground(.hidden)`
+   appears within 6 lines ABOVE the `.glassEffect()` — a NEIGHBORHOOD assertion that is true in
+   both placements. It never names the modifier's TARGET, so "glass on a container" was recorded
+   as delivered without ever being testable. When fixing: pin the target in the test, and pass an
+   explicit rectangular shape (`glassEffect(_:in:)` defaults to `DefaultGlassEffectShape()` at
+   all 3 sites — SDK `SwiftUICore.swiftinterface:2529`). The transcript keeps its opaque
+   background per the HIG content-layer rule (still guarded, still correct).
    **What no harness here can answer is whether the rail READS as glass** — glass, no-glass and
-   glass-on-container render byte-identically off-screen. That needs your eye on an unlocked screen,
-   after `bash swift/build-app.sh`.
+   glass-on-container render byte-identically off-screen. That needs your eye on an unlocked
+   screen, after `bash swift/build-app.sh`.
 3. **Decide what to do about the search field** — NOT a placement argument. `.toolbar`, `.sidebar`
    and `.automatic` all render byte-identically on macOS `NavigationSplitView` (measured, § 0
    finding 7): the field always goes to the toolbar. Matching the mockup's in-header search box
@@ -243,9 +300,15 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    legitimate titles** — in an app whose meetings are often *about* transcripts. Both its tests
    passed, because both only asserted the true-positive direction. Now **1/14 false positives, 0/7
    false negatives**, anchored and multi-word, with the keep-list in the tests. Known limit:
-   `i-m-feeling-lucky-launch` is still erased by the `i-m-` prefix. The real defence is the **Python**
-   guard on the RAW title before `_slugify` — slugification destroys the punctuation a structural test
-   needs, so the Swift side is a narrow backstop for the one bad directory already on disk.
+   `i-m-feeling-lucky-launch` is still erased by the `i-m-` prefix.
+   **CORRECTION (2026-08-03 audit): the "real defence" never got this refinement.** The intended
+   design — Python guard on the RAW title before `_slugify`, structural, since slugification
+   destroys the punctuation a structural test needs — was never built: `pipeline.py:420-432` is
+   the ORIGINAL bare-substring list from `328ad22` (`"sorry"`, `"please provide"`,
+   `"transcript of"`…), untouched since, with zero keep-a-legitimate-title tests
+   (`TestGenerateTitleSlug` asserts only the reject direction). The 1/14 FP / 0/7 FN numbers
+   above describe the Swift BACKSTOP; the guard that runs FIRST still has the 7-of-10-titles bug
+   shape. Open list, item 8.
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
@@ -537,11 +600,12 @@ Both defects had the same shape: values plumbed to consumers that were never cal
 
 Deliberately unbuilt, not bugs:
 
-- **Scroll-to-evidence.** Clicking a timestamp should jump to that utterance. A `Button` wired to an
-  empty `scrollToTimestamp` was REMOVED (`a516cc7`) rather than left in: a control that looks live
-  and does nothing teaches you the evidence is unreachable, so you stop checking — worse than static
-  text on the one path meant to let you verify a claim. Needs a `ScrollViewReader` in
-  `MeetingDetailView` plus a selected-timestamp channel; `Utterance` already carries `timecode`.
+- ~~**Scroll-to-evidence.**~~ **BUILT since `8067322` (2026-07-29) — this entry was stale and
+  contradicted § 3 of this same file (2026-08-03 audit).** The `ScrollViewReader` lives in
+  `MeetingDetailView.swift:11` with `scrollToAnchor(_:using:)` at `:44-59`, wired from
+  `MeetingInspector`'s `onScrollToAnchor`. (The `a516cc7` removal of the dead button predates
+  that.) The remaining gap is § 3's: no meeting on disk has non-empty anchors, so it has never
+  fired on live data.
 - **The badge call site is review-guarded, not test-guarded.** `.badge(BadgeText.badgeText(for:
   item))` — adding `?? "0"` there survives the suite. Closing it needs a view-host test, which
   deadlocked this project twice for 29 minutes with the SwiftPM lock held. One named line on a
