@@ -186,6 +186,8 @@ ownscribe transcribe recording.wav # transcribe an audio or video file: wav/mp3/
 ownscribe summarize transcript.md  # summarize a transcript (saves alongside the input)
 ownscribe resume ./2026-02-20_1736 # resume a partial run, or process a folder's audio/video recording
 ownscribe reprocess ./2026-02-20_1736 # force a full re-transcribe+summarize, even if output already exists
+ownscribe backfill ./2026-02-20_1736 # add missing envelope.json/anchors.json without re-running ASR or the LLM
+ownscribe backfill                 # same, scanning every meeting directory
 ownscribe purge --older-than 30    # delete retained audio older than N days
 ownscribe purge --all              # delete all retained audio regardless of age
 ownscribe purge --dry-run          # preview what a purge would remove, without deleting
@@ -393,6 +395,17 @@ ownscribe reprocess ./2026-02-20_1736 --model large-v3 --template lecture
 ```
 
 Unlike `resume` (which skips work that's already done), `reprocess` always starts over from the audio — it errors out if no retained audio is found for that meeting (i.e. `keep_recording` was `false` when it was recorded, or it's already been purged).
+
+### Backfilling Older Meetings
+
+Meetings recorded before `envelope.json` (the waveform strip) or `anchors.json` (clickable evidence for summary claims) existed have a transcript and summary but neither derived file. `backfill` adds whatever is missing, computed from what's already on disk:
+
+```bash
+ownscribe backfill ./2026-02-20_1736   # backfill one meeting
+ownscribe backfill                     # scan every meeting directory, backfilling each that needs it
+```
+
+It never re-runs transcription or summarization, and it never rewrites or deletes an existing file — a meeting that already has both `envelope.json` and `anchors.json` is left untouched, and `envelope.json` is only added when retained audio is still present (no audio means no waveform, not a flat one). Running it again is always safe; it reports one line per directory and only ever adds files.
 
 ## Summarization Templates
 
