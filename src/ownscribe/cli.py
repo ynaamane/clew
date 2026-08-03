@@ -312,6 +312,21 @@ def reprocess(
 
 
 @cli.command()
+@click.argument("directory", type=click.Path(exists=True, file_okay=False), required=False)
+@click.pass_context
+def backfill(ctx: click.Context, directory: str | None) -> None:
+    """Add missing envelope.json/anchors.json to meetings that already have transcript+summary.
+
+    Scans every meeting directory when DIRECTORY is omitted. Never re-runs ASR or the LLM,
+    and never rewrites or deletes an existing file.
+    """
+    config = ctx.obj["config"]
+    from ownscribe.pipeline import run_backfill
+
+    run_backfill(config, directory)
+
+
+@cli.command()
 @click.option(
     "--older-than",
     "older_than_days",

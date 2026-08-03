@@ -2851,3 +2851,261 @@ class TestResumeWritesTheEvidenceFiles:
             "run_summarize hardcoded summary.md, so a JSON-configured user's summary was "
             "invisible to the app, which looks for summary.json when format == json"
         )
+
+
+class TestBackfillDerivedArtifacts:
+    """envelope.json/anchors.json for meetings that already have transcript+summary but predate
+    those two writers. ADD-only (never rewrites or deletes transcript/summary/existing
+    envelope/anchors), idempotent, and must never re-run ASR or the LLM -- both files can be
+    derived from what is already on disk.
+    """
+
+    TRANSCRIPT = (
+        "# Transcript\n\n"
+        "**Language:** en\n"
+        "**Duration:** 00:42\n\n"
+        "**SPEAKER_00** [00:05]\n"
+        "The JWT token is validated before the Lambda runs.\n"
+        "[00:20] Gary confirmed the Confluence page is updated.\n"
+    )
+    SUMMARY = (
+        "Reviewed the auth path. The JWT token is validated before the Lambda runs. Gary confirmed the Confluence page."
+    )
+
+    def _meeting_dir(self, tmp_path, name="2026-01-01_1200"):
+        d = tmp_path / name
+        d.mkdir(parents=True)
+        return d
+
+    def test_skips_directory_without_transcript_or_summary(self, tmp_path):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        assert not (d / "anchors.json").exists()
+        assert not (d / "envelope.json").exists()
+
+    def test_adds_anchors_from_existing_transcript_and_summary(self, tmp_path):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        anchors_file = d / "anchors.json"
+        assert anchors_file.exists()
+        anchors = json.loads(anchors_file.read_text())["anchors"]
+        assert anchors, "anchoring must find real tokens on this transcript+summary pair"
+        for token, occurrences in anchors.items():
+            for occurrence in occurrences:
+                assert token.lower() in occurrence["context"].lower()
+        assert not (d / "envelope.json").exists(), "no retained audio -- absence must stay absence"
+
+    def test_adds_envelope_from_retained_audio(self, tmp_path, synthetic_wav):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        shutil.copy(synthetic_wav, d / "recording.wav")
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        envelope_file = d / "envelope.json"
+        assert envelope_file.exists()
+        buckets = json.loads(envelope_file.read_text())["envelope"]
+        assert len(buckets) == 500
+
+    def test_idempotent_does_not_touch_existing_derived_files(self, tmp_path, synthetic_wav):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        shutil.copy(synthetic_wav, d / "recording.wav")
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        (d / "anchors.json").write_text('{"version": "1.0", "anchors": {"PLACEHOLDER": []}}')
+        (d / "envelope.json").write_text('{"envelope": [0.1, 0.2]}')
+        original_anchors = (d / "anchors.json").read_text()
+        original_envelope = (d / "envelope.json").read_text()
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        assert (d / "anchors.json").read_text() == original_anchors, "must not overwrite an existing anchors.json"
+        assert (d / "envelope.json").read_text() == original_envelope, "must not overwrite an existing envelope.json"
+
+    def test_does_not_overwrite_existing_anchors_when_only_envelope_is_missing(self, tmp_path, synthetic_wav):
+        """A directory with anchors.json already present but no envelope.json is the partial
+        state the top-level 'both already exist' check does NOT shield -- it must fall through
+        to the per-file guards, and those must still leave the existing anchors.json alone.
+        """
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        shutil.copy(synthetic_wav, d / "recording.wav")
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        (d / "anchors.json").write_text('{"version": "1.0", "anchors": {"PLACEHOLDER": []}}')
+        original_anchors = (d / "anchors.json").read_text()
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        assert (d / "anchors.json").read_text() == original_anchors, (
+            "anchors.json already existed and must not be regenerated just because envelope.json was missing"
+        )
+        assert (d / "envelope.json").exists(), "envelope.json was genuinely missing and must be added"
+
+    def test_does_not_overwrite_existing_envelope_when_only_anchors_is_missing(self, tmp_path, synthetic_wav):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        shutil.copy(synthetic_wav, d / "recording.wav")
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        (d / "envelope.json").write_text('{"envelope": [0.1, 0.2]}')
+        original_envelope = (d / "envelope.json").read_text()
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        assert (d / "envelope.json").read_text() == original_envelope, (
+            "envelope.json already existed and must not be regenerated just because anchors.json was missing"
+        )
+        assert (d / "anchors.json").exists(), "anchors.json was genuinely missing and must be added"
+
+    def test_never_modifies_transcript_or_summary(self, tmp_path):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        assert (d / "transcript.md").read_text() == self.TRANSCRIPT
+        assert (d / "summary.md").read_text() == self.SUMMARY
+
+    def test_never_calls_the_summarizer_or_transcriber(self, tmp_path):
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        (d / "transcript.md").write_text(self.TRANSCRIPT)
+        (d / "summary.md").write_text(self.SUMMARY)
+        config = Config()
+
+        with (
+            mock.patch("ownscribe.pipeline.create_summarizer", side_effect=AssertionError("must not run the LLM")),
+            mock.patch("ownscribe.pipeline._create_transcriber", side_effect=AssertionError("must not run ASR")),
+        ):
+            run_backfill(config, str(d))
+
+        assert (d / "anchors.json").exists()
+
+    def test_parity_between_markdown_and_json_output_format(self, tmp_path):
+        from ownscribe.output.json_output import format_transcript_json
+        from ownscribe.pipeline import run_backfill
+
+        md_dir = self._meeting_dir(tmp_path, "2026-01-01_1200")
+        (md_dir / "transcript.md").write_text(self.TRANSCRIPT)
+        (md_dir / "summary.md").write_text(self.SUMMARY)
+
+        json_dir = self._meeting_dir(tmp_path, "2026-01-01_1300")
+        result = TranscriptResult(
+            segments=[
+                Segment(
+                    text="The JWT token is validated before the Lambda runs.",
+                    start=5.0,
+                    end=10.0,
+                    speaker="SPEAKER_00",
+                ),
+                Segment(
+                    text="Gary confirmed the Confluence page is updated.",
+                    start=20.0,
+                    end=25.0,
+                    speaker="SPEAKER_00",
+                ),
+            ],
+            language="en",
+            duration=42.0,
+        )
+        (json_dir / "transcript.json").write_text(format_transcript_json(result))
+        # _do_transcribe_and_summarize writes summary.json with no header when format == json.
+        (json_dir / "summary.json").write_text(self.SUMMARY)
+
+        config = Config()
+        run_backfill(config, str(md_dir))
+        run_backfill(config, str(json_dir))
+
+        md_anchors = json.loads((md_dir / "anchors.json").read_text())["anchors"]
+        json_anchors = json.loads((json_dir / "anchors.json").read_text())["anchors"]
+        assert md_anchors.keys(), "must find real tokens, not an empty set"
+        assert set(md_anchors.keys()) == set(json_anchors.keys()), (
+            "a real transcript.json must anchor identically to the same content saved as markdown"
+        )
+
+    def test_strips_the_meeting_summary_header_when_present(self, tmp_path):
+        """run_summarize (unlike _do_transcribe_and_summarize) always wraps summary.json with the
+        same '# Meeting Summary' header used for markdown. If backfill fed that header text
+        straight into anchor_summary_claims, 'Summary' would be picked up as a spurious rare
+        token whenever the transcript happens to contain the word 'summary' anywhere.
+        """
+        from ownscribe.output.markdown import format_summary
+        from ownscribe.pipeline import run_backfill
+
+        d = self._meeting_dir(tmp_path)
+        (d / "transcript.md").write_text(self.TRANSCRIPT + "[00:30] In summary, Gary is happy with the rollout.\n")
+        (d / "summary.json").write_text(format_summary(self.SUMMARY))
+        config = Config()
+
+        run_backfill(config, str(d))
+
+        anchors = json.loads((d / "anchors.json").read_text())["anchors"]
+        assert "Summary" not in anchors, "the file header must not leak into the anchored claims"
+
+    def test_scans_every_meeting_directory_when_none_given(self, tmp_path, capsys):
+        from ownscribe.pipeline import run_backfill
+
+        base = tmp_path / "notes"
+        base.mkdir()
+        needs_backfill = base / "2026-01-01_1200"
+        needs_backfill.mkdir()
+        (needs_backfill / "transcript.md").write_text(self.TRANSCRIPT)
+        (needs_backfill / "summary.md").write_text(self.SUMMARY)
+
+        already_has_anchors = base / "2026-01-02_1200"
+        already_has_anchors.mkdir()
+        (already_has_anchors / "transcript.md").write_text(self.TRANSCRIPT)
+        (already_has_anchors / "summary.md").write_text(self.SUMMARY)
+        (already_has_anchors / "anchors.json").write_text('{"version": "1.0", "anchors": {}}')
+
+        incomplete = base / "2026-01-03_1200"
+        incomplete.mkdir()
+
+        config = Config()
+        config.output.dir = str(base)
+
+        run_backfill(config)
+
+        captured = capsys.readouterr()
+        assert "2026-01-01_1200" in captured.out
+        assert "2026-01-02_1200" in captured.out
+        assert "2026-01-03_1200" in captured.out
+        assert (needs_backfill / "anchors.json").exists()
+
+    def test_errors_when_given_directory_does_not_exist(self, tmp_path):
+        from ownscribe.pipeline import run_backfill
+
+        config = Config()
+        missing = tmp_path / "does-not-exist"
+
+        with pytest.raises(SystemExit):
+            run_backfill(config, str(missing))

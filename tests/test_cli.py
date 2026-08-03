@@ -318,6 +318,41 @@ class TestPurgeCommand:
         assert purge_all is True
 
 
+class TestBackfillCommand:
+    def test_backfill_help(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["backfill", "--help"])
+        assert result.exit_code == 0
+        assert "envelope.json" in result.output
+        assert "anchors.json" in result.output
+
+    def test_backfill_with_directory_forwards_it(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_backfill") as mock_backfill:
+            result = runner.invoke(cli, ["backfill", str(tmp_path)])
+
+        assert result.exit_code == 0
+        mock_backfill.assert_called_once()
+        _config, directory = mock_backfill.call_args[0]
+        assert directory == str(tmp_path)
+
+    def test_backfill_without_directory_forwards_none(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("ownscribe.pipeline.run_backfill") as mock_backfill:
+            result = runner.invoke(cli, ["backfill"])
+
+        assert result.exit_code == 0
+        mock_backfill.assert_called_once()
+        _config, directory = mock_backfill.call_args[0]
+        assert directory is None
+
+    def test_backfill_requires_existing_directory_when_given(self):
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(cli, ["backfill", "/no/such/directory"])
+        assert result.exit_code != 0
+
+
 class TestCleanup:
     def test_all_yes_removes_dirs(self, tmp_path):
         config_dir = tmp_path / "config"

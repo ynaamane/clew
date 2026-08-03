@@ -1109,6 +1109,138 @@ def run_reprocess(config: Config, directory: str) -> None:
     _do_transcribe_and_summarize(config, audio, dir_path)
 
 
+_SUMMARY_MD_HEADER = "# Meeting Summary\n\n"
+
+
+def _raw_summary_text_for_anchoring(summary_path: Path) -> str:
+    """Recover the raw summary text anchor_summary_claims originally ran against.
+
+    format_summary's '# Meeting Summary' header is not reversible through any existing reader:
+    _do_transcribe_and_summarize's json path omits it, but run_summarize adds it regardless of
+    output.format. Stripping unconditionally (rather than branching on file extension) covers
+    both write paths with one rule.
+    """
+    content = summary_path.read_text()
+    if content.startswith(_SUMMARY_MD_HEADER):
+        return content[len(_SUMMARY_MD_HEADER) :].rstrip("\n")
+    return content
+
+
+def _load_transcript_result_from_json(text: str):
+    """Reconstruct a TranscriptResult from the JSON produced by format_transcript_json."""
+    import json
+
+    from ownscribe.transcription.models import Segment, TranscriptResult, Word
+
+    data = json.loads(text)
+    segments = [
+        Segment(
+            text=seg["text"],
+            start=seg["start"],
+            end=seg["end"],
+            speaker=seg.get("speaker"),
+            words=[
+                Word(
+                    text=w["text"],
+                    start=w["start"],
+                    end=w["end"],
+                    speaker=w.get("speaker"),
+                    score=w.get("score", 0.0),
+                )
+                for w in seg.get("words", [])
+            ],
+        )
+        for seg in data.get("segments", [])
+    ]
+    return TranscriptResult(segments=segments, language=data.get("language", ""), duration=data.get("duration", 0.0))
+
+
+def _transcript_text_for_anchoring(transcript_path: Path) -> str:
+    """Reconstruct the timestamped markdown text anchor_summary_claims expects.
+
+    A markdown transcript file is already byte-identical to format_transcript's output, so it is
+    read as-is. A JSON transcript is deserialized back into a TranscriptResult and run through
+    the same production format_transcript used everywhere else anchoring happens, rather than
+    matching against the raw JSON text (which carries no markdown timestamp markers at all).
+    """
+    import json
+
+    content = transcript_path.read_text()
+    if transcript_path.suffix != ".json":
+        return content
+
+    from ownscribe.output.markdown import format_transcript
+
+    try:
+        result = _load_transcript_result_from_json(content)
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return content
+
+    return format_transcript(result)
+
+
+def _backfill_directory(config: Config, dir_path: Path) -> str:
+    """Add missing envelope.json/anchors.json to one meeting directory.
+
+    ADD-only: never rewrites or deletes transcript.*, summary.*, or an existing envelope.json /
+    anchors.json. Idempotent: a directory that already has both is left untouched. Never runs
+    ASR or the LLM -- both derived files are computed from what is already on disk.
+    """
+    transcript = _find_transcript(dir_path)
+    summary = _find_summary(dir_path)
+    if transcript is None or summary is None:
+        return f"{dir_path.name}: skipped (no transcript+summary)"
+
+    envelope_path = dir_path / "envelope.json"
+    anchors_path = dir_path / "anchors.json"
+    if envelope_path.exists() and anchors_path.exists():
+        return f"{dir_path.name}: skipped (already has envelope.json and anchors.json)"
+
+    added = []
+
+    if not envelope_path.exists():
+        audio = _resolve_retained_audio(config, dir_path)
+        if audio is not None:
+            _generate_and_save_envelope(audio, dir_path)
+            if envelope_path.exists():
+                added.append("envelope.json")
+
+    if not anchors_path.exists():
+        transcript_text = _transcript_text_for_anchoring(transcript)
+        summary_text = _raw_summary_text_for_anchoring(summary)
+        anchors = anchor_summary_claims(summary_text, transcript_text)
+        save_anchors(anchors, dir_path)
+        added.append("anchors.json")
+
+    if added:
+        return f"{dir_path.name}: added {', '.join(added)}"
+    return f"{dir_path.name}: skipped (no retained audio for envelope.json)"
+
+
+def run_backfill(config: Config, directory: str | None = None) -> None:
+    """Add missing envelope.json/anchors.json to meetings that already have transcript+summary.
+
+    Scans every directory under config.output.resolved_dir when directory is omitted. ADD-only
+    and idempotent -- see _backfill_directory. Never re-runs ASR or the LLM.
+    """
+    if directory is not None:
+        dir_path = Path(directory).resolve()
+        if not dir_path.is_dir():
+            click.echo(f"Error: {dir_path} is not a directory.", err=True)
+            raise SystemExit(1)
+        dirs = [dir_path]
+    else:
+        base = config.output.resolved_dir
+        dirs = sorted(d for d in base.iterdir() if d.is_dir()) if base.is_dir() else []
+
+    if not dirs:
+        click.echo("No meetings found to backfill.")
+        return
+
+    for dir_path in dirs:
+        click.echo(_backfill_directory(config, dir_path))
+
+
 def run_purge(config: Config, older_than_days: int | None, purge_all: bool, dry_run: bool) -> None:
     """Delete retained audio according to the retention policy (keep-N-days, forever, or --all)."""
     effective_days = config.output.retention_days if older_than_days is None else older_than_days
