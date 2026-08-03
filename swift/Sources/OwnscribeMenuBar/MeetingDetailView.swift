@@ -5,13 +5,18 @@ struct MeetingDetailView: View {
 
     @State private var transcript: TranscriptDocument?
     @State private var envelope: EnvelopeDocument?
+    @State private var keyPointsWithAnchors: [KeyPointWithAnchors]?
     @State private var showBackchannel = false
+    @State private var highlightedUtteranceID: UUID?
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
+                    if let anchoringSummary {
+                        anchoringCallout(anchoringSummary)
+                    }
                     if let envelope {
                         EnvelopeStrip(buckets: envelope.buckets)
                             .padding(.horizontal, 26)
@@ -38,7 +43,28 @@ struct MeetingDetailView: View {
             let assets = loadMeetingAssets(from: meeting)
             transcript = assets.transcript
             envelope = assets.envelope
+            keyPointsWithAnchors = MeetingInspectorState.loadKeyPointsWithAnchors(from: meeting.directory)
         }
+    }
+
+    private var anchoringSummary: AnchoringSummary? {
+        AnchoringSummaryCalculator.summary(for: keyPointsWithAnchors ?? [])
+    }
+
+    private func anchoringCallout(_ summary: AnchoringSummary) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 9) {
+            Image(systemName: "flag.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+            Text(AnchoringCalloutText.text(for: summary))
+                .font(.callout)
+        }
+        .padding(EdgeInsets(top: 9, leading: 11, bottom: 9, trailing: 11))
+        .background(Color.orange.opacity(0.14))
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 26)
+        .padding(.bottom, 8)
+        .accessibilityIdentifier("meeting.anchoringCallout")
     }
 
     private func scrollToAnchor(_ chip: AnchorEvidenceChip, using proxy: ScrollViewProxy) {
@@ -48,6 +74,8 @@ struct MeetingDetailView: View {
             in: transcript?.utterances ?? [],
             backchannelVisible: showBackchannel
         ) else { return }
+
+        highlightedUtteranceID = target.utteranceID
 
         guard target.revealsBackchannel else {
             withAnimation { proxy.scrollTo(target.utteranceID, anchor: .center) }
@@ -84,16 +112,11 @@ struct MeetingDetailView: View {
     private var transcriptBody: some View {
         if let transcript, !transcript.utterances.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                if transcript.utterances.contains(where: \.isBackchannel) {
-                    Toggle("Afficher les interventions courtes", isOn: $showBackchannel)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .font(.caption)
-                        .accessibilityIdentifier("meeting.backchannelToggle")
+                if let foldLabel = backchannelFoldLabel {
+                    backchannelFoldPill(foldLabel)
                 }
-                ForEach(visibleUtterances) { utterance in
-                    UtteranceRow(utterance: utterance)
-                        .id(utterance.id)
+                ForEach(TranscriptTurnGrouping.turns(from: visibleUtterances)) { turn in
+                    TurnView(turn: turn, highlightedUtteranceID: highlightedUtteranceID)
                 }
             }
             .padding(EdgeInsets(top: 4, leading: 26, bottom: 30, trailing: 26))
@@ -105,43 +128,78 @@ struct MeetingDetailView: View {
         }
     }
 
+    private var backchannelFoldLabel: BackchannelFoldLabel? {
+        guard let transcript else { return nil }
+        return BackchannelFoldSummary.label(for: transcript.utterances)
+    }
+
+    private func backchannelFoldPill(_ label: BackchannelFoldLabel) -> some View {
+        Button {
+            showBackchannel.toggle()
+        } label: {
+            Text((showBackchannel ? "▾ " : "▸ ") + BackchannelFoldSummary.text(for: label))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Color.secondary.opacity(0.09))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("meeting.backchannelToggle")
+    }
+
     private var visibleUtterances: [Utterance] {
         guard let transcript else { return [] }
         return showBackchannel ? transcript.utterances : transcript.utterances.filter { !$0.isBackchannel }
     }
-
-
 }
 
-private struct UtteranceRow: View {
-    let utterance: Utterance
+private struct TurnView: View {
+    let turn: TranscriptTurn
+    let highlightedUtteranceID: UUID?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(utterance.timecode)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(width: 40, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    speakerAvatar
-                    Text(utterance.speaker)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(SpeakerAvatarStyle.color(for: utterance.speaker))
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                speakerAvatar
+                Text(turn.speaker)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SpeakerAvatarStyle.color(for: turn.speaker))
+                Text(turn.firstTimecode)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+            ForEach(turn.utterances) { utterance in
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Text(utterance.timecode)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 40, alignment: .leading)
+                    Text(utterance.text)
+                        .font(.body)
+                        .textSelection(.enabled)
                 }
-                Text(utterance.text)
-                    .font(.body)
-                    .textSelection(.enabled)
+                .padding(.vertical, 1)
+                .padding(.horizontal, 4)
+                .background(
+                    LineHighlightDecision.isHighlighted(lineID: utterance.id, highlightedID: highlightedUtteranceID)
+                        ? Color.accentColor.opacity(0.12)
+                        : Color.clear
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .id(utterance.id)
             }
         }
+        .padding(.top, 6)
     }
 
     private var speakerAvatar: some View {
         ZStack {
             Circle()
-                .fill(SpeakerAvatarStyle.color(for: utterance.speaker))
+                .fill(SpeakerAvatarStyle.color(for: turn.speaker))
                 .frame(width: 18, height: 18)
-            Text(SpeakerAvatarStyle.displayLabel(for: utterance.speaker))
+            Text(SpeakerAvatarStyle.displayLabel(for: turn.speaker))
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white)
         }
