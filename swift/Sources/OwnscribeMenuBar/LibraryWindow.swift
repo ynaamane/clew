@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct LibraryWindow: View {
@@ -8,6 +9,7 @@ struct LibraryWindow: View {
     @State private var selectedMeeting: MeetingSummary?
     @State private var showBannerDetail = false
     @State private var searchQuery: String = ""
+    @State private var meetingDurations: [String: TimeInterval] = [:]
 
     private var sections: [LibrarySidebarSection] {
         LibrarySidebar.sections(for: appState.recentMeetings, enrolledSpeakers: appState.enrolledSpeakers)
@@ -16,6 +18,11 @@ struct LibraryWindow: View {
     private var shownMeetings: [MeetingSummary] {
         let filtered = selectedFilter.apply(to: appState.recentMeetings)
         return MeetingSearchFilter.filter(filtered, query: searchQuery)
+    }
+
+    private var navigationSubtitleText: String {
+        let known = appState.recentMeetings.compactMap { meetingDurations[$0.id] }
+        return LibraryNavigationSubtitle.text(meetingCount: appState.recentMeetings.count, knownDurations: known)
     }
 
     var body: some View {
@@ -33,7 +40,6 @@ struct LibraryWindow: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .glassEffect()
 
                 if let banner = currentBanner, showBannerDetail || banner.severity == .warning {
                     VStack {
@@ -46,6 +52,7 @@ struct LibraryWindow: View {
                     }
                 }
             }
+            .glassEffect(.regular, in: .rect(cornerRadius: 12))
             .navigationSplitViewColumnWidth(min: 180, ideal: 216, max: 280)
             .accessibilityIdentifier("library.sidebar")
         } content: {
@@ -59,6 +66,9 @@ struct LibraryWindow: View {
             }
         }
         .navigationTitle("Réunions")
+        .navigationSubtitle(navigationSubtitleText)
+        .tint(AppAccentColor.color)
+        .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             ToolbarItemGroup {
                 if case .processing(let step, _, let detail) = appState.phase {
@@ -92,10 +102,12 @@ struct LibraryWindow: View {
             appState.refreshCliAvailability()
             let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: appState.recentMeetings)
             selectedMeeting = resolved
+            loadMeetingDurations()
         }
         .onChange(of: appState.recentMeetings) { _, newMeetings in
             let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: newMeetings)
             selectedMeeting = resolved
+            loadMeetingDurations()
         }
         .onChange(of: shownMeetings) { _, newShown in
             let resolved: MeetingSummary? = LibrarySelection.resolve(current: selectedMeeting, shown: newShown)
@@ -115,6 +127,17 @@ struct LibraryWindow: View {
             muteIndicator: appState.muteIndicator,
             isCliAvailable: appState.isCliAvailable
         )
+    }
+
+    private func loadMeetingDurations() {
+        var result: [String: TimeInterval] = [:]
+        for meeting in appState.recentMeetings {
+            let transcriptURL = meeting.directory.appendingPathComponent("transcript.md")
+            if let document = try? TranscriptDocument(contentsOf: transcriptURL), document.duration > 0 {
+                result[meeting.id] = document.duration
+            }
+        }
+        meetingDurations = result
     }
 }
 
@@ -137,9 +160,18 @@ private struct MeetingListColumn: View {
 private struct MeetingRow: View {
     let meeting: MeetingSummary
     @State private var summaryExcerpt: String?
+    @State private var transcriptFacts: TranscriptDocument?
 
     private var anchorState: UnanchoredClaimBadge {
         UnanchoredClaimBadge.state(unanchoredClaimCount: meeting.unanchoredClaimCount)
+    }
+
+    private var rowMetaText: String {
+        MeetingRowMeta.text(
+            date: meeting.displayDate,
+            duration: transcriptFacts?.duration,
+            speakerCount: transcriptFacts?.speakers.count
+        )
     }
 
     var body: some View {
@@ -148,7 +180,7 @@ private struct MeetingRow: View {
                 .font(.body.weight(.semibold))
                 .lineLimit(1)
             HStack(spacing: 6) {
-                Text(meeting.displayDate)
+                Text(rowMetaText)
                 if let badge = MeetingStatusBadge.Variant(anchorState: anchorState) {
                     MeetingStatusBadge(variant: badge)
                 }
@@ -156,8 +188,7 @@ private struct MeetingRow: View {
                     MeetingStatusBadge(variant: .actionItems(count: count))
                 }
                 if !meeting.hasSummary {
-                    Text("non indexée")
-                        .foregroundStyle(.secondary)
+                    MeetingStatusBadge(variant: .notIndexed)
                 }
             }
             .font(.caption)
@@ -174,6 +205,7 @@ private struct MeetingRow: View {
         .padding(.vertical, 2)
         .task {
             loadSummaryExcerpt()
+            loadTranscriptFacts()
         }
     }
 
@@ -187,6 +219,12 @@ private struct MeetingRow: View {
             from: meeting.directory,
             configURL: configPath
         )
+    }
+
+    private func loadTranscriptFacts() {
+        guard transcriptFacts == nil else { return }
+        let transcriptURL = meeting.directory.appendingPathComponent("transcript.md")
+        transcriptFacts = try? TranscriptDocument(contentsOf: transcriptURL)
     }
 }
 
