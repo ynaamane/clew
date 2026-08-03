@@ -34,37 +34,36 @@ design being rejected again on sight.
    accent at all (zero `.tint`/`AccentColor` → system blue). One word — blue or purple — unblocks
    the single widest-reaching visual change (one `.tint()` on the split view).
 
-**Code, ordered by visual impact:**
-3. **Backfill `envelope.json` + `anchors.json` for existing meetings** through the production
-   functions (`generate_envelope_from_file`, `anchor_summary_claims`, `save_anchors`) — a
-   `reprocess`-style path over dirs that already have transcript+summary. Cause 2 above: without
-   this, no build can look like the mockup on a real meeting.
-4. **Sidebar glass is STILL on the `List`** — `LibraryWindow.swift:36` chains `.glassEffect()`
-   onto the `List`; only the inspector puts it on its container (`MeetingInspector.swift:78`).
-   § 2.2's "CODE DONE" below is WRONG: `f0e7bd6` removed the background-over-glass, it never
-   moved the modifier. `GlassPlacementTests` pins the NEIGHBORHOOD (`scrollContentBackground`
-   within 6 lines above), never the modifier's TARGET — pin the target when fixing, and pass an
-   explicit rectangular shape (all 3 sites currently take `DefaultGlassEffectShape()`, and the
-   § 0 finding-2 deformed-oval reproduction was made against glass-on-List).
-5. **Turn grouping in the transcript** — `UtteranceRow` repeats the 18pt disc + speaker name on
-   EVERY utterance (`MeetingDetailView.swift:94-97`); both references group consecutive
-   utterances under one header. Structurally a chat log, and it is the surface that gets reread.
-6. **Inspector rail styling** — `.formStyle(.grouped)` (`MeetingInspector.swift:74`) draws inset
-   boxes where both references show a flat rail: uppercase tracked captions, hairline rules, the
-   `· 6/7 ancrés` ratio in the Points clés header (the count already exists in `MeetingCounts`).
-7. **List row meta + badge consistency** — rows show the date only; duration + voice count are
-   already composed by `MeetingHeaderDetail.swift:4-9` for the detail header. And "non indexée"
-   renders as bare secondary `Text` between two real pills (`LibraryWindow.swift:158-161`).
-8. **The Python LLM-refusal guard was never actually refined** — `pipeline.py:420-432` is still
-   the original bare-substring list (`"sorry"`, `"please provide"`, `"transcript of"`), untouched
-   since `328ad22`, and `TestGenerateTitleSlug` has zero keep-a-legitimate-title tests. § 2.7's
-   "1/14 FP, 0/7 FN" describes the Swift BACKSTOP only. This is the exact class that erased 7/10
-   titles, sitting on the side of the guard that runs first. TDD both directions.
-9. Smaller mockup deltas, roughly one commit each: `.navigationSubtitle` aggregate
-   (`42 réunions · 18 h 12 min`); the anchoring callout under the detail header ("6 des 7 points
-   clés sont ancrés…"); a tinted highlight on the scroll-target line; the backchannel fold as a
-   count-carrying pill instead of a stock `Toggle(.switch)`; a prominent record button; the
-   empty-state permission rows; a window-level background.
+**Code — the 2026-08-03 afternoon batch CLOSED items 4-8 and most of 9** (three lanes + lead
+verification; every item TDD'd and mutation-checked; final gate CHECK=0, 10/10, 479+47 Swift /
+676 Python; off-screen render read by the lead confirms subtitle, row meta, pills, amber
+callout, turn grouping, flat tracked inspector rail with the N/M ratio):
+3. **Backfill command BUILT, real run PENDING** — `ownscribe backfill [directory]` (8f96085)
+   generates missing `envelope.json`/`anchors.json` through the production functions, ADD-only,
+   idempotent, format-parameterized. Running it on `~/ownscribe/` is what remains (permission-
+   gated in the agent session; or run it yourself once).
+4. ~~Sidebar glass on the List~~ **DONE** (`9ccbf79`): glass on the ZStack container with
+   `.rect(cornerRadius: 12)`; `GlassPlacementTests` rewritten to pin the modifier's TARGET by
+   brace-balancing. **Second instance found by the pair-landing** (`eeaae05` + `aa05cd9`): the
+   inspector rewrite had silently changed the modifier's receiver to the ScrollView — the line
+   never moved, the target did — caught by lane cross-review, fixed, and both rails are now
+   target-pinned; the bare-literal `.glassEffect()` matcher also fixed (it declared "no glass"
+   on explicit-shape calls).
+5. ~~Turn grouping~~ **DONE** (`b8963ff`): `TranscriptTurnGrouping` pure function, one
+   avatar+name header per turn, `UtteranceRow` deleted (not just unused).
+6. ~~Inspector rail~~ **DONE** (`b8963ff`, `eeaae05`): flat rail, uppercase tracked captions,
+   hairlines, `Points clés · N/M ancrés` from `AnchoringSummaryCalculator` (nil when never
+   checked — no false 0/0; a real found-nothing renders 0/N).
+7. ~~Row meta + badge~~ **DONE** (`9ccbf79`, `82297f0`): `date · durée · N voix` shared with
+   `MeetingHeaderDetail` (absent stays absent), "non indexée" is the grey pill.
+8. ~~Python refusal guard~~ **DONE** (`851aede`): structural on the raw title, 12 catch + 10
+   keep tests; reverting to the substring list turns 5 keep-tests red (the real false positives
+   it was producing). Bonus latent bug fixed: `run_summarize` wraps `summary.json` with the
+   markdown header — stripped before anchoring so "Summary" can't leak in as an anchored token.
+9. Landed from this list: `.navigationSubtitle` aggregate, anchoring callout, scroll-target
+   highlight, backchannel fold pill, window background, purple `.tint` (`AppAccentColor`, one
+   line to flip if overruled). **Still open**: a prominent record button in the toolbar, the
+   empty-state permission rows.
 
 10. **In-room speaker differentiation does not exist yet** (surfaced by the 2026-08-03 question):
     `mic.wav` is tagged Owner wholesale and never diarized (`pipeline.py:344-350` — correct by
