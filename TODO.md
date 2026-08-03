@@ -83,17 +83,32 @@ callout, turn grouping, flat tracked inspector rail with the N/M ratio):
     all. Overlap on one mixed room mic stays the accuracy ceiling either way. One real in-room
     meeting should confirm (a) empirically (that the tap captures the room entity's stream).
 
-**Needs YOU also: enrollment.** 0 voiceprints exist on disk
-(`~/.config/meeting-scribe/voiceprints/voiceprints.json` absent), so no meeting can show real
-names yet — remote calls show `SPEAKER_NN`. The exact syntax is
-`uv run ownscribe enroll --name "Sam" clip.wav` (10-30s clean clip; `speakers` lists,
-`unenroll <name>` removes; needs the HF token from config). Matching is already built
-(`speakers/matching.py`, cosine 0.65). The sidebar's "Enrôler…" item is a PLACEHOLDER —
-`LibraryFilter.apply` treats `.enroll` like `.all` — so enrollment is CLI-only today. The
-2026-08-03 real call gives free reference clips: extract a speaker's clean monologue from its
-`system.wav` with ffmpeg, enroll it, then `ownscribe reprocess <dir> --diarize` re-attributes
-the meeting retroactively. Enrolling from the room-mic-carried audio is the RIGHT channel for
-the in-room case (same acoustic path future meetings will take).
+**Enrollment: 1 voiceprint exists (Yanis, 2026-08-03), colleagues pending.** Enrolled from the
+real call WITHOUT a fresh recording: contextual inference (3 name-vocatives + turn-taking) said
+SPEAKER_00 = Yanis, voice forensics confirmed the reasoning chain, and the print was verified at
+the deployed threshold — a SECOND segment of the same voice matches at cos 0.957, the two
+colleagues at 0.210 / −0.045. First empirical answer to the 0.65 question below: within-speaker
+0.957 (long clips) and 0.782 (25-38s clips), worst cross-speaker pair observed 0.556 — the
+threshold holds, but the 0.556 pair leaves only ~0.1 margin; re-check when more voices enroll.
+CAUTION the inference needed: the OBVIOUS first read (SPEAKER_01 answers the "qu'est-ce qui a
+changé, Yanis" framing → must be Yanis) was WRONG — refuted by [24:28] where the same
+voice-coherent cluster (cos 0.782 across its two blocks) itself addresses "Yanis". Vocatives
+EXCLUDE, responses only SUGGEST. Also measured: the laptop mic's 6 unmuted seconds matched
+SPEAKER_02 at 0.777 — that identifies who was IN THE ROOM (acoustic path to the laptop), not the
+owner. Syntax: `uv run ownscribe enroll --name "Sam" clip.wav` (10-30s; `speakers` lists,
+`unenroll <name>` removes; HF token from config). The sidebar's "Enrôler…" item is a PLACEHOLDER
+(`LibraryFilter.apply` treats `.enroll` like `.all`) — CLI-only today. Retroactive re-attribution
+of an existing meeting = `ownscribe reprocess <dir> --diarize`, which REWRITES
+transcript.md/summary.md and re-runs the full pipeline — user's call, never automatic.
+
+**Feature candidate (validated live 2026-08-03): auto-suggest enrollment.** Post-pipeline step:
+extract vocatives/self-intros deterministically, LLM arbitrates name↔cluster with per-mapping
+evidence, gate at ≥2 independent signals with vocative-exclusion logic, surface as one-click
+suggestions behind the "Enrôler…" button — never auto-enroll below the bar. The local-model
+question splits cleanly: voice biometrics is NOT an LLM job (pyannote/ECAPA embeddings, already
+local, already built; Ollama has no speaker-embedding models); the NAME-INFERENCE part is a text
+task a local Qwen-32B-class model handles IF decomposed as above — free-form "read the
+transcript, who is who" is exactly the failure mode the caution above documents.
 
 **Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
 item 3's backfill may close this without a new recording if anchoring finds tokens on the
