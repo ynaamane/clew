@@ -25,23 +25,29 @@ design being rejected again on sight.
 ### THE OPEN LIST
 
 **Needs YOU (2):**
-1. **Look at the rebuilt window** and judge it against `design/direction-b-glass.png`, ideally
-   AFTER item 3 so the strip/anchors have data to show. (2026-08-03 directive: agents now run
-   `build-app.sh` and the full e2e themselves — the signing cert alone must never be
-   recreated/deleted. What stays yours is the taste verdict.)
-2. **One ruling — accent color.** `mockup.html:12` declares Apple blue (`#0071e3`); the PNG you
-   validated is purple throughout (selection, pills, envelope, timestamps). The app declares NO
-   accent at all (zero `.tint`/`AccentColor` → system blue). One word — blue or purple — unblocks
-   the single widest-reaching visual change (one `.tint()` on the split view).
+1. ~~Look at the rebuilt window~~ **e2e CLOSED by agents 2026-08-03 (user GO):** backfill run for
+   real (diff-proven ADD-only: 4 files, 0 existing touched — the 27-Jul meeting gained REAL
+   anchors: 9 tokens incl. Lambda@05:09, Gary@08:30, JWT@05:28, matching the mockup exactly),
+   `build-app.sh` rebuilt+installed (bundle now 2026-08-03 13:48), app relaunched, the real
+   meeting selected via AX, window captured and read: the callout says "6 des 7 points clés sont
+   ancrés", the real RMS strip renders, "27 interventions courtes masquées" with real examples,
+   grouped turns, purple monospaced anchor chips, flat tracked rail. **What stays yours: the
+   taste verdict** (glass/materials in motion can't be judged from a static capture).
+2. **Accent applied: PURPLE** (`AppAccentColor`, one line to flip). Note from the live capture:
+   the LIST SELECTION renders in your macOS **system accent** (green on this machine) — macOS
+   drives selection from System Settings, not from `.tint`; the purple shows in chips/links.
+   Forcing purple selection would fight the OS convention (same family as forcing dark mode).
+   Say the word if you want it forced anyway.
 
 **Code — the 2026-08-03 afternoon batch CLOSED items 4-8 and most of 9** (three lanes + lead
 verification; every item TDD'd and mutation-checked; final gate CHECK=0, 10/10, 479+47 Swift /
 676 Python; off-screen render read by the lead confirms subtitle, row meta, pills, amber
 callout, turn grouping, flat tracked inspector rail with the N/M ratio):
-3. **Backfill command BUILT, real run PENDING** — `ownscribe backfill [directory]` (8f96085)
-   generates missing `envelope.json`/`anchors.json` through the production functions, ADD-only,
-   idempotent, format-parameterized. Running it on `~/ownscribe/` is what remains (permission-
-   gated in the agent session; or run it yourself once).
+3. ~~Backfill command + real run~~ **DONE** — `ownscribe backfill` (8f96085) run on the real
+   library 2026-08-03 after the user's GO: `2026-07-27_1536` and `2026-07-24_1756` gained
+   envelope.json + anchors.json; before/after `find -exec stat` diff proves exactly 4 additions
+   and zero modifications. The 27-Jul anchors are non-empty (9 tokens); 24-Jul's are empty —
+   legitimate, its transcript is 317 bytes.
 4. ~~Sidebar glass on the List~~ **DONE** (`9ccbf79`): glass on the ZStack container with
    `.rect(cornerRadius: 12)`; `GlassPlacementTests` rewritten to pin the modifier's TARGET by
    brace-balancing. **Second instance found by the pair-landing** (`eeaae05` + `aa05cd9`): the
@@ -65,12 +71,20 @@ callout, turn grouping, flat tracked inspector rail with the N/M ratio):
    line to flip if overruled). **Still open**: a prominent record button in the toolbar, the
    empty-state permission rows.
 
-10. **In-room speaker differentiation does not exist yet** (surfaced by the 2026-08-03 question):
-    `mic.wav` is tagged Owner wholesale and never diarized (`pipeline.py:344-350` — correct by
-    construction for the headphones/remote case). In a shared room (N people = 1 Zoom entity),
-    every room voice enters the mic and gets labeled Owner. Closing it means diarizing `mic.wav`
-    too and assigning Owner by voiceprint match instead of by construction — accepting the
-    overlap ceiling (spatial info is lost once voices mix in one channel).
+10. **In-room speaker differentiation** — REFRAMED by the user's 2026-08-03 clarification of his
+    actual workflow: the room ALSO joins Zoom (its own entity/mic) while he sits at his laptop.
+    That routes room voices through Zoom → his tap → `system.wav` → diarized + voiceprint-named
+    like any remote speaker, so his real in-room case is largely covered WITHOUT new code. Three
+    operational rules make it work (documented for the user): (a) join WITH computer audio —
+    joining "without audio" means Zoom sends no stream and `system.wav` records nothing
+    (speakers at zero are fine: the tap reads the app's output pre-hardware); (b) enroll HIS OWN
+    voice too, so his room-mic-carried speech gets named instead of clustering anonymously;
+    (c) in-room, silence `mic.wav` with the APP's master mute or `mic = false` — **muting in
+    Zoom does NOT stop the app's mic capture** (Zoom-mute only stops what Zoom transmits; the
+    app records the physical device directly). The original item — diarize `mic.wav` + Owner by
+    voiceprint — remains valid but drops in priority: it now only covers rooms with NO Zoom at
+    all. Overlap on one mixed room mic stays the accuracy ceiling either way. One real in-room
+    meeting should confirm (a) empirically (that the tap captures the room entity's stream).
 
 **Needs YOU also: enrollment.** 0 voiceprints exist on disk
 (`~/.config/meeting-scribe/voiceprints/voiceprints.json` absent), so no meeting can show real
