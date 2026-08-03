@@ -2,6 +2,32 @@
 
 Contexte de construction (2026-07-23 → 08-03), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
 
+## Session 2026-08-03 (suite) — premier VRAI appel vérifié bout en bout, 3 voix enrôlées
+
+Le premier appel réel (`2026-08-03_1401_pptx-tool-bug-review-update`, 32:45, fr, en salle avec
+Devon, Kamal en 3ᵉ voix) a traversé toute la chaîne sans intervention : pistes alignées à 26 ms,
+48 kHz partout, transcript complet, titre passé le garde anti-refus, 5 tokens d'ancres, envelope
+96 % active, pipeline ~1× temps réel. Le mute SYSTÈME de Yanis a produit un `mic.wav` en zéro
+numérique après 6 s — gate RMS impeccable ; l'unique tour Owner est l'hallucination Whisper
+canonique sur quasi-silence (« Sous-titrage Société Radio-Canada », filtre à construire).
+
+**Enrollment fait depuis l'appel lui-même, sans enregistrement neuf** : Yanis identifié par
+forensique contextuel + voix — **la première lecture (SPEAKER_01=Yanis) était FAUSSE**, réfutée
+par un vocatif au milieu d'un monologue voix-cohérent (règle : un vocatif EXCLUT son locuteur,
+une réponse ne fait que suggérer ; les deux indices contradictoires étaient la première et la
+dernière ligne de l'enregistrement). Devon/Kamal départagés par UN fait physique fourni par
+Yanis (Devon dans la salle = le cluster qui matche le mic à 0.777). Matrice 3×3 sur segments
+témoins : diagonale 0.957/0.725/0.863, pire croisement **0.637 (marge 0.013 sous le seuil)** →
+c'est l'argument des prints multi-échantillons. Vérifié dans l'app VIVANTE par AX tree : la
+sidebar Personnes affiche Yanis/Devon/Kamal. Prochains meetings auto-nommés ; celui du jour
+reste en SPEAKER_NN sauf `reprocess` explicitement demandé (réécrit transcript/summary, ~30 min).
+
+Défaut réel trouvé en regardant : badge « 1 action » sur un meeting dont le summary dit
+« Action Items: None mentioned. » (le parseur compte le bullet). Designs validés par Yanis :
+auto-suggest enrollment avec **confirmation in-app obligatoire**, et règles anti-overlap
+(clips mi-run seulement, chevauchement affiché comme incertitude). **La reprise se fait par
+`TODO.md` § BUILD NEXT** — 9 items ordonnés, designs complets dans les paragraphes en dessous.
+
 ## Session 2026-08-03 — l'audit 4 lanes puis le batch design, e2e fermé par les agents
 
 Déclencheur : « le design n'est pas bon » — et l'audit a montré que le verdict avait été rendu
@@ -27,7 +53,8 @@ Trois directives/faits nouveaux à connaître avant de reprendre :
 - **Réunions en salle** : la salle rejoint Zoom aussi → les voix de la salle passent par
   `system.wav` et sont diarisables/nommables. Règles : rejoindre AVEC l'audio ordinateur ;
   enrôler sa propre voix ; couper `mic.wav` avec le mute de l'APP — **le mute Zoom n'arrête pas
-  la capture micro de l'app**. Détail : TODO item 10. Enrôlement toujours à faire (0 empreinte).
+  la capture micro de l'app**. Détail : TODO item 10. ~~Enrôlement toujours à faire (0
+  empreinte).~~ Fait le soir même — voir le bloc de session au-dessus (3 empreintes vérifiées).
 
 ## Où en est le projet
 

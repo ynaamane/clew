@@ -274,6 +274,17 @@ The one that needed thought is the record button: its TITLE changes with state
 moment a recording starts — exactly when you would want to press stop. The identifier is stable
 while the title is not.
 
+**UPDATE 2026-08-03 — two evidence facts from the enrollment verification.** (1) `capture.sh`
+can fail the PNG ("could not create image from window") while still dumping a full `axtree.txt`
+(173 lines that day) — and for a claim like "are these NAMES displayed", the AX tree is the
+STRONGER evidence: `AXStaticText ="Yanis"` at real coordinates in the live app beats pixels
+needing interpretation. Don't treat a failed screenshot as a failed verification before reading
+the tree. (2) The off-screen render harness CANNOT verify anything that lives in the real
+machine state outside the copied library — it isolates `homeDir` by design, so it never sees
+`~/.config/meeting-scribe/voiceprints/voiceprints.json` and the Personnes section renders empty
+there regardless of what is enrolled. Live-app AX is the only channel for that class of claim.
+Add it to the CANNOT-VERIFY list alongside glass/materials.
+
 Open `⌘0` (or the URL above) and judge against `design/direction-b-glass.png`
 and `design/mockup.html`:
 

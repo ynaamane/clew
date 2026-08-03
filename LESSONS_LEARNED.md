@@ -366,3 +366,39 @@ large-v3 CPU on this Mac: 165 back-to-back transcriptions over a real 3605s hour
   in-room workflow in TODO item 10 after the user described his real setup (the room joins Zoom
   too → room voices arrive via `system.wav`, diarizable+nameable — join WITH computer audio or
   the tap records nothing).
+
+## 2026-08-03 evening — the first real call, and what speaker forensics taught
+
+- **A vocative EXCLUDES its speaker; a response only SUGGESTS.** The obvious read — "SPEAKER_02
+  asks *qu'est-ce qui a changé, Yanis*, SPEAKER_01 answers → SPEAKER_01 = Yanis" — was WRONG,
+  refuted by [24:28] where the same voice-coherent cluster (0.782 across its two blocks) itself
+  says "si vous êtes d'accord, Yanis" mid-monologue. Exclusion evidence is hard; turn-taking
+  evidence is soft. Build name-inference on exclusions first.
+- **Both contradictory identity clues were the literal FIRST and LAST lines of the recording** —
+  exactly where diarization mis-attributes most (warm-up, wrap-up overlap). Downweight boundary
+  lines as evidence. The user's own hypothesis (he and Devon talked simultaneously at the end)
+  explained the final mis-attributed line: overlap in one mixed channel lands in whichever
+  cluster is nearest, sometimes a third party's.
+- **The unmuted mic seconds identify who is IN THE ROOM, not who the owner is.** mic[0:6s]
+  matched SPEAKER_02 at 0.777 — tempting to read as "that's Yanis". The timeline said
+  SPEAKER_02 was the one TALKING during those seconds: the laptop mic samples whoever is
+  audible nearby. Same measurement, opposite meaning — the cross-reference (what was happening
+  at that timestamp) is what kept it honest. It became a usable physical-presence signal.
+- **One question to the user can beat any amount of inference.** The 01/02 mapping was 50/50 on
+  text and unresolvable by audio alone; "who was in the room with you?" settled it in one word,
+  because the mic-presence measurement had converted a physical fact into a cluster identity.
+  The auto-suggest feature should do the same: when evidence contradicts, ask the ONE
+  discriminating question instead of guessing.
+- **Same size ≠ same content.** `recording.wav` and `mic.wav` were byte-identical in SIZE
+  (same format × same duration); `cmp` proved different bytes and RMS sampling proved the mix
+  carried the meeting. Size equality is a hypothesis generator, never a conclusion.
+- **For "is X displayed", the AX tree outranks a screenshot.** The window refused
+  `screencapture` at that moment, but the AX dump gave `AXStaticText ="Yanis"/"Devon"/"Kamal"`
+  at real coordinates in the LIVE app — text + position, no pixel interpretation. Know which
+  evidence class the claim needs; sometimes the fallback is stronger than the preferred tool.
+  (The off-screen render harness could NOT close this one: it isolates the home dir by design,
+  so it never sees the real voiceprints DB — a documented blind spot, not a bug.)
+- **The threshold got its first real numbers.** Within-speaker 0.725-0.957, worst cross-pair
+  0.637 vs a 0.65 threshold — argmax matching absorbs it while both prints exist, but the
+  0.013 margin is the empirical case for multi-sample voiceprints, written down before it
+  bites.

@@ -19,6 +19,43 @@ design being rejected again on sight.
 3. ~~Real code gaps vs the validated mockup~~ **items 4-8 and most of 9 CLOSED same day** by the
    three-lane batch below; the captured window now shows the mockup's exact scene on live data.
 
+### BUILD NEXT — what is missing in the app (2026-08-03 evening, post-first-real-call)
+
+Ordered by value; items share no files except 1↔2 (both touch the speakers path). Full designs
+for 1, 2, 5 live in the enrollment/overlap paragraphs below — read them before building.
+
+1. **Wire "Enrôler…" → the auto-suggest enrollment flow** (today it is a placeholder filter:
+   `LibraryFilter.apply` treats `.enroll` like `.all`). Design is user-validated: deterministic
+   vocative/self-intro extraction → hard rules (vocative EXCLUDES its speaker; boundary +
+   overlap downweight; 3rd-person-only = absent; mic-presence signal) → local-LLM arbiter over
+   the evidence TABLE (shipped llama.cpp first, Qwen-32B via Ollama only if the eval demands) →
+   gate ≥2 independent evidences → one-click user confirmation IN THE APP, never auto. Roster
+   `[speakers] known = [...]` in config doubles as ASR-name-correction vocabulary.
+2. **Multi-sample `VoiceprintDB`** — `upsert` currently overwrites; store N samples per name,
+   match against max/centroid. Empirical driver: Kamal-print vs a Devon segment = 0.637, only
+   0.013 under the 0.65 threshold (argmax saves it today; one contaminated sample could not).
+3. **Action-badge lie** — the LLM writes `- None mentioned.` under `## Action Items` and
+   `SummaryDocument.bullets` counts it: the row shows "1 action" for a zero-action meeting
+   (`MeetingCounts.swift:26`). Filter none-family bullets parser-side; test BOTH directions.
+4. **Last two design items**: prominent record button in the toolbar + empty-state permission
+   rows (item 9 below).
+5. **Overlap surfaced as uncertainty** — mark pyannote overlap regions "chevauchement" in the
+   transcript instead of confidently attributing; exclude them from embeddings.
+6. **Owner-track hallucination filter** — the ~6 unmuted seconds produced the canonical Whisper
+   silence-hallucination ("Sous-titrage Société Radio-Canada") as the only Owner turn. Filter
+   against the known-hallucination list at the gate that already RMS-drops silent mic segments.
+7. **Summary language** — today's fr meeting got an ENGLISH summary (built-in template). Needs
+   the user's pick: force French, or infer from transcript language. One-line prompt change once
+   decided.
+8. **Anchor-chip → scroll e2e on real data** — the never-exercised path; today's meeting has
+   first-class anchors (5 tokens) to drive it via AX.
+9. (deprioritized) Item 10's original code path — diarize `mic.wav` + match Owner by voiceprint;
+   only covers rooms with NO Zoom at all.
+
+User-side gates (no build): taste verdict on the live window · `reprocess` of today's meeting to
+retro-name its speakers (~30 min, REWRITES transcript/summary — explicit go only) · optional
+forced-purple selection ruling.
+
 ### THE OPEN LIST
 
 **Needs YOU (2):**
@@ -80,8 +117,13 @@ callout, turn grouping, flat tracked inspector rail with the N/M ratio):
     Zoom does NOT stop the app's mic capture** (Zoom-mute only stops what Zoom transmits; the
     app records the physical device directly). The original item — diarize `mic.wav` + Owner by
     voiceprint — remains valid but drops in priority: it now only covers rooms with NO Zoom at
-    all. Overlap on one mixed room mic stays the accuracy ceiling either way. One real in-room
-    meeting should confirm (a) empirically (that the tap captures the room entity's stream).
+    all. Overlap on one mixed room mic stays the accuracy ceiling either way.
+    **CONFIRMED EMPIRICALLY 2026-08-03 by the first real call** (32:45, in-room with Devon,
+    Kamal + Yanis's room voice via the room entity): `system.wav` carried the full meeting
+    (envelope 96% active, 3 clean diarized clusters), rule (c) validated live — the user's
+    system-level mute produced digital-zero `mic.wav` after 6s and the RMS gate dropped all of
+    it, and the mic↔cluster cosine (0.777 to Devon) proved usable as a WHO-IS-IN-THE-ROOM
+    signal. The user's end-of-meeting overlap hypothesis explained the one mis-attributed line.
 
 **Enrollment: DONE for the 2026-08-03 call — 3 voiceprints (Yanis, Devon, Kamal).** All enrolled
 from the real call WITHOUT fresh recordings: contextual inference gave SPEAKER_00 = Yanis (voice
