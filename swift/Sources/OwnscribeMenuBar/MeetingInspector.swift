@@ -10,87 +10,89 @@ struct MeetingInspector: View {
     @State private var tracks: [AudioTrackPresence] = []
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let summary {
-                    section("Résumé") {
-                        Text(summary.prose)
-                            .font(.callout)
-                    }
-                    Divider()
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let summary {
+                        section("Résumé") {
+                            Text(summary.prose)
+                                .font(.callout)
+                        }
+                        Divider()
 
-                    if let keyPoints = keyPointsWithAnchors, !keyPoints.isEmpty {
-                        section(keyPointsCaption(for: keyPoints)) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(Array(keyPoints.enumerated()), id: \.offset) { _, keyPoint in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(keyPoint.text)
-                                            .font(.callout)
-                                        evidenceRow(for: keyPoint)
+                        if let keyPoints = keyPointsWithAnchors, !keyPoints.isEmpty {
+                            section(keyPointsCaption(for: keyPoints)) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    ForEach(Array(keyPoints.enumerated()), id: \.offset) { _, keyPoint in
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(keyPoint.text)
+                                                .font(.callout)
+                                            evidenceRow(for: keyPoint)
+                                        }
                                     }
+                                }
+                            }
+                            Divider()
+                        }
+
+                        section("Actions") {
+                            if summary.actionItems.isEmpty {
+                                Text(summary.actionItemsPlaceholder)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .italic()
+                            } else {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    ForEach(Array(summary.actionItems.enumerated()), id: \.offset) { _, item in
+                                        Text(item)
+                                            .font(.callout)
+                                    }
+                                }
+                            }
+                        }
+                        Divider()
+                    } else {
+                        section(nil) {
+                            Text("Pas encore de résumé — cette réunion n'est pas indexée par la recherche.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        Divider()
+                    }
+
+                    if let transcript, !transcript.speakers.isEmpty {
+                        section("Voix") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(transcript.speakers, id: \.self) { speaker in
+                                    Text(speaker)
+                                        .font(.callout)
                                 }
                             }
                         }
                         Divider()
                     }
 
-                    section("Actions") {
-                        if summary.actionItems.isEmpty {
-                            Text(summary.actionItemsPlaceholder)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .italic()
-                        } else {
-                            VStack(alignment: .leading, spacing: 6) {
-                                ForEach(Array(summary.actionItems.enumerated()), id: \.offset) { _, item in
-                                    Text(item)
+                    section("Pistes audio") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(tracks, id: \.filename) { track in
+                                HStack {
+                                    Text(track.filename)
                                         .font(.callout)
+                                    Spacer()
+                                    Text(track.displayStatus)
+                                        .foregroundStyle(track.hasContent ? .green : .secondary)
+                                        .font(.caption)
                                 }
                             }
                         }
                     }
-                    Divider()
-                } else {
-                    section(nil) {
-                        Text("Pas encore de résumé — cette réunion n'est pas indexée par la recherche.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Divider()
                 }
-
-                if let transcript, !transcript.speakers.isEmpty {
-                    section("Voix") {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(transcript.speakers, id: \.self) { speaker in
-                                Text(speaker)
-                                    .font(.callout)
-                            }
-                        }
-                    }
-                    Divider()
-                }
-
-                section("Pistes audio") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(tracks, id: \.filename) { track in
-                            HStack {
-                                Text(track.filename)
-                                    .font(.callout)
-                                Spacer()
-                                Text(track.displayStatus)
-                                    .foregroundStyle(track.hasContent ? .green : .secondary)
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                }
+                .padding(16)
             }
-            .padding(16)
+            .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("inspector.form")
         }
-        .scrollContentBackground(.hidden)
-        .accessibilityIdentifier("inspector.form")
-        .glassEffect()
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
         .task(id: meeting.id) {
             summary = loadSummary()
             keyPointsWithAnchors = MeetingInspectorState.loadKeyPointsWithAnchors(from: meeting.directory)
