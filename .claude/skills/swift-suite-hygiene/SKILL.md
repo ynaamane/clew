@@ -179,6 +179,19 @@ intention-recorded-as-delivery in this repo. When a source guard exists to pin W
 is applied, it must name the RECEIVER (parse which declaration the modifier chain attaches to),
 not assert what happens to sit nearby.
 
+Two sequels from the same afternoon, same family:
+- **The line never moved — the target did.** A rewrite dissolved the container a modifier was
+  chained under, silently changing its receiver from the ZStack to the ScrollView while the
+  modifier's own line stayed textually identical. The author honestly reported it "unmoved".
+  A claim about a modifier is a claim about its receiver. Caught by lane cross-review, not by
+  any test.
+- **A guard's text pattern must match the CALL FAMILY, not one spelling.** The content-layer
+  guard searched for the bare literal `.glassEffect()`, so `.glassEffect(.regular, in: .rect(...))`
+  slipped past it — the guard declared "no glass" on a file gaining MORE glass. Proved live:
+  an explicit-shape violation on the transcript PASSED under the old matcher, failed under
+  `.contains(".glassEffect(")`. When you change a call's spelling anywhere (adding arguments,
+  a label, a wrapper), grep every guard that matches it by string.
+
 ## An injected seam can end up asserting itself
 
 When every test for a behaviour **injects** the thing it is testing, the production default is
