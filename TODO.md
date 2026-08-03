@@ -109,6 +109,17 @@ question splits cleanly: voice biometrics is NOT an LLM job (pyannote/ECAPA embe
 local, already built; Ollama has no speaker-embedding models); the NAME-INFERENCE part is a text
 task a local Qwen-32B-class model handles IF decomposed as above — free-form "read the
 transcript, who is who" is exactly the failure mode the caution above documents.
+USER 2026-08-03: validation stays in the app — the user confirms every enrollment, never
+auto. Design refinements from the live case: (a) a known-names roster in config
+(`[speakers] known = [...]`) doubles as ASR-correction vocabulary — Whisper wrote the same
+colleague as "Camal" AND (probably) "Carl", and "PR" as "paire/pierre"; (b) DOWNWEIGHT
+boundary lines — both contradictory identity clues today were the literal first and last
+lines of the recording, where diarization mis-attributes most; (c) the unmuted mic seconds
+are a free PHYSICAL-PRESENCE signal (mic↔cluster cosine says who sat in the room); (d) when
+evidence contradicts, the suggestion UI should ask the user the ONE discriminating question
+(today: "who was in the room with you?") instead of guessing. Arbiter model: try the shipped
+llama.cpp summarizer first, escalate to Qwen-32B-class via Ollama only if it fails the eval;
+build that eval from real meetings as they accumulate (today's = first labeled case).
 
 **Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
 item 3's backfill may close this without a new recording if anchoring finds tokens on the
