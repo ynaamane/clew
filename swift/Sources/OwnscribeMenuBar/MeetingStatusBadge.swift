@@ -18,6 +18,7 @@ struct MeetingStatusBadge: View {
         case neverChecked
         case actionItems(count: Int)
         case mutedTrack
+        case notIndexed
 
         init?(anchorState: UnanchoredClaimBadge) {
             switch anchorState {
@@ -37,6 +38,8 @@ struct MeetingStatusBadge: View {
                 return count == 1 ? "1 action" : "\(count) actions"
             case .mutedTrack:
                 return "piste système muette"
+            case .notIndexed:
+                return "non indexée"
             }
         }
 
@@ -44,7 +47,7 @@ struct MeetingStatusBadge: View {
             switch self {
             case .unanchored:
                 return .orange
-            case .neverChecked, .mutedTrack:
+            case .neverChecked, .mutedTrack, .notIndexed:
                 return .secondary
             case .actionItems:
                 return .green
@@ -57,7 +60,7 @@ struct MeetingStatusBadge: View {
                 return Color.orange.opacity(0.16)
             case .actionItems:
                 return Color.green.opacity(0.16)
-            case .neverChecked, .mutedTrack:
+            case .neverChecked, .mutedTrack, .notIndexed:
                 return Color(white: 0.5, opacity: 0.16)
             }
         }

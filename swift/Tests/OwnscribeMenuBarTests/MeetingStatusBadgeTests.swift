@@ -59,6 +59,15 @@ struct MeetingStatusBadgeTests {
         #expect(badge.foregroundColor == Color.secondary)
     }
 
+    @Test("Grey pill for not-indexed meetings, consistent with its sibling grey pills")
+    func testNotIndexedBadge() {
+        let badge = MeetingStatusBadge.Variant.notIndexed
+
+        #expect(badge.text == "non indexée")
+        #expect(badge.foregroundColor == Color.secondary)
+        #expect(badge.backgroundColor == MeetingStatusBadge.Variant.neverChecked.backgroundColor)
+    }
+
     @Test("Plural inflection for unanchored")
     func testUnanchoredSingularPlural() {
         let singular = MeetingStatusBadge.Variant.unanchored(count: 1)
