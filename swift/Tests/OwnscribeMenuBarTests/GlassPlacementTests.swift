@@ -124,7 +124,7 @@ final class GlassPlacementTests: XCTestCase {
             detail.contains(".background(.background)"),
             "The transcript is the content layer and must stay opaque.")
         XCTAssertFalse(
-            detail.contains(".glassEffect()"),
+            detail.contains(".glassEffect("),
             "HIG: \"Don't use Liquid Glass in the content layer.\" A transcript is text that gets reread the next morning; glass behind it costs legibility, which is the one thing this view exists for.")
     }
 }
