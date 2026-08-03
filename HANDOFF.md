@@ -1,6 +1,33 @@
 # HANDOFF — reprendre le projet dans ce repo
 
-Contexte de construction (2026-07-23 → 07-30), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
+Contexte de construction (2026-07-23 → 08-03), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
+
+## Session 2026-08-03 — l'audit 4 lanes puis le batch design, e2e fermé par les agents
+
+Déclencheur : « le design n'est pas bon » — et l'audit a montré que le verdict avait été rendu
+sur un bundle périmé de 22 commits UI, sur des réunions sans données d'ancrage. Trois causes
+empilées, toutes fermées le jour même. Livré (commits `851aede`→`1830b0b`) : verre sur les
+conteneurs des 3 surfaces avec tests qui épinglent le **receveur** du modificateur (deux bugs
+attrapés par revue croisée : un receveur changé sans que la ligne bouge, un matcher littéral
+aveugle aux appels à arguments) ; tours de parole groupés ; rail inspecteur plat + ratio N/M ;
+callout d'ancrage ; pilule interventions courtes ; méta de rangées ; accent violet
+(`AppAccentColor`) ; sous-titre ; garde anti-refus Python structurel testé dans les deux sens ;
+commande `ownscribe backfill` **exécutée en réel** (le 27-juil. a 9 tokens d'ancres : Lambda@05:09,
+Gary@08:30, JWT@05:28 — la scène exacte de la maquette, vérifiée sur capture de la vraie fenêtre).
+Chiffres au moment du dernier check.sh de la session (re-mesure-les, règle ci-dessous) :
+479 XCTest + 47 swift-testing, 676 Python (1 skipped, 7 deselected), CHECK=0, 10/10.
+
+Trois directives/faits nouveaux à connaître avant de reprendre :
+- **« Aucune action n'est interdite aux agents »** (Yanis, 2026-08-03) : les agents font l'e2e
+  complet, `build-app.sh` compris. Invariants conservés : ne jamais recréer/supprimer le cert de
+  signature ; capture de la fenêtre seule, jamais l'écran ; `~/ownscribe/` en ADD-only ;
+  restaurer tout état système modifié.
+- **La sélection de liste suit l'accent SYSTÈME** (vert sur cette machine), pas le `.tint` —
+  c'est macOS, pas un bug ; le violet s'applique aux puces/liens.
+- **Réunions en salle** : la salle rejoint Zoom aussi → les voix de la salle passent par
+  `system.wav` et sont diarisables/nommables. Règles : rejoindre AVEC l'audio ordinateur ;
+  enrôler sa propre voix ; couper `mic.wav` avec le mute de l'APP — **le mute Zoom n'arrête pas
+  la capture micro de l'app**. Détail : TODO item 10. Enrôlement toujours à faire (0 empreinte).
 
 ## Où en est le projet
 

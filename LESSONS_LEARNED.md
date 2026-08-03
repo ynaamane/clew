@@ -337,3 +337,32 @@ large-v3 CPU on this Mac: 165 back-to-back transcriptions over a real 3605s hour
 - **A test that needs a precise interleaving on a serial actor is the wrong instrument — and it deadlocks instead of failing.** Verifying that a finishing pipeline cannot clobber a live recording seemed to need the real interleaving: suspend `runPipeline` inside a fake runner's continuation, start a second recording, then resume. Two attempts HUNG — 23 minutes and 6 minutes — each holding the SwiftPM `.build` lock and blocking two other agents; the lead's own instruction to "model production's fire-and-forget `Task {}`" was the wrong advice and was retracted. Root cause read off a real backtrace (`lldb -p <pid> --batch -o "thread backtrace all"` → frames #7-#11 `XCTWaiter._synchronouslyWaitForTimeInterval` → `waitForExpectations`): `AppState`, the fake runner AND the `XCTestCase` body are all `@MainActor` while XCTest pumps a CFRunLoop on that same thread, so the three-way ordering the test required cannot be forced by `Task.yield()` — when it does not happen, the continuation is never resumed and the test hangs forever rather than reporting. Fix: extract the DECISION from the choreography — a pure `terminalPhase(after:completedWith:)` returning nil unless the phase is still `.processing`. Same claim, 7 tests, 0.001s, and it mutation-checks cleanly (success guard → 4 red, failure guard → 1 red, guarded independently). **A deadlocking test is worse than a failing one and must be deleted, not skipped:** it cannot report, and it blocks every other build on the machine. Corollary for diagnosis: this package's whole suite runs in ~38s, so a `swift test` past ~90s is hanging, not building — and `lldb` on the stuck pid names the cause in one command.
 - **The fix for a lying indicator can create a worse lie.** Seeding `isMuted` from `readInputMute()` at launch closes a real defect (a mic muted by a crash or another app read as live, so you join a call believing you are heard). But `restoreUnmutedOnQuit` fires on every exit path, so seeding alone would make the app **silently unmute a mute the user made themselves in System Settings** when it quits — a false sense of mute in a live call, i.e. trading a stale display for the exact failure class the whole mute path exists to prevent. The state therefore has to distinguish a mute this app PERFORMED from one it merely OBSERVED; ownership is taken only when a set is confirmed by read-back, and an observed mute is displayed truthfully and never undone. Reverting `guard isMuted, appOwnsMute` to `guard isMuted` turns 2 tests red; reverting the seeding turns 8 red. Lesson: before making a display reflect reality, check every consumer that ACTS on that display.
 - **Two properties passed 160 tests while being replaceable by a constant.** `AppState.isRecording` → `return false` left the whole suite green, yet its only consumer is the window's record button, which would then read "Enregistrer" during a live recording — UI asserting a state it never verified, the same class as the mute-icon bug fixed hours earlier. And removing `headerTimestamp = nil` from `TranscriptDocument`'s timestamped-line branch also left 160 green; it is not an equivalent mutant, because header → stamped line → bare line then invents an utterance AND places it out of chronological order (00:12 after 00:30). Latent, not live — the current formatter never emits that shape — but the transcript format already changed once, which is why that parser exists. Both now have tests that go red on those exact mutations. A property with a single consumer is exactly the shape that escapes coverage.
+
+## 2026-08-03 — the audit that redirected a design rejection, and the batch that closed it
+
+- **A visual verdict dates the BUNDLE and the DATA, not the code.** "Le design n'est pas bon" was
+  rendered on an app built 2026-07-30 12:18:46 while 22 UI commits postdated it (`nm -a` on the
+  installed binary: 0 `accessibilityIdentifier` symbols vs 10 in sources), on meetings that had
+  no anchors/envelope to feed the design's two signature elements. Before auditing code against a
+  mockup, `stat` the installed bundle vs `git log --since=<mtime>`, then check the data the UI
+  needs exists. Both causes were fixable the same day (`build-app.sh`, `ownscribe backfill`); the
+  code gaps were real too, but a third of the complaint was staleness and a third was data.
+- **A claim about a modifier is a claim about its RECEIVER.** The inspector rewrite kept
+  `.glassEffect()` on the same source line while dissolving the container above it — the receiver
+  silently became the ScrollView, the exact anti-pattern being fixed in the sibling file, and the
+  author honestly reported it "unmoved". Caught by lane cross-review, not by any test. Sequel:
+  the guard's bare-literal matcher `.glassEffect()` declared "no glass" on explicit-shape calls
+  `.glassEffect(.regular, in: .rect(...))` — proven live (an injected content-layer violation
+  PASSED under the old matcher, failed under `.contains(".glassEffect(")`). When a call's
+  spelling gains arguments anywhere, grep every guard that matches it by string.
+- **`click at {x,y}` does not change a SwiftUI List's selection — and reports success anyway.**
+  Driving the window for the e2e capture needed `set selected of row N of outline 1 ...` (path
+  read from the capture's own axtree.txt). Verify the selection changed by reading the NEXT
+  capture, never from the click's return. Also: the AX process name is `OwnscribeMenuBar`, not
+  "MeetingScribe".
+- **Zoom-mute does not stop this app's mic capture.** Zoom's mute gates what Zoom transmits; the
+  app records the physical input device directly, so in-room the whole room lands in `mic.wav`
+  labeled Owner unless the APP's master mute (or `mic = false`) is used. Documented with the
+  in-room workflow in TODO item 10 after the user described his real setup (the room joins Zoom
+  too → room voices arrive via `system.wav`, diarizable+nameable — join WITH computer audio or
+  the tap records nothing).

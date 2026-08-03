@@ -9,18 +9,15 @@ design being rejected again on sight.
 
 ### WHY THE WINDOW LOOKED WRONG — three stacked causes, all measured
 
-1. **The judged app predates every visual fix.** `/Applications/MeetingScribe.app` was built
-   2026-07-30 **12:18:46** (single mtime across binary + Info.plist); **22 commits** touching
-   `swift/Sources` came after, including every glass/sidebar/avatar/banner fix of Jul 30-31.
-   Hard proof: `nm -a` on the installed binary → **0** `accessibilityIdentifier` symbols, vs 10
-   in today's sources. The rejection was rendered on a build containing none of the batch.
-2. **No real meeting has the data the design is built around.** 7 of 9 dirs under `~/ownscribe/`
-   have no `anchors.json` / `envelope.json` at all (including both real meetings, 24 & 27 Jul);
-   the 2 that do carry `anchors: {}` — 0 tokens. So the RMS strip and anchored key points — the
-   mockup's two signature elements — currently render on NO real meeting. The off-screen render
-   proves the strip works where `envelope.json` exists (the selftest dir).
-3. **Real code gaps vs the validated mockup remain** — the biggest are items 4-8 below; the full
-   34-element table lives in the 2026-08-03 audit report (session), top-5 ranked by reach.
+1. ~~The judged app predates every visual fix~~ **RESOLVED same day**: bundle rebuilt+installed
+   2026-08-03 13:48 (was 2026-07-30 12:18:46, 22 UI commits stale, `nm -a` → 0
+   `accessibilityIdentifier` symbols — how a rejection got rendered on none of the batch).
+2. ~~No real meeting has the data the design is built around~~ **RESOLVED same day**:
+   `ownscribe backfill` run on the real library — the 27-Jul meeting now carries 9 real anchor
+   tokens + its envelope; the 24-Jul one its envelope (anchors legitimately empty, 317-byte
+   transcript). Diff-proven ADD-only.
+3. ~~Real code gaps vs the validated mockup~~ **items 4-8 and most of 9 CLOSED same day** by the
+   three-lane batch below; the captured window now shows the mockup's exact scene on live data.
 
 ### THE OPEN LIST
 

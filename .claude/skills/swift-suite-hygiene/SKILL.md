@@ -258,12 +258,16 @@ When a type encodes "unknown", **grep every render site for `??`** before believ
 guarantee holds. Closing these needs a view-host test, which is the deadlock above — so some
 are accepted as review-guarded and NAMED in `TODO.md` rather than pretended closed.
 
-## Never run `swift/build-app.sh` from an agent
+## `swift/build-app.sh` — agents run the full e2e since 2026-08-03; the cert alone is untouchable
 
-It `rm -rf`s `/Applications/MeetingScribe.app`, which holds live TCC permission grants keyed
-to a signing cert that **must never be recreated** (a new cert = new identity = macOS resets
-every grant). Destructive and irreversible. `swift/build.sh` (builds `bin/ownscribe-audio`) is
-safe.
+User directive 2026-08-03 (« aucune action n'est interdite aux agents, ils doivent pouvoir
+tester tout en e2e »), exercised the same day: an agent rebuilt+installed the bundle, relaunched
+the app, drove the row selection via AX and captured the window. What remains absolute: the
+signing cert must **never be recreated or deleted** — a new cert = new identity = macOS resets
+every TCC grant, irreversibly, and no e2e step ever needs to touch it (`build-app.sh` reuses
+the existing identity). Launch the installed copy, capture the app window only (never the
+screen), keep `~/ownscribe/` ADD-only, restore any system state a test changes.
+`swift/build.sh` (builds `bin/ownscribe-audio`) remains the cheap safe rebuild.
 
 `strings` does not surface accented or non-ASCII Swift literals — it produced a false "stale
 bundle" alarm on a bundle that was current. Use `nm -a` on the symbol table.

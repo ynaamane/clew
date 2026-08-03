@@ -171,7 +171,24 @@ bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev # window-scoped PNG
 
 The capture resolves the window id **by owner** and passes it to `screencapture -l`, so it
 cannot capture the screen. Activate the app first — `screencapture -l` fails on a window that
-is not frontmost ("could not create image from window").
+is not frontmost ("could not create image from window"). The AX process name is
+**`OwnscribeMenuBar`** (the executable), not "MeetingScribe" — `System Events` lookups by the
+app's display name fail with "Can't get process".
+
+**UPDATE 2026-08-03 — an agent can also DRIVE the window, not only photograph it.** Selecting
+a meeting row via `click at {x,y}` reports success but does NOT change a SwiftUI List's
+selection (verified: the capture after the click was unchanged). What works is the AX
+selection attribute, path taken from the capture's own `axtree.txt`:
+
+```bash
+osascript -e 'tell application "System Events" to tell process "OwnscribeMenuBar"
+set selected of row 5 of outline 1 of scroll area 1 of group 2 of splitter group 1 of group 1 of window 1 to true
+end tell'
+```
+
+That is how the 27-Jul meeting's detail column (real anchors, real envelope, the fold pill
+with real examples) was captured and verified on 2026-08-03. Verify the selection CHANGED by
+reading the next capture — never trust the click's own success report.
 
 **⚠️ THAT PATH REQUIRES AN UNLOCKED SCREEN, so it is unavailable most of the time.** Measured
 the same afternoon it was written: with the screen locked
