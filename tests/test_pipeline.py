@@ -505,6 +505,58 @@ class TestSlugify:
         assert "_" not in _slugify("sprint_2")
 
 
+class TestIsLlmRefusal:
+    """The guard runs FIRST, on the raw title before _slugify -- structural, not bare substrings.
+
+    A bare-substring version of this exact guard erased 7 of 10 legitimate titles in the Swift
+    backstop's first version (`3dffe4d`), because this app's meetings are often *about*
+    transcripts. Both directions are pinned here: real refusals must still be caught, and
+    ordinary titles containing the trigger words as content must survive untouched.
+    """
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "I'm sorry, but I need the transcript of the meeting",
+            "Sorry, please provide the transcript",
+            "I cannot summarize without the meeting transcript",
+            "Could you please provide the text",
+            "I need more information to proceed",
+            "Sure, please provide the transcript of the meeting",
+            "Sure, I cannot summarize this without a transcript",
+            "Sure, I'm unable to summarize this content",
+            "There is nothing to summarize here",
+            "What meeting is this transcript from?",
+            "I don't have enough context to title this meeting",
+            "I apologize, but no transcript was provided",
+        ],
+    )
+    def test_catches_refusal(self, title):
+        from ownscribe.pipeline import _is_llm_refusal
+
+        assert _is_llm_refusal(title) is True, f"Should catch refusal: {title!r}"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Transcript Review Workshop",
+            "What I Need From The Marketing Team",
+            "Could You Believe This Onboarding Chaos",
+            "Sorry Not Sorry Marketing Retro",
+            "Please Note Compliance Training",
+            "More Information Systems Roadmap",
+            "Client Needs Assessment Call",
+            "Transcript Of The Board Meeting Review",
+            "Weekly Standup Notes And Action Items",
+            "Sales Pipeline Review Q3",
+        ],
+    )
+    def test_keeps_legitimate_title(self, title):
+        from ownscribe.pipeline import _is_llm_refusal
+
+        assert _is_llm_refusal(title) is False, f"Should keep legitimate title: {title!r}"
+
+
 class TestGenerateTitleSlug:
     def test_returns_slug(self):
         from ownscribe.pipeline import _generate_title_slug
@@ -556,6 +608,14 @@ class TestGenerateTitleSlug:
             mock_summarizer.generate_title.return_value = refusal
             result = _generate_title_slug("", mock_summarizer)
             assert result == "", f"Refusal '{refusal}' must not become a slug, got '{result}'"
+
+    def test_keeps_legitimate_title_containing_trigger_words(self):
+        from ownscribe.pipeline import _generate_title_slug
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.generate_title.return_value = "Transcript Review Workshop"
+
+        assert _generate_title_slug("summary", mock_summarizer) == "transcript-review-workshop"
 
 
 class TestRenameOutputDir:

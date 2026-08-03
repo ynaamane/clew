@@ -417,19 +417,41 @@ def _generate_title_slug(summary: str, summarizer) -> str:
         return ""
 
 
+_REFUSAL_OPENERS = (
+    "im-",
+    "i-cannot-",
+    "i-need-",
+    "i-dont-",
+    "i-apologize-",
+    "sorry-but-",
+    "sorry-i-",
+    "i-am-sorry-",
+)
+
+_REFUSAL_PHRASES = (
+    "please-provide",
+    "cannot-summarize",
+    "unable-to-summarize",
+    "nothing-to-summarize",
+)
+
+
 def _is_llm_refusal(title: str) -> bool:
-    """Detect if the title is an LLM refusal/apology rather than an actual title."""
-    lower = title.lower()
-    refusal_patterns = [
-        "sorry",
-        "i need",
-        "i cannot",
-        "please provide",
-        "could you",
-        "transcript of",
-        "more information",
-    ]
-    return any(pattern in lower for pattern in refusal_patterns)
+    """Detect if the title is an LLM refusal/apology rather than an actual title.
+
+    Structural, not a bare-substring list: a refusal is a SENTENCE (a first-person
+    disclaimer, a direct question, or an imperative request for input), a real title is
+    a PHRASE. Runs on the raw title before _slugify, so punctuation (a question mark) is
+    still available as a signal; the opener/phrase checks reuse _slugify itself so they
+    see exactly the normalized form a real title would be judged against.
+    """
+    if "?" in title:
+        return True
+
+    slug = _slugify(title)
+    if slug.startswith(_REFUSAL_OPENERS):
+        return True
+    return any(phrase in slug for phrase in _REFUSAL_PHRASES)
 
 
 def run_pipeline(config: Config) -> None:
