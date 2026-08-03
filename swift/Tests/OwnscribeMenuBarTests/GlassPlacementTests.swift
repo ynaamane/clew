@@ -54,11 +54,6 @@ final class GlassPlacementTests: XCTestCase {
         return chain
     }
 
-    /// Scoped to LibraryWindow.swift alone (this lane's sole ownership). MeetingInspector.swift
-    /// is owned by a sibling lane and was found mid-rewrite during this batch — it no longer has
-    /// the ZStack-wrapping-Form shape this target check depends on, so hardcoding its structure
-    /// here would couple this test to another lane's in-progress work. See the proximity check
-    /// below, which still guards it without assuming a specific container/scrollable pair.
     func testSidebarGlassAttachesToTheZStackContainerNotTheList() throws {
         let all = try lines("LibraryWindow.swift")
 
@@ -79,19 +74,28 @@ final class GlassPlacementTests: XCTestCase {
             "LibraryWindow.swift: .background(.background) paints an opaque layer over the glass behind it — strictly less glass than before the change, while reading as a correct fix.")
     }
 
-    func testMeetingInspectorHidesTheScrollBackgroundThatWouldCoverItsGlass() throws {
+    /// Was a softer within-6-lines proximity check while MeetingInspector.swift was mid-rewrite
+    /// by a sibling lane (b8963ff had dissolved its ZStack, chaining glassEffect straight onto the
+    /// ScrollView — the same clipped-glass anti-pattern the sidebar escaped in 9ccbf79). Now that
+    /// eeaae05 restored the ZStack wrapper, this asserts the same TARGET check as the sidebar's:
+    /// which construct the modifier attaches to, not merely what sits near it.
+    func testInspectorGlassAttachesToTheZStackContainerNotTheScrollView() throws {
         let all = try lines("MeetingInspector.swift")
-        guard let glass = all.firstIndex(where: { $0.contains(".glassEffect()") }) else {
-            XCTFail("MeetingInspector.swift no longer applies glass; this guard needs updating")
-            return
-        }
 
-        let above = all[..<glass].suffix(6)
+        let scrollableChain = modifierChain(attachedTo: "ScrollView {", in: all)
         XCTAssertTrue(
-            above.contains { $0.contains(".scrollContentBackground(.hidden)") },
-            "MeetingInspector.swift: a scrollable view keeps an opaque default background that renders IN FRONT of the glass, so glass without .scrollContentBackground(.hidden) is glass nobody can see.")
+            scrollableChain.contains { $0.contains(".scrollContentBackground(.hidden)") },
+            "MeetingInspector.swift: the ScrollView must hide its own opaque background, or it paints in front of the container's glass. Its own modifier chain: \(scrollableChain)")
         XCTAssertFalse(
-            above.contains { $0.contains(".background(.background)") },
+            scrollableChain.contains { $0.contains(".glassEffect(") },
+            "MeetingInspector.swift: glassEffect must not be chained directly onto the ScrollView — that clips the glass to the scrollable content's own bounds, the same anti-pattern the sidebar escaped. Its own modifier chain: \(scrollableChain)")
+
+        let containerChain = modifierChain(attachedTo: "ZStack {", in: all)
+        XCTAssertTrue(
+            containerChain.contains { $0.contains(".glassEffect(") },
+            "MeetingInspector.swift: glassEffect must be chained onto the ZStack container, not the ScrollView inside it. Container's own modifier chain: \(containerChain)")
+        XCTAssertFalse(
+            containerChain.contains { $0.contains(".background(.background)") },
             "MeetingInspector.swift: .background(.background) paints an opaque layer over the glass behind it — strictly less glass than before the change, while reading as a correct fix.")
     }
 
@@ -102,6 +106,15 @@ final class GlassPlacementTests: XCTestCase {
         XCTAssertTrue(
             containerChain.contains { $0.contains(".glassEffect(") && $0.contains("in:") },
             "The sidebar's glassEffect must pass an explicit shape (glassEffect(_:in:)) — the bare .glassEffect() defaults to DefaultGlassEffectShape(), the exact configuration that produced the deformed-oval rail when it sat on a List. Container's own modifier chain: \(containerChain)")
+    }
+
+    func testInspectorGlassPassesAnExplicitRectangularShape() throws {
+        let all = try lines("MeetingInspector.swift")
+        let containerChain = modifierChain(attachedTo: "ZStack {", in: all)
+
+        XCTAssertTrue(
+            containerChain.contains { $0.contains(".glassEffect(") && $0.contains("in:") },
+            "MeetingInspector.swift: the container's glassEffect must pass an explicit shape (glassEffect(_:in:)) — the bare .glassEffect() defaults to DefaultGlassEffectShape(), the exact configuration that clipped the sidebar into a deformed oval. Container's own modifier chain: \(containerChain)")
     }
 
     func testTheTranscriptKeepsAnOpaqueBackgroundBecauseItIsTheContentLayer() throws {
