@@ -85,12 +85,31 @@ callout, turn grouping, flat tracked inspector rail with the N/M ratio):
 
 **Needs YOU also: enrollment.** 0 voiceprints exist on disk
 (`~/.config/meeting-scribe/voiceprints/voiceprints.json` absent), so no meeting can show real
-names yet — remote calls show `SPEAKER_NN`. `ownscribe enroll <name>` with 10-30s per recurring
-colleague is what turns clusters into names (matching is already built, `speakers/matching.py`).
+names yet — remote calls show `SPEAKER_NN`. The exact syntax is
+`uv run ownscribe enroll --name "Sam" clip.wav` (10-30s clean clip; `speakers` lists,
+`unenroll <name>` removes; needs the HF token from config). Matching is already built
+(`speakers/matching.py`, cosine 0.65). The sidebar's "Enrôler…" item is a PLACEHOLDER —
+`LibraryFilter.apply` treats `.enroll` like `.all` — so enrollment is CLI-only today. The
+2026-08-03 real call gives free reference clips: extract a speaker's clean monologue from its
+`system.wav` with ffmpeg, enroll it, then `ownscribe reprocess <dir> --diarize` re-attributes
+the meeting retroactively. Enrolling from the room-mic-carried audio is the RIGHT channel for
+the in-room case (same acoustic path future meetings will take).
 
 **Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
 item 3's backfill may close this without a new recording if anchoring finds tokens on the
-27-July transcript.
+27-July transcript. UPDATE 2026-08-03: the first real call
+(`2026-08-03_1401_pptx-tool-bug-review-update`, 32:45, fr, 3 remote speakers + muted Owner)
+ran the WHOLE chain clean — aligned tracks, full transcript, real summary/anchors/envelope —
+so the chip→scroll path now has first-class live data too.
+
+**Small defect found on the first real call (badge lies):** the LLM wrote `- None mentioned.`
+as a bullet under `## Action Items`, and `SummaryDocument.bullets` counts it, so the row shows
+"1 action" for a meeting with zero actions (`MeetingCounts.swift:26`). Fix either by filtering
+none-family bullets in the parser or by prompting the section empty — parser side is testable
+both directions. Same call also surfaced two cosmetic warts: a canonical Whisper hallucination
+("Sous-titrage Société Radio-Canada") from the ~6 unmuted first seconds of the mic track, and
+one 1-word backchannel ("Hum.") attributed to `Unknown` because the diarizer had no cluster
+for it.
 
 **And the batch was closed once BEFORE anyone had looked, which found one more bug.** I reported
 seven items done without rendering the window this session, then ran
