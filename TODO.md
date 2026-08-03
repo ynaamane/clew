@@ -120,6 +120,13 @@ evidence contradicts, the suggestion UI should ask the user the ONE discriminati
 (today: "who was in the room with you?") instead of guessing. Arbiter model: try the shipped
 llama.cpp summarizer first, escalate to Qwen-32B-class via Ollama only if it fails the eval;
 build that eval from real meetings as they accumulate (today's = first labeled case).
+Overlap refinements (USER hypothesis 2026-08-03, end-of-meeting simultaneous speech): enroll
+only from long mid-run single-speaker monologues (never edges or rapid exchanges); make
+`VoiceprintDB` multi-sample per name (upsert currently overwrites) so one contaminated clip
+dilutes; surface pyannote's overlap regions as "chevauchement" in the transcript instead of
+confidently attributing them; exclude overlap zones from embeddings and downweight
+name-evidence inside them. In-room voices overlap MORE than remote ones (Zoom half-duplex
+serializes remotes; room acoustics serialize nothing).
 
 **Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
 item 3's backfill may close this without a new recording if anchoring finds tokens on the
