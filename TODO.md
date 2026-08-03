@@ -83,13 +83,19 @@ callout, turn grouping, flat tracked inspector rail with the N/M ratio):
     all. Overlap on one mixed room mic stays the accuracy ceiling either way. One real in-room
     meeting should confirm (a) empirically (that the tap captures the room entity's stream).
 
-**Enrollment: 1 voiceprint exists (Yanis, 2026-08-03), colleagues pending.** Enrolled from the
-real call WITHOUT a fresh recording: contextual inference (3 name-vocatives + turn-taking) said
-SPEAKER_00 = Yanis, voice forensics confirmed the reasoning chain, and the print was verified at
-the deployed threshold — a SECOND segment of the same voice matches at cos 0.957, the two
-colleagues at 0.210 / −0.045. First empirical answer to the 0.65 question below: within-speaker
-0.957 (long clips) and 0.782 (25-38s clips), worst cross-speaker pair observed 0.556 — the
-threshold holds, but the 0.556 pair leaves only ~0.1 margin; re-check when more voices enroll.
+**Enrollment: DONE for the 2026-08-03 call — 3 voiceprints (Yanis, Devon, Kamal).** All enrolled
+from the real call WITHOUT fresh recordings: contextual inference gave SPEAKER_00 = Yanis (voice
+forensics confirmed), the user settled the contradictory 01/02 mapping with one physical fact
+(Devon was in the room → SPEAKER_02 = Devon, so SPEAKER_01 = Kamal), and clips were cut from
+mid-run monologues per the overlap rules below. Verified 3×3 (each print vs a SECOND segment of
+each voice): diagonal 0.957 / 0.725 / 0.863, all cross pairs below threshold — but the worst,
+Kamal-print vs a Devon segment, hit **0.637, only 0.013 under 0.65**. Two reasons this is safe
+today and watched tomorrow: `match_speaker` is argmax-above-threshold, so Devon's own print
+(0.725+) outbids Kamal on his segments; but a meeting where one of them speaks and the other's
+print exists while his own does NOT would sit on a knife edge, and overlap-contaminated segments
+score ambiguously on both. Re-measure this pair as more samples accumulate; it is the empirical
+argument for multi-sample prints. Future meetings now auto-name all three; today's meeting keeps
+SPEAKER_NN unless the user asks for `reprocess` (rewrites transcript/summary, ~30 min).
 CAUTION the inference needed: the OBVIOUS first read (SPEAKER_01 answers the "qu'est-ce qui a
 changé, Yanis" framing → must be Yanis) was WRONG — refuted by [24:28] where the same
 voice-coherent cluster (cos 0.782 across its two blocks) itself addresses "Yanis". Vocatives
