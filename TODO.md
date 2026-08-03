@@ -25,9 +25,10 @@ design being rejected again on sight.
 ### THE OPEN LIST
 
 **Needs YOU (2):**
-1. **Rebuild, then look**: `bash swift/build-app.sh && open "ownscribe://library"` — never an
-   agent (`rm -rf` + TCC grants keyed to a cert that must never be recreated). Judge against
-   `design/direction-b-glass.png`, ideally AFTER item 3 so the strip/anchors have data to show.
+1. **Look at the rebuilt window** and judge it against `design/direction-b-glass.png`, ideally
+   AFTER item 3 so the strip/anchors have data to show. (2026-08-03 directive: agents now run
+   `build-app.sh` and the full e2e themselves — the signing cert alone must never be
+   recreated/deleted. What stays yours is the taste verdict.)
 2. **One ruling — accent color.** `mockup.html:12` declares Apple blue (`#0071e3`); the PNG you
    validated is purple throughout (selection, pills, envelope, timestamps). The app declares NO
    accent at all (zero `.tint`/`AccentColor` → system blue). One word — blue or purple — unblocks
@@ -64,6 +65,18 @@ design being rejected again on sight.
    clés sont ancrés…"); a tinted highlight on the scroll-target line; the backchannel fold as a
    count-carrying pill instead of a stock `Toggle(.switch)`; a prominent record button; the
    empty-state permission rows; a window-level background.
+
+10. **In-room speaker differentiation does not exist yet** (surfaced by the 2026-08-03 question):
+    `mic.wav` is tagged Owner wholesale and never diarized (`pipeline.py:344-350` — correct by
+    construction for the headphones/remote case). In a shared room (N people = 1 Zoom entity),
+    every room voice enters the mic and gets labeled Owner. Closing it means diarizing `mic.wav`
+    too and assigning Owner by voiceprint match instead of by construction — accepting the
+    overlap ceiling (spatial info is lost once voices mix in one channel).
+
+**Needs YOU also: enrollment.** 0 voiceprints exist on disk
+(`~/.config/meeting-scribe/voiceprints/voiceprints.json` absent), so no meeting can show real
+names yet — remote calls show `SPEAKER_NN`. `ownscribe enroll <name>` with 10-30s per recurring
+colleague is what turns clusters into names (matching is already built, `speakers/matching.py`).
 
 **Needs one real recording (1)**: the clickable evidence chip → scroll on live data (§ 3) —
 item 3's backfill may close this without a new recording if anchoring finds tokens on the
