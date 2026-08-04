@@ -285,6 +285,40 @@ machine state outside the copied library — it isolates `homeDir` by design, so
 there regardless of what is enrolled. Live-app AX is the only channel for that class of claim.
 Add it to the CANNOT-VERIFY list alongside glass/materials.
 
+**Pre-capture 2026-08-04 (off-screen renderer, agent), at `3978b62`, against
+`/tmp/ui-render/library-light.png` and `library-dark.png`.** These are pre-verdicts on the
+observables the renderer CAN see (layout, spacing, type hierarchy, text content, light/dark).
+They are not the design verdict: no item below is globally VERIFIED, the final call on every
+item is Yanis's, in the live app. Blind spots that apply to this whole block: glass and
+materials render byte-identically to no glass, the selected sidebar row paints an opaque
+black pill over its own label (seen again in both PNGs, known artifact, not a defect), and
+real translucency, vibrancy and selection styling are invisible off-screen.
+
+- Item 1 (one deliberate design): `Design status: UNVERIFIED`, whole-window judgment, needs Yanis.
+- Item 2 (transcript legibility): observables pass in both PNGs, timestamp gutter, speaker
+  avatar and utterance text render without truncation or overlap, avatar does not compete
+  with the text at render size. Legibility itself: `Design status: UNVERIFIED`, needs Yanis.
+- Item 3 (type scale): hierarchy reads coherent in both PNGs (detail title > section
+  headers in small caps > body > badge captions), no arbitrary-size outlier observed. Exact
+  pt values not measurable from pixels: final read needs Yanis.
+- Item 4 (glass rails): `Design status: UNVERIFIED`, glass is in the renderer's cannot-verify
+  list, needs Yanis at the screen.
+- Item 5 (density and spacing vs mockup): observables pass, list rows carry the mockup's
+  title/meta/summary structure with badges, compact density comparable to the mockup, no
+  spacing anomaly in either theme.
+- Item 6 (speaker avatars distinguishable): `Design status: UNVERIFIED` in this render, the
+  selected fixture meeting has a single Unknown voice so no two-avatar comparison exists in
+  the PNGs. Needs a multi-speaker meeting selected, or Yanis in the live app.
+- Item 7 (envelope strip): observables pass, the strip renders with real amplitude variation
+  in both themes. Informative-vs-decoration: needs Yanis.
+- Item 8 (inspector states): partial pass, `(aucune correspondance)` renders on both key
+  points and reads as data, not breakage, in both themes. `(pas encore vérifié)` is not
+  exercised by this fixture. Whether the wording reads neutral: needs Yanis.
+- Item 9 (anchor chip click): `Design status: UNVERIFIED`, interaction, off-screen renderer
+  cannot click, needs the live app.
+- Item 10 (settings pane): `Design status: UNVERIFIED`, the renderer draws the library
+  window only, the settings pane is not in either PNG.
+
 Open `⌘0` (or the URL above) and judge against `design/direction-b-glass.png`
 and `design/mockup.html`:
 
