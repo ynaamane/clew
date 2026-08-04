@@ -661,6 +661,12 @@ LOOKING. Not a passing suite, not 3 `glassEffect` call sites, not a symbol prese
 binary. Those prove the code runs; they say nothing about whether it reads well. If nobody
 has looked, the honest status line is "unverified", never "matches the design".
 
+**Also learned, at a real cost:** `screencapture -x` of the full screen is NOT a usable
+verification method on this machine. The one attempt captured confidential content unrelated
+to this project and had to be deleted immediately. Any future visual check must target the
+app window ALONE (`-l <windowid>` or `-R` on its frame), never the desktop, and never while
+other work is on screen.
+
 **What is NOT yet known:** which part of the design is wrong. "Pas bon du tout" is a verdict
 on the whole, so the next step is to look at the window WITH the user rather than guess at
 spacing or colour and iterate blind against a target nobody has seen.

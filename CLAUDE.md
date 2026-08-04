@@ -25,6 +25,11 @@ Default on every non-trivial change — not a per-task ask:
   for the REQUIRED one: a passing suite, N `glassEffect` call sites and a symbol in the binary prove
   the code RUNS, never how it READS. Write "unverified" when nobody has looked. Correcting a
   claim-without-evidence with a different claim-without-evidence is not a correction.
+- **Never `screencapture` the full screen on this machine.** A full-screen capture records
+  everything on the display, and the one attempt captured confidential content unrelated to this
+  project. Deleted immediately; the exposure was real. Target the app window alone
+  (`screencapture -l <windowid>`, or `-R` on its frame), and prefer asking the user to look
+  over automating a capture of a screen that holds other work.
 - **Never explain the BUG5 staleness gate away — run `bash swift/build.sh` and see.** It fired on
   2026-07-30 and was dismissed as *"a false positive: that file is excluded from the audio binary
   target (`Package.swift:19`)"*. It is not scoped to a target: `scripts/check.sh:34` is

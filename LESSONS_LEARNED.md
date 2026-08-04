@@ -155,6 +155,12 @@ the structural test depends on, so it must run on the RAW title.
   re-measured Python (catching 635) but *accepted* 276 from the document it was auditing — so the
   audit confirmed a wrong number as correct. An inherited figure is not evidence; re-derive each one
   in the turn you cite it.
+- **`screencapture -x` full-screen is NOT a usable verification method here: it leaked confidential
+  data on first use.** A full-screen capture records everything on the display, not just the app
+  under test, and the one attempt captured confidential content unrelated to this project. Deleted
+  immediately, but the exposure was real. Any visual verification must target the app window ALONE
+  (`screencapture -l <windowid>`, or `-R` on its frame), never the desktop. And prefer asking the
+  user to look over automating a screenshot of a machine whose screen holds other work.
 - **Sabotage the production function, not the test.** Two builders reported COMPLETE on tests that
   guarded nothing. Replacing `loadEnvelope()` with `return nil` — W0-5 completely dead — left all
   SIX tests green, because they rebuilt `try? EnvelopeDocument(contentsOf:)` themselves and asserted

@@ -226,6 +226,13 @@ tout ça prouve que le code TOURNE. Rien n'est une preuve sur la façon dont il 
 seule réponse honnête est « personne n'a regardé », il faut l'écrire. Et corriger une
 affirmation-sans-preuve par une *autre* affirmation-sans-preuve n'est pas une correction.
 
+**Piège d'outillage : la capture plein écran est interdite ici.** `screencapture -x` plein écran
+est INUTILISABLE : un écran capture tout ce qui s'y trouve, pas seulement l'app sous test, et la
+seule tentative a capturé du contenu confidentiel sans aucun rapport avec ce projet. Supprimé
+immédiatement, mais l'exposition était réelle. Toute vérif visuelle doit cibler la fenêtre de
+l'app SEULE (`-l <windowid>` ou `-R` sur son cadre), jamais le bureau. Et mieux vaut demander à
+l'utilisateur de regarder que d'automatiser une capture d'un écran qui porte d'autres travaux.
+
 **Ce qu'on ne sait PAS encore :** quelle partie du design est mauvaise. « Pas bon du tout » est un
 verdict global, donc l'étape suivante est de regarder la fenêtre AVEC l'utilisateur, pas de deviner
 un espacement ou une couleur et d'itérer à l'aveugle contre une cible que personne n'a vue.

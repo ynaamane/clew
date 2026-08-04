@@ -345,6 +345,11 @@ and `design/mockup.html`:
       says a restart is needed, because `AppState` reads the config once at
       launch.
 
+**Screenshots: window only, never the screen.** The one full-screen
+`screencapture -x` attempt captured confidential content unrelated to this
+project. Use `screencapture -l <windowid>` or `-R` on the window frame, and
+only when the rest of the screen is clear.
+
 **When the verdict is negative, get specifics before changing anything.**
 "Pas bon du tout" is a verdict on the whole; guessing at spacing or colour
 and iterating blind against an unseen target wastes both sides' time. Look at
