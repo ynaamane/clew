@@ -57,7 +57,7 @@ recording of real colleagues**. Read-only, always: never write, move or delete a
 `~/ownscribe/`. Do not print transcript content into a report or a commit message. It is the only
 real fixture and it is worth using — two tests read from it deliberately. Voiceprint embeddings are
 biometric data (GDPR Art. 9, cleared for this use) and live outside the tracked tree, under
-`~/.config` and `~/ownscribe` — never commit them into the repo.
+`~/.config` and `~/ownscribe`: never commit them into the repo.
 
 `~/ownscribe/2026-07-27_1352/` is the BUG4 artifact: 12,890,112 bytes, 33.56s, **peak 0.0, rms
 0.0**. Useful precisely because it is valid-but-empty — the case a presence check calls "fine".

@@ -54,7 +54,7 @@ for 1, 2, 5 live in the enrollment/overlap paragraphs below — read them before
 
 User-side gates (no build): taste verdict on the live window · `reprocess` of today's meeting to
 retro-name its speakers (~30 min, REWRITES transcript/summary — explicit go only). Forced-purple
-selection ruling: DECIDED 2026-08-06, not forced — see OPEN LIST item 2.
+selection ruling: DECIDED 2026-08-06, not forced, see OPEN LIST item 2.
 
 ### THE OPEN LIST
 
