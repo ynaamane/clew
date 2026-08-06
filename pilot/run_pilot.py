@@ -12,9 +12,9 @@ Usage:
         [--thermal-duration-s SECONDS] [--out-dir DIR]
 
 With no --clip/--reference, downloads and uses the public FEBLOC fallback
-clip (see fetch_fallback_clip.py) -- runnable without user-provided audio, per
-the ticket's requirement. Pass --clip/--reference (reference in the same
-JSON shape fetch_fallback_clip.py writes) to run against a real,
+clip (see fetch_fallback_clip.py) -- runnable with the bundled public clip
+alone, per the ticket's requirement. Pass --clip/--reference (reference in
+the same JSON shape fetch_fallback_clip.py writes) to run against a real,
 Yanis-provided meeting clip instead.
 
 PRE-COMMITTED pass/fail (from the ticket, applied in decide_verdict()):

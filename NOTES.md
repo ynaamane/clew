@@ -626,7 +626,7 @@ pytest: **414 -> 434 passed** (20 new; 1 correctly deselected — the real integ
 
 ## Task#9 (planner P8) — PILOT harness, A/B Whisper-large-v3 vs Canary-MLX
 
-Unblocked by Task#8. The ticket asks for "ONE real code-switched FR/EN meeting clip (Yanis-provided) + a reference transcript + a public FR/EN clip fallback so it's runnable without user-provided audio." No Yanis-provided clip exists in this environment — a real gap, not something to fabricate. Built the fallback path fully (the actual deliverable this session could complete) and designed `pilot/run_pilot.py` to accept a real clip+reference via `--clip`/`--reference` whenever one becomes available, using the exact same code path.
+Unblocked by Task#8. The ticket asks for "ONE real code-switched FR/EN meeting clip (Yanis-provided) + a reference transcript + a public FR/EN clip fallback so it's runnable without a user-provided real-world clip." No Yanis-provided clip exists in this environment — a real gap, not something to fabricate. Built the fallback path fully (the actual deliverable this session could complete) and designed `pilot/run_pilot.py` to accept a real clip+reference via `--clip`/`--reference` whenever one becomes available, using the exact same code path.
 
 ### Sourcing the public fallback: found, then independently re-verified, a real FR/EN code-switching corpus
 

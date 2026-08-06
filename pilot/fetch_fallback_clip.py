@@ -1,6 +1,6 @@
 """Fetch and prepare the public FR/EN code-switching fallback clip for the pilot.
 
-Runnable without user-provided audio, per the ticket's requirement. Downloads a
+Runnable without any user-provided audio, per the ticket's requirement. Downloads a
 30.5s window from FEBLOC (French-English Bilingual Loved Ones Corpus,
 Gosselin, University of Ottawa, CC-BY 4.0, https://febloc.ca), a real
 recorded conversation with genuine intra-sentential French/English
