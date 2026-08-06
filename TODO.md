@@ -53,8 +53,8 @@ for 1, 2, 5 live in the enrollment/overlap paragraphs below — read them before
    only covers rooms with NO Zoom at all.
 
 User-side gates (no build): taste verdict on the live window · `reprocess` of today's meeting to
-retro-name its speakers (~30 min, REWRITES transcript/summary — explicit go only) · optional
-forced-purple selection ruling.
+retro-name its speakers (~30 min, REWRITES transcript/summary — explicit go only). Forced-purple
+selection ruling: DECIDED 2026-08-06, not forced — see OPEN LIST item 2.
 
 ### THE OPEN LIST
 
@@ -67,11 +67,12 @@ forced-purple selection ruling.
    ancrés", the real RMS strip renders, "27 interventions courtes masquées" with real examples,
    grouped turns, purple monospaced anchor chips, flat tracked rail. **What stays yours: the
    taste verdict** (glass/materials in motion can't be judged from a static capture).
-2. **Accent applied: PURPLE** (`AppAccentColor`, one line to flip). Note from the live capture:
-   the LIST SELECTION renders in your macOS **system accent** (green on this machine) — macOS
-   drives selection from System Settings, not from `.tint`; the purple shows in chips/links.
-   Forcing purple selection would fight the OS convention (same family as forcing dark mode).
-   Say the word if you want it forced anyway.
+2. ~~Accent applied: PURPLE~~ **DECIDED 2026-08-06 (Yanis): KEEP macOS system selection.**
+   (`AppAccentColor`, one line to flip). Note from the live capture: the LIST SELECTION renders
+   in your macOS **system accent** (green on this machine) — macOS drives selection from System
+   Settings, not from `.tint`; the purple shows in chips/links. Forcing purple selection would
+   fight the OS convention (same family as forcing dark mode). Decision: not forced, the system
+   selection color stays.
 
 **Code — the 2026-08-03 afternoon batch CLOSED items 4-8 and most of 9** (three lanes + lead
 verification; every item TDD'd and mutation-checked; final gate CHECK=0, 10/10, 479+47 Swift /
