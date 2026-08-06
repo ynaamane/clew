@@ -1,7 +1,7 @@
 # ownscribe
 
 [![PyPI](https://img.shields.io/pypi/v/ownscribe)](https://pypi.org/project/ownscribe/)
-[![CI](https://github.com/paberr/ownscribe/actions/workflows/ci.yml/badge.svg)](https://github.com/paberr/ownscribe/actions/workflows/ci.yml)
+[![CI](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
@@ -23,6 +23,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 - [Summarization Templates](#summarization-templates)
 - [Speaker Diarization](#speaker-diarization)
 - [Headphones vs Speakers (Owner Track Purity)](#headphones-vs-speakers-owner-track-purity)
+- [What I Inherited vs What I Built](#what-i-inherited-vs-what-i-built)
 - [Acknowledgments](#acknowledgments)
 - [Contributing](#contributing)
 - [License](#license)
@@ -513,6 +514,17 @@ Known scope limits for this engine, compared to the WhisperX default:
 - **One language per run.** No per-segment auto-detection; `[transcription] language` (or the CLI `--language` flag) sets both source and target language for the whole file, defaulting to French if unset.
 - **VAD-segmented in ≤`max_segment_seconds` chunks** (via faster-whisper's bundled Silero VAD, already installed for WhisperX — no extra dependency) rather than one continuous pass, since Canary's positional encoding has no long-form chunking of its own.
 - **Pilot result: WhisperX stays the default.** On a real code-switched FR/EN clip (see `pilot/`), Canary's WER on code-switch spans was consistently worse than WhisperX's across every `max_segment_seconds` tested (5s/10s/40s) — the pre-committed pass bar (Canary must win switch-span WER by ≥3 points) was not met. `max_segment_seconds` defaults to 10.0 based on this pilot, not the 40.0 first assumed: 40s let VAD hand Canary an entire 30s conversational clip in one call, which measurably hurt accuracy versus finer segmentation.
+
+## What I Inherited vs What I Built
+
+This project is a fork of [paberr/ownscribe](https://github.com/paberr/ownscribe) at commit `afc1d18` (2026-07-20). As of this writing, 237 of the 318 commits on this branch were made by me, all after that fork point.
+
+Distinctive additions built in this fork, not present upstream:
+
+- **Claim anchoring**: each summary key point links back to the transcript timestamps where its source text appears, so a claim can be checked against the recording instead of trusted on faith.
+- **Voiceprint-based speaker enrollment and naming**: `ownscribe enroll` computes a voiceprint from a reference clip and matches it against future diarized speakers by cosine similarity, replacing generic `SPEAKER_00` labels with real names. Upstream has no speaker-identity system at all.
+- **Hardware-verified microphone mute**: the system-wide mute is verified by reading the device state back after setting it, instead of trusting that the set call succeeded.
+- **The SwiftUI menu-bar app** (`swift/Sources/OwnscribeMenuBar/`): a three-column library window, search, claim anchoring in the inspector, an RMS envelope strip, and settings, layered on the same CLI pipeline. Upstream's `swift/` directory holds a single Swift file, `swift/Sources/AudioCapture.swift`; this fork's `swift/Sources/` now holds 65.
 
 ## Acknowledgments
 
