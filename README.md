@@ -6,7 +6,7 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 Local-first meeting transcription and summarization CLI.
-Record, transcribe, and summarize meetings and system audio entirely on your machine – no cloud, no bots, no data leaving your device.
+Record, transcribe, and summarize meetings and system audio entirely on your machine: no cloud, no bots, no data leaving your device.
 
 > System audio capture requires **macOS 14.2 or later**. Other platforms can use the sounddevice backend with an external audio source.
 
@@ -45,31 +45,31 @@ All audio, transcripts, and summaries remain local.
 
 ## Features
 
-- **System audio capture** — records all system audio natively via a CoreAudio process tap (macOS 14.2+), no virtual audio drivers needed, no Screen Recording permission required
-- **Microphone capture** — optionally record system + mic audio simultaneously with `--mic`
-- **WhisperX transcription** — fast, accurate speech-to-text with word-level timestamps
-- **Speaker diarization** — optional speaker identification via pyannote (requires HuggingFace token)
-- **Pipeline progress** — live checklist showing transcription, diarization sub-steps, and summarization progress
-- **Local LLM summarization** — structured meeting notes with a built-in model (Phi-4-mini); also supports Ollama, LM Studio, or any OpenAI-compatible server
-- **Summarization templates** — built-in presets for meetings, lectures, and quick briefs; define your own in config
-- **Ask your meetings** — ask natural-language questions across all your meeting notes; uses a two-stage LLM pipeline with keyword fallback
+- **System audio capture**: records all system audio natively via a CoreAudio process tap (macOS 14.2+), no virtual audio drivers needed, no Screen Recording permission required
+- **Microphone capture**: optionally record system + mic audio simultaneously with `--mic`
+- **WhisperX transcription**: fast, accurate speech-to-text with word-level timestamps
+- **Speaker diarization**: optional speaker identification via pyannote (requires HuggingFace token)
+- **Pipeline progress**: live checklist showing transcription, diarization sub-steps, and summarization progress
+- **Local LLM summarization**: structured meeting notes with a built-in model (Phi-4-mini); also supports Ollama, LM Studio, or any OpenAI-compatible server
+- **Summarization templates**: built-in presets for meetings, lectures, and quick briefs; define your own in config
+- **Ask your meetings**: ask natural-language questions across all your meeting notes; uses a two-stage LLM pipeline with keyword fallback
   <br><img src="docs/demo-ask.gif" alt="ownscribe ask demo" width="700">
-- **Silence auto-stop** — automatically stops recording after sustained silence (default: 5 minutes, configurable)
-- **One command** — just run `ownscribe`, press Ctrl+C when done, get transcript + summary
+- **Silence auto-stop**: automatically stops recording after sustained silence (default: 5 minutes, configurable)
+- **One command**: just run `ownscribe`, press Ctrl+C when done, get transcript + summary
 
 ## Requirements
 
 - macOS 14.2+ (for system audio capture)
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- [ffmpeg](https://ffmpeg.org/) — `brew install ffmpeg`
+- [ffmpeg](https://ffmpeg.org/): `brew install ffmpeg`
 - Xcode Command Line Tools (`xcode-select --install`)
 
-Summarization works out of the box — a local model (Phi-4-mini, ~2.4 GB) downloads automatically on first run. Optionally, you can use [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or any OpenAI-compatible server instead (see [Configuration](#configuration)).
+Summarization works out of the box: a local model (Phi-4-mini, ~2.4 GB) downloads automatically on first run. Optionally, you can use [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or any OpenAI-compatible server instead (see [Configuration](#configuration)).
 
 Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc.).
 
-> **Tip:** The first time ownscribe records system audio, macOS prompts for **System Audio Recording** permission — a narrower grant than Screen Recording; it only lets ownscribe hear other apps' audio, not see your screen. If you use `--mic`, macOS also prompts for **Microphone** permission. Open either settings panel directly with:
+> **Tip:** The first time ownscribe records system audio, macOS prompts for **System Audio Recording** permission, a narrower grant than Screen Recording; it only lets ownscribe hear other apps' audio, not see your screen. If you use `--mic`, macOS also prompts for **Microphone** permission. Open either settings panel directly with:
 >
 > ```bash
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
@@ -78,7 +78,7 @@ Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc
 >
 > Enable your terminal app under "System Audio Recording Only", then restart it.
 >
-> ownscribe checks Microphone access **before** starting a recording (when `--mic` is set) and exits with the exact fix if it's missing. System Audio Recording is a private macOS permission with no public preflight API, so it's requested naturally on first capture instead — if denied, ownscribe reports it immediately rather than silently recording silence. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
+> ownscribe checks Microphone access **before** starting a recording (when `--mic` is set) and exits with the exact fix if it's missing. System Audio Recording is a private macOS permission with no public preflight API, so it's requested naturally on first capture instead. If denied, ownscribe reports it immediately rather than silently recording silence. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
 >
 > On macOS versions before 14.2, or if you pass `[audio] capture_backend = "screencapturekit"` in config, ownscribe falls back to ScreenCaptureKit, which does require the Screen Recording permission instead.
 
@@ -155,7 +155,7 @@ This will:
 3. Summarize with your local LLM
 4. Save everything to `~/ownscribe/YYYY-MM-DD_HHMMSS/`
 
-> **Note:** By default, ownscribe records all system audio directly with no picker — every app's output (Zoom, WhatsApp, browser tabs, etc.) is captured at once. To show a source picker on each launch instead, set `capture_mode = "picker"` in the `[audio]` config section.
+> **Note:** By default, ownscribe records all system audio directly with no picker: every app's output (Zoom, WhatsApp, browser tabs, etc.) is captured at once. To show a source picker on each launch instead, set `capture_mode = "picker"` in the `[audio]` config section.
 
 On first run, WhisperX / pyannote and the summarization model may download model files. ownscribe shows a `Preparing models` step and best-effort download progress in the TUI while this happens. Use `ownscribe warmup` to pre-download all models.
 
@@ -202,18 +202,18 @@ ownscribe cleanup                  # remove ownscribe data from disk
 
 ### Auto-Detecting a Meeting
 
-Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether BOTH the default input device (mic) and the default output device (speakers/headphones) are active at the same time — a permission-free, OS-level signal on both sides, since it only reads a hardware property and never opens an actual audio stream — and once that combined state holds continuously for a few seconds it starts recording automatically. Mic activity alone (dictation, a voice memo) does not trigger it, and output activity alone (music, a video) does not either — only mic AND output together, the pattern a live call produces.
+Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether BOTH the default input device (mic) and the default output device (speakers/headphones) are active at the same time (a permission-free, OS-level signal on both sides, since it only reads a hardware property and never opens an actual audio stream), and once that combined state holds continuously for a few seconds it starts recording automatically. Mic activity alone (dictation, a voice memo) does not trigger it, and output activity alone (music, a video) does not either: only mic AND output together, the pattern a live call produces.
 
 ```bash
 ownscribe watch                          # default: 3s of sustained mic+output activity before recording starts
 ownscribe watch --sustained-seconds 5    # require a longer sustained window (fewer false starts)
 ```
 
-This works identically regardless of which app produces the audio — Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only activity that stays sustained on both devices for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline — everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
+This works identically regardless of which app produces the audio: Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only activity that stays sustained on both devices for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline: everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
 
-> **Known limitation**: `ownscribe`'s own `--mic` capture (via `AVAudioEngine`) makes the OS report the output device as "running" even while producing silence — an artifact of `AVAudioEngine`'s internal render graph, not of anything actually playing. This does not affect `watch` today, since `watch-activity` always exits before a recording starts (they never run concurrently), but it means the mic+output signal is not safe to reuse while `ownscribe`'s own mic capture is active.
+> **Known limitation**: `ownscribe`'s own `--mic` capture (via `AVAudioEngine`) makes the OS report the output device as "running" even while producing silence, an artifact of `AVAudioEngine`'s internal render graph, not of anything actually playing. This does not affect `watch` today, since `watch-activity` always exits before a recording starts (they never run concurrently), but it means the mic+output signal is not safe to reuse while `ownscribe`'s own mic capture is active.
 
-> **Video files work too.** Anywhere ownscribe accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v) — it extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `ownscribe resume ./that-folder/` (transcript + summary); use `ownscribe transcribe meeting.mp4` for a transcript only.
+> **Video files work too.** Anywhere ownscribe accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v). It extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `ownscribe resume ./that-folder/` (transcript + summary); use `ownscribe transcribe meeting.mp4` for a transcript only.
 
 Use `warmup` ahead of time to avoid first-run model download delays while recording:
 
@@ -235,15 +235,15 @@ ownscribe ask "action items from last week" --limit 5
 
 This runs a two-stage pipeline:
 
-1. **Find** — sends meeting summaries to the LLM to identify which meetings are relevant
-2. **Answer** — sends the full transcripts of relevant meetings to the LLM to produce an answer with quotes
+1. **Find**: sends meeting summaries to the LLM to identify which meetings are relevant
+2. **Answer**: sends the full transcripts of relevant meetings to the LLM to produce an answer with quotes
 
 If the LLM finds no relevant meetings, a keyword fallback searches summaries and transcripts directly.
 
 ## The macOS app
 
 Everything above is the CLI. There is also a menu-bar app (`swift/Sources/OwnscribeMenuBar`) that
-drives the same pipeline — it shells out to this repo's `ownscribe`, so the CLI is the engine and the
+drives the same pipeline: it shells out to this repo's `ownscribe`, so the CLI is the engine and the
 app is a front end, not a reimplementation.
 
 ```bash
@@ -253,13 +253,13 @@ open /Applications/MeetingScribe.app     # always launch the INSTALLED copy
 ```
 
 `build-app.sh` installs on purpose and fails if the installed binary differs from the one just
-built — a real call was once recorded against a stale bundle because building and installing were
+built: a real call was once recorded against a stale bundle because building and installing were
 separate steps.
 
 What the app adds over the CLI:
 
 - **A three-column library window**: filters, meeting list, transcript with an inspector.
-  Meetings come from `~/ownscribe/` (or `[output] dir` in the config). Open it three ways — ⌘0,
+  Meetings come from `~/ownscribe/` (or `[output] dir` in the config). Open it three ways: ⌘0,
   the app menu, or `open "ownscribe://library"`. The URL route exists because until 2026-07-30 the
   window could only be reached by clicking the menu bar extra, and SwiftUI's `MenuBarExtra(.window)`
   popover exposes nothing to accessibility: a keyboard-only user was locked out, and so was any
@@ -268,12 +268,12 @@ What the app adds over the CLI:
   actions" narrows that filter rather than replacing it), and a two-line summary excerpt per row so
   the list says what a meeting was about.
 - **A record button and a global hotkey** (⌘⇧M) for the system-wide mic mute. The mute is verified
-  by reading the device back, and the menu bar shows three distinct states — not muted, muted and
-  verified, muted but **unverified** in amber — because a hardware-refused mute once displayed as
+  by reading the device back, and the menu bar shows three distinct states: not muted, muted and
+  verified, muted but **unverified** in amber, because a hardware-refused mute once displayed as
   successful, meaning the app said "muted" while the call could still hear you.
 - **Claim anchoring in the inspector.** Each summary key point shows the timestamps where its rare
   tokens appear in the transcript, and clicking one scrolls to that utterance. Three states are kept
-  deliberately distinct: `(pas encore vérifié)` means no `anchors.json` exists, `—` means anchoring
+  deliberately distinct: `(pas encore vérifié)` means no `anchors.json` exists, an em dash means anchoring
   ran and found nothing, and a chip means real evidence. Absence must never render as a confident
   zero.
 - **An RMS envelope strip**, so an abnormal silence is visible without opening a 400 MB wav.
@@ -286,7 +286,7 @@ Two caveats worth knowing before you build:
 - The app requires **macOS 26+** (`swift/Package.swift`), because the design targets the current
   visual language. The CLI has no such requirement.
 - macOS ties permission grants to the signing identity, so **never delete or recreate the signing
-  cert** — a new cert is a new identity and every System Audio Recording / Microphone grant resets.
+  cert**, a new cert is a new identity and every System Audio Recording / Microphone grant resets.
   See `BUILD.md`.
 
 ### Looking at the window without a mouse
@@ -301,7 +301,7 @@ bash scripts/ui-evidence/render.sh /tmp/ui-render             # off-screen; work
 ```
 
 `capture.sh` resolves the window id **by owner** and passes it to `screencapture -l`, so it cannot
-capture the screen — but it fails on a locked screen and on a window that is not frontmost.
+capture the screen, but it fails on a locked screen and on a window that is not frontmost.
 `render.sh` hosts the real `LibraryWindow` in an off-screen `NSWindow` and reads its pixels, in both
 light and dark appearances.
 
@@ -369,13 +369,13 @@ retention_days = 0        # days before `ownscribe purge` may remove audio; 0 = 
 
 ## Audio Retention
 
-By default (`keep_recording = true`), every recording's WAV files (system, mic, and any sidecar files) stay on disk next to the transcript and summary. This is what makes `resume` and `reprocess` possible — both need the original audio.
+By default (`keep_recording = true`), every recording's WAV files (system, mic, and any sidecar files) stay on disk next to the transcript and summary. This is what makes `resume` and `reprocess` possible: both need the original audio.
 
 There are three ways to control how long retained audio sticks around:
 
-- **Keep forever (default)** — `retention_days = 0` and never run `purge`. Nothing is ever deleted automatically.
-- **Auto-delete after each meeting** — `keep_recording = false` deletes the WAV files immediately after transcription (no retention at all, so `reprocess` won't work on that meeting later).
-- **Keep for N days, then purge manually** — set `retention_days` in config, and periodically run `ownscribe purge` to remove anything older than that. This is _not_ a background job; retention only happens when you invoke `purge`.
+- **Keep forever (default)**: `retention_days = 0` and never run `purge`. Nothing is ever deleted automatically.
+- **Auto-delete after each meeting**: `keep_recording = false` deletes the WAV files immediately after transcription (no retention at all, so `reprocess` won't work on that meeting later).
+- **Keep for N days, then purge manually**: set `retention_days` in config, and periodically run `ownscribe purge` to remove anything older than that. This is _not_ a background job; retention only happens when you invoke `purge`.
 
 ```bash
 ownscribe purge                    # purge using retention_days from config (no-op if retention_days = 0)
@@ -384,18 +384,18 @@ ownscribe purge --all              # purge every retained recording, regardless 
 ownscribe purge --dry-run          # preview what would be purged, without deleting anything
 ```
 
-`purge` only ever removes retained audio (WAV files and sidecars) — transcripts and summaries are never touched, so past notes remain readable even after their source audio is gone.
+`purge` only ever removes retained audio (WAV files and sidecars): transcripts and summaries are never touched, so past notes remain readable even after their source audio is gone.
 
 ### Reprocessing a Meeting
 
-If a transcript or summary came out wrong — a bad model choice, a config change, a summarization backend swap — `reprocess` redoes the whole pipeline from the retained audio, overwriting the existing transcript and summary:
+If a transcript or summary came out wrong (a bad model choice, a config change, a summarization backend swap), `reprocess` redoes the whole pipeline from the retained audio, overwriting the existing transcript and summary:
 
 ```bash
 ownscribe reprocess ./2026-02-20_1736
 ownscribe reprocess ./2026-02-20_1736 --model large-v3 --template lecture
 ```
 
-Unlike `resume` (which skips work that's already done), `reprocess` always starts over from the audio — it errors out if no retained audio is found for that meeting (i.e. `keep_recording` was `false` when it was recorded, or it's already been purged).
+Unlike `resume` (which skips work that's already done), `reprocess` always starts over from the audio: it errors out if no retained audio is found for that meeting (i.e. `keep_recording` was `false` when it was recorded, or it's already been purged).
 
 ### Backfilling Older Meetings
 
@@ -406,7 +406,7 @@ ownscribe backfill ./2026-02-20_1736   # backfill one meeting
 ownscribe backfill                     # scan every meeting directory, backfilling each that needs it
 ```
 
-It never re-runs transcription or summarization, and it never rewrites or deletes an existing file — a meeting that already has both `envelope.json` and `anchors.json` is left untouched, and `envelope.json` is only added when retained audio is still present (no audio means no waveform, not a flat one). Running it again is always safe; it reports one line per directory and only ever adds files.
+It never re-runs transcription or summarization, and it never rewrites or deletes an existing file: a meeting that already has both `envelope.json` and `anchors.json` is left untouched, and `envelope.json` is only added when retained audio is still present (no audio means no waveform, not a flat one). Running it again is always safe; it reports one line per directory and only ever adds files.
 
 ## Summarization Templates
 
@@ -451,7 +451,7 @@ ownscribe enroll --name "Alice" alice-sample.wav
 
 This computes a voiceprint using the same embedding model diarization already loads (no extra download) and stores it in `~/.config/meeting-scribe/voiceprints/voiceprints.json`. Enrollment requires the same HuggingFace token as diarization (§ Speaker Diarization above).
 
-During a meeting, every diarized speaker cluster is compared against enrolled voiceprints by cosine similarity. A match above the threshold (default `0.65`) gets the enrolled name; anything below gets `Unknown-1`, `Unknown-2`, etc. — never a forced wrong match. If you record with `--mic` (or `capture_mode` retains separate tracks), your own segments are always labeled `Owner` directly from the microphone track and are never sent through diarization or matching, since you're a known speaker by construction.
+During a meeting, every diarized speaker cluster is compared against enrolled voiceprints by cosine similarity. A match above the threshold (default `0.65`) gets the enrolled name; anything below gets `Unknown-1`, `Unknown-2`, etc., never a forced wrong match. If you record with `--mic` (or `capture_mode` retains separate tracks), your own segments are always labeled `Owner` directly from the microphone track and are never sent through diarization or matching, since you're a known speaker by construction.
 
 ```bash
 ownscribe speakers            # list all enrolled names
@@ -473,15 +473,15 @@ If headphones aren't an option, `[audio] echo_cancellation` can enable macOS's o
 echo_cancellation = "off"   # "off" (default), "on", or "auto"
 ```
 
-- `"off"` — never touches the mic input. The current default.
-- `"on"` — always enables voice processing on the mic.
-- `"auto"` — enables voice processing only when the current default output device is the Mac's built-in speakers (detected via CoreAudio's transport type, not by matching a device name), since that's the only case where mic-into-speaker acoustic echo actually happens. Headphones and external outputs are left untouched.
+- `"off"`: never touches the mic input. The current default.
+- `"on"`: always enables voice processing on the mic.
+- `"auto"`: enables voice processing only when the current default output device is the Mac's built-in speakers (detected via CoreAudio's transport type, not by matching a device name), since that's the only case where mic-into-speaker acoustic echo actually happens. Headphones and external outputs are left untouched.
 
-macOS's voice processing also ducks non-voice audio playing through the speakers relative to detected speech — correct behavior for suppressing acoustic echo, but it means the effect on your own voice specifically has not been validated against a real recorded meeting in this fork; test it against your own voice before relying on it for anything you need transcribed precisely.
+macOS's voice processing also ducks non-voice audio playing through the speakers relative to detected speech (correct behavior for suppressing acoustic echo), but it means the effect on your own voice specifically has not been validated against a real recorded meeting in this fork; test it against your own voice before relying on it for anything you need transcribed precisely.
 
 ## Transcript Correction
 
-Meetings with French/English code-switching (speakers alternating languages mid-sentence) can trip up Whisper's spelling and word-boundary detection. An opt-in correction pass sends each transcript segment's text through your configured LLM backend, asking it to fix spelling and misheard words only — never to paraphrase, translate, add content, or touch timestamps/speakers.
+Meetings with French/English code-switching (speakers alternating languages mid-sentence) can trip up Whisper's spelling and word-boundary detection. An opt-in correction pass sends each transcript segment's text through your configured LLM backend, asking it to fix spelling and misheard words only, never to paraphrase, translate, add content, or touch timestamps/speakers.
 
 ```toml
 [correction]
@@ -489,11 +489,11 @@ enabled = true
 max_length_delta_ratio = 0.4  # reject a fix that changes segment length by more than this fraction
 ```
 
-A correction is applied only if it passes the length-delta guard; anything further outside that ratio (a sign of an added or truncated response) is rejected and the original segment text is kept unchanged. Uses your existing `[summarization]` backend — no separate model or config needed. Runs after diarization/speaker naming and before summarization, using the same summarizer instance.
+A correction is applied only if it passes the length-delta guard; anything further outside that ratio (a sign of an added or truncated response) is rejected and the original segment text is kept unchanged. Uses your existing `[summarization]` backend: no separate model or config needed. Runs after diarization/speaker naming and before summarization, using the same summarizer instance.
 
 ## Canary Transcription Engine (A/B Pilot)
 
-`engine = "canary_mlx"` swaps the default WhisperX/faster-whisper pipeline for [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2) via [mlx-audio](https://github.com/Blaizzy/mlx-audio) (Apple Silicon native, MLX runtime). This is a pilot A/B engine, not the default — pick it explicitly to compare against WhisperX on your own recordings.
+`engine = "canary_mlx"` swaps the default WhisperX/faster-whisper pipeline for [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2) via [mlx-audio](https://github.com/Blaizzy/mlx-audio) (Apple Silicon native, MLX runtime). This is a pilot A/B engine, not the default: pick it explicitly to compare against WhisperX on your own recordings.
 
 ```toml
 [transcription]
@@ -510,10 +510,10 @@ Requires `uv` on PATH (already required to run ownscribe from source). `mlx-audi
 Known scope limits for this engine, compared to the WhisperX default:
 
 - **Segment-level only, no word-level timestamps.** Canary's decoder has no forced-alignment step; every segment's `words` list is empty.
-- **No self-diarization.** Speaker labeling for Canary transcripts is whatever your existing diarization/naming pipeline produces on a segment-overlap basis — Canary itself never diarizes.
+- **No self-diarization.** Speaker labeling for Canary transcripts is whatever your existing diarization/naming pipeline produces on a segment-overlap basis. Canary itself never diarizes.
 - **One language per run.** No per-segment auto-detection; `[transcription] language` (or the CLI `--language` flag) sets both source and target language for the whole file, defaulting to French if unset.
-- **VAD-segmented in ≤`max_segment_seconds` chunks** (via faster-whisper's bundled Silero VAD, already installed for WhisperX — no extra dependency) rather than one continuous pass, since Canary's positional encoding has no long-form chunking of its own.
-- **Pilot result: WhisperX stays the default.** On a real code-switched FR/EN clip (see `pilot/`), Canary's WER on code-switch spans was consistently worse than WhisperX's across every `max_segment_seconds` tested (5s/10s/40s) — the pre-committed pass bar (Canary must win switch-span WER by ≥3 points) was not met. `max_segment_seconds` defaults to 10.0 based on this pilot, not the 40.0 first assumed: 40s let VAD hand Canary an entire 30s conversational clip in one call, which measurably hurt accuracy versus finer segmentation.
+- **VAD-segmented in ≤`max_segment_seconds` chunks** (via faster-whisper's bundled Silero VAD, already installed for WhisperX, no extra dependency) rather than one continuous pass, since Canary's positional encoding has no long-form chunking of its own.
+- **Pilot result: WhisperX stays the default.** On a real code-switched FR/EN clip (see `pilot/`), Canary's WER on code-switch spans was consistently worse than WhisperX's across every `max_segment_seconds` tested (5s/10s/40s): the pre-committed pass bar (Canary must win switch-span WER by ≥3 points) was not met. `max_segment_seconds` defaults to 10.0 based on this pilot, not the 40.0 first assumed: 40s let VAD hand Canary an entire 30s conversational clip in one call, which measurably hurt accuracy versus finer segmentation.
 
 ## What I Inherited vs What I Built
 
@@ -530,13 +530,13 @@ Distinctive additions built in this fork, not present upstream:
 
 ownscribe builds on some excellent open-source projects:
 
-- [WhisperX](https://github.com/m-bain/whisperX) — fast speech recognition with word-level timestamps and speaker diarization
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — CTranslate2-based Whisper inference
-- [pyannote.audio](https://github.com/pyannote/pyannote-audio) — speaker diarization
-- [mlx-audio](https://github.com/Blaizzy/mlx-audio) / [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2) — Apple Silicon native ASR (Canary pilot engine)
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) / [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) — local LLM inference
-- [Ollama](https://ollama.ai) — local LLM serving
-- [Click](https://click.palletsprojects.com) — CLI framework
+- [WhisperX](https://github.com/m-bain/whisperX): fast speech recognition with word-level timestamps and speaker diarization
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper): CTranslate2-based Whisper inference
+- [pyannote.audio](https://github.com/pyannote/pyannote-audio): speaker diarization
+- [mlx-audio](https://github.com/Blaizzy/mlx-audio) / [NVIDIA Canary-1B-v2](https://huggingface.co/nvidia/canary-1b-v2): Apple Silicon native ASR (Canary pilot engine)
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) / [llama-cpp-python](https://github.com/abetlen/llama-cpp-python): local LLM inference
+- [Ollama](https://ollama.ai): local LLM serving
+- [Click](https://click.palletsprojects.com): CLI framework
 
 ## Contributing
 

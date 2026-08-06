@@ -285,6 +285,10 @@ machine state outside the copied library — it isolates `homeDir` by design, so
 there regardless of what is enrolled. Live-app AX is the only channel for that class of claim.
 Add it to the CANNOT-VERIFY list alongside glass/materials.
 
+**Owner verdict 2026-08-06:** global approval by Yanis (app in daily use; recorded via
+project decision log). Renderer pre-verdicts above stand; no per-item formal pass was
+performed.
+
 **Pre-capture 2026-08-04 (off-screen renderer, agent), at `3978b62`, against
 `/tmp/ui-render/library-light.png` and `library-dark.png`.** These are pre-verdicts on the
 observables the renderer CAN see (layout, spacing, type hierarchy, text content, light/dark).
