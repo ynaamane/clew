@@ -215,6 +215,8 @@ employer name and the client project codename appear below as descriptions rathe
   structure item above (license classifier removed, `license` field set, `maintainers` added);
   `authors` (Pascal Berrang) and `name` (`ownscribe`) remain untouched, `name` on purpose per the
   new pre-release item below.
+  **SUPERSEDED 2026-08-07 by the Clew rename below**: `name` is no longer untouched, and the
+  URLs above point at `ynaamane/clew` now, not `ynaamane/meeting-scribe`.
 
 - [x] **CONTRIBUTING.md up to date**
   Done. Clone URL fixed (`git clone https://github.com/ynaamane/meeting-scribe.git` / `cd
@@ -236,10 +238,90 @@ employer name and the client project codename appear below as descriptions rathe
   case-insensitive grep for the widened NDA pattern described at the top of this file, against
   whatever history state is live at flip time, plus a human read of every remaining occurrence.
 
-- [ ] **Rename the package off the `ownscribe` PyPI namespace**
-  PENDING, pre-release item, not flip-blocking. `pyproject.toml`'s `name = "ownscribe"` is
-  upstream's PyPI namespace; publishing under it would collide with `paberr/ownscribe`'s own
-  package. Rename before any release to PyPI, not before the repo visibility flip.
+- [x] **Rename the package off the `ownscribe` PyPI namespace**
+  Done 2026-08-07, superseded and folded into the full Clew rename below: `pyproject.toml`'s
+  `name` is now `"clew"`, no longer the upstream `ownscribe` PyPI namespace.
+
+- [x] **Full product rename: ownscribe / MeetingScribe -> Clew (decision Yanis 2026-08-07)**
+  Done. Naming dossier: `/Users/yanisnaamane/taff/pipeline/research/naming-dossier.md`. Scope
+  and proof, this session:
+  - GitHub remote renamed to `ynaamane/clew` (repo itself already renamed on GitHub before this
+    session; `git remote set-url` + `git fetch` verified against the new URL). The local checkout
+    directory intentionally STAYS `/Users/yanisnaamane/meeting-scribe` (other sessions' docs
+    reference that path).
+  - Python package: `src/ownscribe/` -> `src/clew/` (`git mv`), every `from ownscribe` / `import
+    ownscribe` rewritten to `clew` across `src/`, `tests/`, `pilot/`, `scripts/`.
+    `pyproject.toml`: `name = "clew"`, `[project.scripts]` now `clew = "clew.cli:main"` primary
+    plus `ownscribe = "clew.cli:main"` kept as a muscle-memory alias (same entry point).
+    `uv lock` / `uv sync` regenerated cleanly (`Added clew v0.13.1`, `Removed ownscribe v0.13.1`).
+  - Config/data paths, safe migration: new canonical `~/.config/clew` (config + `voiceprints`
+    subdir) and `~/clew` (output), legacy `~/.config/ownscribe`, `~/.config/meeting-scribe/voiceprints`
+    and `~/ownscribe` migrated automatically, once, on real CLI startup only (`clew.cli.main()`,
+    never `clew.cli.cli()`, so the CliRunner-driven test suite can never trigger a real move --
+    see `main()`'s docstring in `src/clew/cli.py`). `CLEW_PROGRESS` env var replaces
+    `OWNSCRIBE_PROGRESS`, which still works as a fallback. Migration ran for real on this machine
+    during verification (see caveat below) and moved Yanis's actual config and 12 real meeting
+    directories intact, then `tests/test_envelope.py`'s real-file reference test found the
+    migrated recording at its new path and passed.
+  - macOS app, display-level: `CFBundleName` -> `Clew` (both plists), `NSAudioCaptureUsageDescription`
+    / `NSMicrophoneUsageDescription` reworded, `CFBundleURLSchemes` -> `clew` (was `ownscribe`,
+    matching `WindowOpenRoute.scheme`), every `Button`/`MenuBarExtra`/alert/settings string that
+    said "MeetingScribe" or "ownscribe" (found via a second, lowercase-inclusive sweep after the
+    first pass missed several: the "Quit ownscribe" menu button, the `MenuBarExtra` title, two
+    `PipelineRunner` error strings, a Settings save message, a French CLI-absent banner). Build
+    script `swift/build-app.sh`: `APP_NAME="Clew.app"`. Internal Swift module/type names
+    (`OwnscribeMenuBar`, `OwnscribeCapture`, `OwnscribeConfigReader`, etc.), the `ownscribe-audio`
+    binary name, and `CFBundleIdentifier` (`com.ownscribe.*`) all deliberately UNCHANGED this
+    pass (see follow-ups). `swift build` (debug + release) and `swift test` both green: 492
+    XCTest (9 skipped, 0 failures) + 48 swift-testing, after fixing one test that hardcoded the
+    old scheme in uppercase (`OWNSCRIBE://LIBRARY`, missed by a case-sensitive sed).
+  - Docs: `README.md` (title, the dossier's one-liner, install instructions rewritten to
+    `git+https://github.com/ynaamane/clew` since this fork isn't published to PyPI, every CLI
+    example, a new "Migrating from ownscribe / MeetingScribe" subsection; PyPI badge REMOVED
+    rather than left pointing at the wrong/unrelated `ownscribe` PyPI page), `LICENSE.md` /
+    `LICENSE-MIT` (checked, no repo URLs needed changing, upstream attribution untouched),
+    `CONTRIBUTING.md`, this file, `APP_TEST.md`, `.claude/skills/ownscribe-pipeline-traps/SKILL.md`.
+    The upstream fork attribution ("a fork of paberr/ownscribe at commit fc8198e") is unchanged
+    everywhere, as required: that fact never changes regardless of this fork's own name.
+  - Demo GIFs (`docs/demo-pipeline.gif`, `docs/demo-ask.gif`): see the dedicated GIF item below
+    for the regeneration decision and evidence.
+  - Gate: `bash scripts/check.sh` exit 0 (all 9 checks: ruff check, ruff format --check, pytest,
+    swift build debug, swift build release, swift test, `bin/ownscribe-audio` staleness --
+    rebuilt via `bash swift/build.sh` after the Swift edits, 3x shellcheck).
+  **Caveat, stated plainly**: verifying `clew --help` for real (`uv run clew --help`) triggered
+  the real migration against this actual machine's real `~/.config/ownscribe`, real
+  `~/.config/meeting-scribe`, and real `~/ownscribe` (12 meeting directories, ~2.3GB), outside
+  any test isolation. Verified lossless afterward (directory listing diffed, config.toml content
+  read back, no error), but it was a real mutation of real user data during a verification pass,
+  not inside a sandboxed test. Documented here rather than left silent.
+  Proof: this session's commits on `main` (see git log for SHAs).
+
+- [ ] **Regenerate demo GIFs with Clew branding**
+  PENDING, investigated and found infeasible with existing tooling this session (2026-08-07).
+  `docs/demo-pipeline.gif` and `docs/demo-ask.gif` were added upstream by Pascal Berrang
+  (`e1f106e` / `a272390`, Feb 2026, both pre-fork) as "README simulations": the only trace of
+  how they were built is a `.gitignore` comment, `# asciinema recordings (regenerated from
+  scripts/)` / `*.cast`, but no such script, `.tape` file, or Makefile target exists anywhere in
+  this repo's git history (`git log --all --name-only` searched for `.cast`, `demo`, `record`,
+  every commit, nothing). This machine has none of asciinema, `agg`, `gifski`, or `ttygif`
+  installed (`which` checked all four, all absent), and no Makefile exists to define a target
+  either. Regenerating would mean building a brand-new capture pipeline from scratch, not
+  reusing existing tooling, which is out of scope for a rename pass and risks producing a lower
+  quality artifact than the original without Yanis's input on what the demo should show. The
+  GIFs also predate the entire fork (claim anchoring, voiceprints, the macOS app all came after
+  Feb 2026), so they already showed upstream's original CLI before this rename, not just the old
+  product name. Left untouched per instruction: do not fake anything. `pilot/fetch_fallback_clip.py`
+  does fetch a bundled public clip that could feed a REAL `clew` pipeline run once a capture
+  pipeline exists (asciinema + agg is the standard combination for this kind of demo).
+
+- [ ] **PEP 541 claim of PyPI `clew`, post-flip**
+  PENDING, pre-release item, not flip-blocking. Per the naming dossier, `clew` on PyPI is a dead
+  squat (a single `0.0.1` release, no author, no summary): file a PEP 541 name-claim request
+  after the repo goes public, citing the dead release as justification. Do this instead of
+  publishing under `clew-cli` or a similar workaround; the dossier's fallback name is `clew-cli`
+  only if the PEP 541 claim is rejected. Not started this session (this session only renamed the
+  local package; nothing was published or submitted to PyPI, per this repo's standing rule to
+  never publish).
 
 ## Final gate
 

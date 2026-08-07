@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>MeetingScribe — maquette d'interface</title>
+<title>Clew : maquette d'interface</title>
 <style>
   :root {
     --text: #1d1d1f;
@@ -228,7 +228,7 @@
 <body>
 <div class="page">
 
-<h1>MeetingScribe — maquette d'interface</h1>
+<h1>Clew : maquette d'interface</h1>
 <p class="lede">Quatre surfaces, avec le contenu réel de ta réunion du 27 juillet (17:30, FR/EN, 3 locuteurs). Les tailles de texte et de contrôles suivent les valeurs publiées par Apple pour macOS : corps 13&nbsp;pt, sous-titre 11&nbsp;pt, légende 10&nbsp;pt, contrôles 28&nbsp;pt de haut, barre de menus 24&nbsp;pt, séparateur de split view 1&nbsp;pt.</p>
 <p class="rule-note"><b>Pourquoi une fenêtre existe désormais.</b> HIG, <i>The menu bar</i> : « <i>Avoid relying on the presence of menu bar extras</i> » — le système les masque et les réaffiche, et tu ne peux pas prédire leur position. Et « <i>Avoid making a dynamic menu item the only way to accomplish a task</i> ». Aujourd'hui le menu est la <em>seule</em> interface : c'est la violation à corriger d'abord.</p>
 
@@ -372,7 +372,7 @@
       <div class="pop-row"><span class="glyph" style="color:var(--green)">✓</span> Micro coupé — <b>vérifié</b> <span class="kbd">⌘⇧M</span></div>
       <div class="pop-row" style="font-size:var(--t-sub);color:var(--text-2);height:auto;padding-bottom:5px">AirPods Max — relecture confirmée</div>
       <div class="pop-sep"></div>
-      <div class="pop-row"><span class="glyph">◳</span> Ouvrir MeetingScribe <span class="kbd">⌘0</span></div>
+      <div class="pop-row"><span class="glyph">◳</span> Ouvrir Clew <span class="kbd">⌘0</span></div>
       <div class="pop-row"><span class="glyph">⚙</span> Réglages… <span class="kbd">⌘,</span></div>
     </div>
     <p class="cap"><b>Nominal.</b> Le chrono vit dans la barre : plus besoin d'ouvrir quoi que ce soit pour savoir si ça enregistre. Les deux vumètres sont alimentés par le calcul de crête qui existe déjà dans <code>AudioLevels.swift</code> : <code>computePeakLevel</code> est appelé depuis <code>CoreAudioTapCapture</code>, <code>MicCapture</code> et <code>main.swift</code>, et <code>kSystemLoudThreshold</code> pilote le détecteur de silence. Le niveau est donc calculé en continu — il ne va simplement nulle part dans l'interface : il part sur <code>stderr</code> en <code>[SILENCE_WARNING]</code>. Ce n'est pas un fichier mort à réveiller, c'est un affichage à brancher.</p>

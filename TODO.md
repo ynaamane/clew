@@ -273,7 +273,7 @@ turned out to be wrong.
 
 ### 0. THE DESIGN HAS NOW BEEN LOOKED AT (2026-07-30) — and it is wrong, as you said
 
-First actual visual review in this project's history. `open "ownscribe://library"` +
+First actual visual review in this project's history. `open "clew://library"` +
 `screencapture -l <windowid>` + reading the PNG.
 
 **⚠️ RE-CHECKED THE SAME DAY: FOUR OF THE SEVEN FINDINGS BELOW WERE WRONG**, including the one
@@ -331,7 +331,7 @@ What DOES match: the amber/green pills (`2 non ancrés`, `3 actions`) are the mo
 summary excerpts render, search exists, and "non vérifiée" appears correctly on unchecked
 meetings — the three things built earlier today.
 
-**Two measurement notes.** `find ~/ownscribe -name envelope.json` now returns **2** files, not
+**Two measurement notes.** `find ~/clew -name envelope.json` now returns **2** files, not
 the 1 recorded below — re-measure before quoting either. And the AX tree returned **55 lines**,
 not 0: it carries every row's text with pixel frames (`@433,322 174x16`), which is enough to
 measure spacing. What it lacks is `.accessibilityIdentifier` on the *interactive* views, so
@@ -464,7 +464,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
     rather than as unverified. Needs a legible empty state, not a data change.
 
 After each: render both appearances with the § 2.0 harness and **read the PNG**. The old loop
-(`open "ownscribe://library"` + `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`) still
+(`open "clew://library"` + `bash scripts/ui-evidence/capture.sh Clew /tmp/ui-ev`) still
 works when you are at an unlocked machine — activate the app first, since `screencapture -l` fails on
 a window that is not frontmost — but it cannot be the harness's only path.
 
@@ -502,7 +502,7 @@ could be trusted**
 
 - ~~**`checkHasAudio` reads only the first 48,000 frames.**~~ **CLOSED, and it was LIVE, not
   "suspected".** One second at 48 kHz. Measured through production's own `checkTracks`:
-  `~/ownscribe/2026-07-27_1531/recording.wav` is a real 238.7s recording, whole-file peak 0.999,
+  `~/clew/2026-07-27_1531/recording.wav` is a real 238.7s recording, whole-file peak 0.999,
   first audible sample at **5.33s** — it reported `hasContent=false` and wore the BUG4 ⚠ that means
   "your recording failed". `2026-07-27_1352` is silent end to end and correctly still warns. That
   pair is the discriminator. Now a chunked full scan with early exit; worst case (a silent file,
@@ -702,7 +702,7 @@ Writing them corrected three assumptions about the binary, which is the argument
 
 One test is deliberately skipped: the merge-failure path only runs with a live `MicCapture`, so it needs `OWNSCRIBE_TEST_REAL_MIC=1` and built-in hardware. A hardware-free test covers the same guarantee.
 
-**⚠️ `5c00efd` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
+**⚠️ `5c00efd` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/Clew.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
 **⚠️ ONE THING NEEDS YOU: which part of the design is wrong.** The window HAS now been seen — twice on 2026-07-28, and rejected both times (see the top of this file). What has never happened is a *specific* reading: "pas bon du tout" is a verdict on the whole, and nobody has named a part. So this is not "open it and say what you think" any more; it is "open ⌘0 and tell me which of the eight checks in `APP_TEST.md` § Design pass fails, and how". No audit can close this, and no amount of guessing at spacing can either.
 
@@ -720,7 +720,7 @@ One test is deliberately skipped: the merge-failure path only runs with a live `
 
 **W0-9 — CLI availability pre-flight check** (8 tests): The app can now warn you BEFORE starting to record that the ownscribe CLI is missing, so you don't record an entire meeting then learn nothing can transcribe it. A banner appears when the CLI is unavailable: *"Audio will be recorded but not transcribed — the ownscribe CLI is missing. Restore it, then run ./rec.sh redo <dir> to transcribe this meeting from its retained audio."* The check runs before starting a recording and once when the window opens. Recording is ALLOWED (not disabled) because the meeting is irreplaceable — the audio survives for later `redo`. The check is cheap (env lookups + one `isExecutableFile`, no PATH walk) and respects the injected `pipelineRunnerFactory` seam. Banner precedence: `.failed` → mute warning → CLI warning → nil, so a real failure or an unverified-mute state always shows first. Tests pin the precedence and prove the factory is called.
 
-**W0-4 — Sidebar counts now populate** (implemented by `builder-counts` in parallel): The action and anchor filters' counts were always zero because no writer existed — they're now computed on every sidebar refresh (0.44 ms, no cache needed). The counts are `Int?` rather than `Int`, because of the six meetings on disk **one** has an `anchors.json` at all and its `anchors` object is `{}` — so **zero have usable anchors**, measured 2026-07-29 with `find ~/ownscribe -name anchors.json` plus a token count on the file. (This entry said "zero of six have `anchors.json`", which was true when written and is now off by one file; the distinction that matters is present-but-empty versus absent, and both must stay distinguishable from a real zero.) Rendering an absent count as `0` would claim "all claims have evidence" for meetings that were never checked, which is the W0-1 anti-hallucination signal failure. Absence → nil → rendered as grayed-out text or a distinct UI state. The trap that can be generalized: when a count's source file may not exist (a late-added `anchors.json`, a deferred check), make it `Int?` so absence cannot masquerade as zero. Scoped as cheap, so no caching layer added.
+**W0-4 — Sidebar counts now populate** (implemented by `builder-counts` in parallel): The action and anchor filters' counts were always zero because no writer existed — they're now computed on every sidebar refresh (0.44 ms, no cache needed). The counts are `Int?` rather than `Int`, because of the six meetings on disk **one** has an `anchors.json` at all and its `anchors` object is `{}` — so **zero have usable anchors**, measured 2026-07-29 with `find ~/clew -name anchors.json` plus a token count on the file. (This entry said "zero of six have `anchors.json`", which was true when written and is now off by one file; the distinction that matters is present-but-empty versus absent, and both must stay distinguishable from a real zero.) Rendering an absent count as `0` would claim "all claims have evidence" for meetings that were never checked, which is the W0-1 anti-hallucination signal failure. Absence → nil → rendered as grayed-out text or a distinct UI state. The trap that can be generalized: when a count's source file may not exist (a late-added `anchors.json`, a deferred check), make it `Int?` so absence cannot masquerade as zero. Scoped as cheap, so no caching layer added.
 
 Both defects had the same shape: values plumbed to consumers that were never called. Neither was detectable by a green suite.
 
@@ -851,7 +851,7 @@ The rest:
 
 ### 1. Build the app — DONE 2026-07-27
 
-Cert `MeetingScribeDev` created (`C722A95A6314533F47284B33AD4A0B1D7876B1AC`); the app is built, signed and installed at `/Applications/MeetingScribe.app`.
+Cert `MeetingScribeDev` created (`C722A95A6314533F47284B33AD4A0B1D7876B1AC`); the app is built, signed and installed at `/Applications/Clew.app`.
 Verified: `codesign --verify --deep --strict` → "satisfies its Designated Requirement"; entitlement `device.audio-input` present; `LSUIElement`/`NSAudioCaptureUsageDescription`/`NSMicrophoneUsageDescription` all in `Contents/Info.plist`; the BUG0 fix confirmed in-binary (`strings Contents/MacOS/ownscribe-audio | grep NSAudioCaptureUsageDescription` → hit, and the helper is signed as `com.ownscribe.audio`).
 
 ⚠️ **Never delete the cert** — a recreated cert = new identity = macOS resets every permission grant. See BUILD.md.
@@ -859,7 +859,7 @@ Verified: `codesign --verify --deep --strict` → "satisfies its Designated Requ
 To launch:
 
 ```bash
-open /Applications/MeetingScribe.app   # the INSTALLED copy, via LaunchServices — not the inner binary, not dist/
+open /Applications/Clew.app   # the INSTALLED copy, via LaunchServices — not the inner binary, not dist/
 ```
 
 Note: the app drives `~/meeting-scribe/.venv/bin/ownscribe` (present + executable), not a bundled Python — by design for v1. `OWNSCRIBE_BIN` / `OWNSCRIBE_REPO_ROOT` override it.
@@ -978,7 +978,7 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
 8. ~~**W0-5 — the envelope strip.**~~ **DONE** — `EnvelopeDocument` + `EnvelopeStrip` read
    `envelope.json` and `MeetingDetailView` draws it; absent file → no strip, because a flat band
    would assert total silence over a full meeting. Of the six meetings on disk **one** has the file
-   (measured 2026-07-29: `find ~/ownscribe -name envelope.json` → 1), so absent-means-unknown is
+   (measured 2026-07-29: `find ~/clew -name envelope.json` → 1), so absent-means-unknown is
    still the common path. Per-speaker lanes are NOT built. Note `AudioLevels.computePeakLevel` is already live (called from `CoreAudioTapCapture`,
    `MicCapture` and `main.swift`) — the level exists and only goes to `stderr`, so the live vumeters
    are a display to wire up, not a computation to write.
@@ -993,7 +993,7 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
     after writing because `Data.write(options: .atomic)` is a temp-file-and-rename that would
     otherwise leave the token file at `0644` instead of `600`. Verified: mutating the writer to
     discard the existing text turns the token test RED (re-run independently of the builder's own
-    claim), and the real `~/.config/ownscribe/config.toml` is untouched — mtime still 2026-07-27,
+    claim), and the real `~/.config/clew/config.toml` is untouched — mtime still 2026-07-27,
     mode still `600`, all five keys present. **`AppState` reads the config once at `init`**, so the
     pane says a restart is needed; live re-application is a separate change and is NOT done.
     **Unverified: how the pane looks. Nobody has looked at it.**
@@ -1021,11 +1021,11 @@ Already optimal, do not "fix": `compute_type=int8`, `batch_size=16`, pyannote VA
 
 ## Everyday usage
 
-The HF token now lives in `~/.config/ownscribe/config.toml` (chmod 600, outside the repo) and in the login Keychain under service `com.ownscribe.menubar` / account `hf_token` for the app. Nothing to export anymore; `export HF_TOKEN=...` still works as a one-off override.
+The HF token now lives in `~/.config/clew/config.toml` (chmod 600, outside the repo) and in the login Keychain under service `com.ownscribe.menubar` / account `hf_token` for the app. Nothing to export anymore; `export HF_TOKEN=...` still works as a one-off override.
 
 ```bash
 cd ~/meeting-scribe
-./rec.sh          # English call (Ctrl+C to stop) — output in ~/ownscribe/
+./rec.sh          # English call (Ctrl+C to stop) — output in ~/clew/
 ./rec.sh fr       # French call ← use this for FR audio
 ./rec.sh redo DIR # re-transcribe a past meeting from its retained audio
 ./rec.sh enroll "Sam" clip.wav   # teach a colleague's voice → auto-named next time

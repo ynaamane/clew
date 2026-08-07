@@ -1,14 +1,14 @@
 ---
 name: ownscribe-pipeline-traps
-description: The Python-side traps in this repo's record→transcribe→summarize pipeline — which binary production actually loads, why absent must never render as zero, the dependency dead-ends that have no config-only fix, and the fixtures that are real user data. Read BEFORE touching src/ownscribe/, the pipeline, anchoring, the envelope, or any test that mocks a boundary.
+description: The Python-side traps in this repo's record, transcribe, summarize pipeline (now the clew package, renamed from ownscribe) -- which binary production actually loads, why absent must never render as zero, the dependency dead-ends that have no config-only fix, and the fixtures that are real user data. Read BEFORE touching src/clew/, the pipeline, anchoring, the envelope, or any test that mocks a boundary.
 paths:
-  - "src/ownscribe/**"
+  - "src/clew/**"
   - "tests/**"
   - "pilot/**"
   - "rec.sh"
 ---
 
-# ownscribe pipeline — the traps that shipped
+# clew pipeline (formerly ownscribe) -- the traps that shipped
 
 Every item here reached production or survived a green suite. The recurring shape is a value
 that is *correct* at every individual link and *dead* at the consumer.
@@ -52,14 +52,14 @@ Three states, three renderings, never two: `nil` → "not checked yet" · `[]` �
 
 ## Real fixtures, and one that is off-limits
 
-`~/ownscribe/2026-07-27_1536_project-technical-review-key-points/` is a **real 17.5-minute
+`~/clew/2026-07-27_1536_project-technical-review-key-points/` is a **real 17.5-minute
 recording of real colleagues**. Read-only, always: never write, move or delete anything under
-`~/ownscribe/`. Do not print transcript content into a report or a commit message. It is the only
+`~/clew/`. Do not print transcript content into a report or a commit message. It is the only
 real fixture and it is worth using — two tests read from it deliberately. Voiceprint embeddings are
 biometric data (GDPR Art. 9, cleared for this use) and live outside the tracked tree, under
-`~/.config` and `~/ownscribe`: never commit them into the repo.
+`~/.config` and `~/clew`: never commit them into the repo.
 
-`~/ownscribe/2026-07-27_1352/` is the BUG4 artifact: 12,890,112 bytes, 33.56s, **peak 0.0, rms
+`~/clew/2026-07-27_1352/` is the BUG4 artifact: 12,890,112 bytes, 33.56s, **peak 0.0, rms
 0.0**. Useful precisely because it is valid-but-empty — the case a presence check calls "fine".
 
 `/tmp/ms-fixture/` is a DERIVED copy of the 27-July meeting, shared by **three** suites (grep it
@@ -71,7 +71,7 @@ against that meeting's **14 real anchors**. It lives in `/tmp`, so it does not s
 and writing only under `/tmp`.
 
 **Regenerating it from a different recording is worse than losing it.** The first attempt sourced
-`~/ownscribe/scribe_selftest_*`, whose transcript anchors to **0** tokens — so the Python test's
+`~/clew/scribe_selftest_*`, whose transcript anchors to **0** tokens, so the Python test's
 loop body never executes, `missing_token` stays empty, and a fully reverted anchoring fix passes.
 Coverage deleted, suite still green. `md5` on `transcript.md`/`summary.md` is the cheap check that a
 fixture is the meeting it claims to be. Two rules follow: a fixture generator is production code for
@@ -133,10 +133,10 @@ the call bleeds into the mic track (`echo_cancellation` mitigates).
 
 ## Testing this pipeline
 
-**`.venv/lib/python3.*/site-packages/ownscribe.pth` hardcodes `/Users/yanisnaamane/meeting-scribe/src`.**
+**`.venv/lib/python3.*/site-packages/clew.pth` hardcodes `/Users/yanisnaamane/meeting-scribe/src`.**
 So pytest run from a worktree or a copied tree **silently imports the main checkout's production
 code**. An entire audit once returned a false "this also passes on the old code". Force
-`PYTHONPATH=<tree>/src` and *prove* which tree loaded (assert on `ownscribe.__file__`) before
+`PYTHONPATH=<tree>/src` and *prove* which tree loaded (assert on `clew.__file__`) before
 believing any number.
 
 `timeout` does not exist on this machine — exit 127, reported as success.
@@ -150,5 +150,5 @@ tests had let stand: no `--duration` flag (records until SIGINT), usage on **std
 OUTPUTS, so on a silent system it correctly writes a valid header with **zero frames**, and the
 first version captured that silence and blamed the binary.
 
-Patch `ownscribe.pipeline.create_summarizer` (imported at module level) when mocking the
+Patch `clew.pipeline.create_summarizer` (imported at module level) when mocking the
 summarizer factory in pipeline tests.

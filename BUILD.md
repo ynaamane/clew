@@ -1,6 +1,6 @@
-# Building MeetingScribe.app
+# Building Clew.app
 
-The app ships as a self-signed `.app` bundle for personal/solo use — no Apple
+The app ships as a self-signed `.app` bundle for personal/solo use: no Apple
 Developer account, no notarization. This is a deliberate tradeoff: a stable
 self-signed identity keeps TCC permission grants (Screen & System Audio
 Recording, Microphone) across rebuilds, at the cost of the "unidentified
@@ -12,9 +12,12 @@ developer" Gatekeeper warning on first launch (right-click → Open once).
 bash scripts/setup-codesign-identity.sh
 ```
 
-This creates a self-signed certificate named `MeetingScribeDev`, imports it
-into your login keychain, and trusts it for code signing. It is idempotent —
-running it again when the identity already exists is a no-op.
+This creates a self-signed certificate named `MeetingScribeDev` (unchanged after
+the Clew rename: it is the existing on-disk signing identity TCC grants are
+anchored to on a machine that already ran this once, see "Do not delete this
+certificate" below), imports it into your login keychain, and trusts it for
+code signing. It is idempotent: running it again when the identity already
+exists is a no-op.
 
 Verify it exists:
 
@@ -41,9 +44,9 @@ bash swift/build-app.sh
 ```
 
 This builds `ownscribe-audio` and `OwnscribeMenuBar` in release mode,
-assembles `dist/MeetingScribe.app`, signs both binaries plus the bundle
+assembles `dist/Clew.app`, signs both binaries plus the bundle
 itself with the `MeetingScribeDev` identity, then **installs it to
-`/Applications/MeetingScribe.app`** — quitting a running instance first, and
+`/Applications/Clew.app`**, quitting a running instance first, and
 failing if the installed binary ends up differing from the one just built.
 Pass `SKIP_INSTALL=1` to stop at `dist/`. Installing is part of the build on
 purpose: a real 17-minute call was once recorded against a stale bundle
@@ -64,15 +67,15 @@ It ends with `codesign -dvvv` / `--entitlements -` output so you can confirm:
 ## 3. Launch it
 
 ```bash
-open /Applications/MeetingScribe.app
+open /Applications/Clew.app
 ```
 
-Launch the INSTALLED copy, not the one in `dist/` — otherwise you can be
+Launch the INSTALLED copy, not the one in `dist/`: otherwise you can be
 testing a different build than the one you think is current. Always launch via
 `open` (or double-click in Finder): this goes through LaunchServices, which is
 what actually triggers the TCC permission prompts on first launch. Running the
 inner binary directly from a shell
-(`/Applications/MeetingScribe.app/Contents/MacOS/OwnscribeMenuBar`) skips
+(`/Applications/Clew.app/Contents/MacOS/OwnscribeMenuBar`) skips
 LaunchServices and the permission prompts may not fire correctly.
 
 The app is `LSUIElement`, so it has no Dock icon — look for it in the menu bar.

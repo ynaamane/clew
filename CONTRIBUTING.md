@@ -1,13 +1,13 @@
-# Contributing to ownscribe
+# Contributing to Clew
 
-Thanks for your interest in contributing! This project is fully local meeting transcription and summarization — all processing stays on-device.
+Thanks for your interest in contributing! This project is fully local meeting transcription and summarization: all processing stays on-device.
 
 ## Development setup
 
 ```bash
 # Clone the repo
-git clone https://github.com/ynaamane/meeting-scribe.git
-cd meeting-scribe
+git clone https://github.com/ynaamane/clew.git
+cd clew
 
 # Install dependencies (including dev tools)
 uv sync --dev
@@ -124,7 +124,7 @@ Here are some areas where contributions would be especially welcome:
 
 ### Linux/Windows audio capture backends
 
-Currently, system audio capture only works on macOS via Core Audio Taps. Adding support for PulseAudio/PipeWire (Linux) or WASAPI (Windows) would make the tool cross-platform. See `src/ownscribe/audio/base.py` for the recorder interface. A two-device mode for SoundDeviceRecorder (separate system audio + mic streams) would also bring mic mute toggle support to non-macOS platforms.
+Currently, system audio capture only works on macOS via Core Audio Taps. Adding support for PulseAudio/PipeWire (Linux) or WASAPI (Windows) would make the tool cross-platform. See `src/clew/audio/base.py` for the recorder interface. A two-device mode for SoundDeviceRecorder (separate system audio + mic streams) would also bring mic mute toggle support to non-macOS platforms.
 
 ### GUI frontend
 
@@ -132,7 +132,7 @@ Currently, system audio capture only works on macOS via Core Audio Taps. Adding 
 (`swift/Sources/OwnscribeMenuBar`, see "The macOS app" in the README): recording indicator, a
 three-column library window with the transcript and an inspector, claim anchoring with clickable
 timestamps, an RMS envelope strip, and a system-wide mic mute. It shells out to this repo's
-`ownscribe`, so it is a front end rather than a reimplementation.
+`clew`, so it is a front end rather than a reimplementation.
 
 Still open, and worth doing: **live transcript preview during recording** (nothing streams yet — the
 transcript appears after the pipeline finishes), live vumeters in the menu bar
@@ -150,7 +150,7 @@ Currently, diarization produces anonymous labels (`SPEAKER_00`, `SPEAKER_01`). A
 
 ### Additional LLM backends
 
-Add support for more summarization backends beyond the built-in local model, Ollama, and OpenAI-compatible servers — for example, Anthropic or Google. See `src/ownscribe/summarization/base.py` for the summarizer interface.
+Add support for more summarization backends beyond the built-in local model, Ollama, and OpenAI-compatible servers, for example Anthropic or Google. See `src/clew/summarization/base.py` for the summarizer interface.
 
 ### Improved diarization
 

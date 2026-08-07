@@ -67,7 +67,7 @@ Default on every non-trivial change — not a per-task ask:
   signal still exists: slugification destroys the punctuation the structural test needs, so it runs
   on the RAW title.
 - **You CAN look at the window yourself — do it before claiming anything about appearance.**
-  `open "ownscribe://library"` then `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev`,
+  `open "clew://library"` then `bash scripts/ui-evidence/capture.sh Clew /tmp/ui-ev`,
   then Read the PNG. The capture resolves the window id by OWNER and passes it to `screencapture -l`,
   so it cannot capture the screen; activate the app first, because `screencapture -l` fails on a
   window that is not frontmost. The first real review (2026-07-30) found seven gaps a green suite
@@ -112,11 +112,11 @@ non-trivial.
 `build-app.sh` installs on purpose and fails if the installed binary differs
 from the one just built — a real call was once recorded against a stale bundle
 because building and installing were separate steps. Always launch the
-installed copy (`open /Applications/MeetingScribe.app`), never the inner binary.
+installed copy (`open /Applications/Clew.app`), never the inner binary.
 
 ## Architecture
 
-**ownscribe** is a CLI tool for local meeting recording, transcription, and summarization. The main pipeline is: Record → Transcribe → Summarize → Output.
+**clew** (formerly ownscribe; the console script is still also installed as `ownscribe` for muscle memory) is a CLI tool for local meeting recording, transcription, and summarization. The main pipeline is: Record → Transcribe → Summarize → Output.
 
 ### Plugin systems with abstract base classes
 
@@ -129,10 +129,10 @@ Each stage has a base class in its subpackage and one or more implementations:
 
 ### Key modules
 
-- **`cli.py`** — Click command group. Entry point: `ownscribe.cli:cli`. All subcommands (`ask`, `transcribe`, `summarize`, `resume`, `devices`, `apps`, `config`, `cleanup`).
-- **`pipeline.py`** — Orchestrates the record → transcribe → summarize flow. Creates timestamped output dirs (`~/ownscribe/YYYY-MM-DD_HHMM_slug/`).
+- **`cli.py`** — Click command group. Console-script entry point: `clew.cli:main` (runs the legacy-path migration, then the `cli` group below; `ownscribe.cli:cli`'s old direct-to-group wiring is gone, tests still drive `cli` directly via `CliRunner` so migration never touches a real path). All subcommands (`ask`, `transcribe`, `summarize`, `resume`, `devices`, `apps`, `config`, `cleanup`).
+- **`pipeline.py`** — Orchestrates the record → transcribe → summarize flow. Creates timestamped output dirs (`~/clew/YYYY-MM-DD_HHMM_slug/`).
 - **`search.py`** — Two-stage LLM search over meeting notes. Stage 1 scores summaries for relevance, stage 2 synthesizes answers from full transcripts. Has keyword fallback and quote verification. Helper functions return data; only `ask()` calls `click.echo`.
-- **`config.py`** — Dataclass hierarchy (`Config` → `AudioConfig`, `TranscriptionConfig`, `SummarizationConfig`, etc.). Loaded from `~/.config/ownscribe/config.toml` with env var overrides (`HF_TOKEN`, `OLLAMA_HOST`).
+- **`config.py`** — Dataclass hierarchy (`Config` → `AudioConfig`, `TranscriptionConfig`, `SummarizationConfig`, etc.). Loaded from `~/.config/clew/config.toml` with env var overrides (`HF_TOKEN`, `OLLAMA_HOST`).
 - **`summarization/prompts.py`** — Built-in prompt templates (meeting, lecture, brief) plus search prompts. Users can define custom templates in config TOML.
 
 ### Testing conventions
@@ -141,7 +141,7 @@ Each stage has a base class in its subpackage and one or more implementations:
 - Shared fixtures in `conftest.py`: `sample_transcript`, `diarized_transcript`, `synthetic_wav`.
 - Tests use `FakeSummarizer` (in `test_search.py`) or `unittest.mock` for pipeline tests.
 - Markers: `@pytest.mark.hardware` (auto-skipped in CI), `@pytest.mark.macos` (auto-skipped on non-macOS).
-- When mocking the shared summarizer factory in pipeline tests, patch `ownscribe.pipeline.create_summarizer` (it's imported at module level).
+- When mocking the shared summarizer factory in pipeline tests, patch `clew.pipeline.create_summarizer` (it's imported at module level).
 
 ### Important notes
 

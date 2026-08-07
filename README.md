@@ -1,9 +1,10 @@
-# ownscribe
+# Clew
 
-[![PyPI](https://img.shields.io/pypi/v/ownscribe)](https://pypi.org/project/ownscribe/)
-[![CI](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml)
+[![CI](https://github.com/ynaamane/clew/actions/workflows/ci.yml/badge.svg)](https://github.com/ynaamane/clew/actions/workflows/ci.yml)
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange.svg)](LICENSE.md)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
+*Clew is the thread through every meeting you attended. Pull it, and see what connects.*
 
 Local-first meeting transcription and summarization CLI.
 Record, transcribe, and summarize meetings and system audio entirely on your machine: no cloud, no bots, no data leaving your device.
@@ -31,7 +32,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 
 ## Privacy
 
-ownscribe **does not**:
+Clew **does not**:
 
 - send audio to external servers
 - upload transcripts
@@ -41,7 +42,7 @@ ownscribe **does not**:
 All audio, transcripts, and summaries remain local.
 
 <p align="center">
-  <img src="docs/demo-pipeline.gif" alt="ownscribe demo" width="750">
+  <img src="docs/demo-pipeline.gif" alt="Clew demo" width="750">
 </p>
 
 ## Features
@@ -54,9 +55,9 @@ All audio, transcripts, and summaries remain local.
 - **Local LLM summarization**: structured meeting notes with a built-in model (Phi-4-mini); also supports Ollama, LM Studio, or any OpenAI-compatible server
 - **Summarization templates**: built-in presets for meetings, lectures, and quick briefs; define your own in config
 - **Ask your meetings**: ask natural-language questions across all your meeting notes; uses a two-stage LLM pipeline with keyword fallback
-  <br><img src="docs/demo-ask.gif" alt="ownscribe ask demo" width="700">
+  <br><img src="docs/demo-ask.gif" alt="Clew ask demo" width="700">
 - **Silence auto-stop**: automatically stops recording after sustained silence (default: 5 minutes, configurable)
-- **One command**: just run `ownscribe`, press Ctrl+C when done, get transcript + summary
+- **One command**: just run `clew`, press Ctrl+C when done, get transcript + summary
 
 ## Requirements
 
@@ -70,7 +71,7 @@ Summarization works out of the box: a local model (Phi-4-mini, ~2.4 GB) download
 
 Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc.).
 
-> **Tip:** The first time ownscribe records system audio, macOS prompts for **System Audio Recording** permission, a narrower grant than Screen Recording; it only lets ownscribe hear other apps' audio, not see your screen. If you use `--mic`, macOS also prompts for **Microphone** permission. Open either settings panel directly with:
+> **Tip:** The first time Clew records system audio, macOS prompts for **System Audio Recording** permission, a narrower grant than Screen Recording; it only lets Clew hear other apps' audio, not see your screen. If you use `--mic`, macOS also prompts for **Microphone** permission. Open either settings panel directly with:
 >
 > ```bash
 > open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
@@ -79,45 +80,51 @@ Works with any app that outputs audio through Core Audio (Zoom, Teams, Meet, etc
 >
 > Enable your terminal app under "System Audio Recording Only", then restart it.
 >
-> ownscribe checks Microphone access **before** starting a recording (when `--mic` is set) and exits with the exact fix if it's missing. System Audio Recording is a private macOS permission with no public preflight API, so it's requested naturally on first capture instead. If denied, ownscribe reports it immediately rather than silently recording silence. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
+> Clew checks Microphone access **before** starting a recording (when `--mic` is set) and exits with the exact fix if it's missing. System Audio Recording is a private macOS permission with no public preflight API, so it's requested naturally on first capture instead. If denied, Clew reports it immediately rather than silently recording silence. With `--mic`, the system audio and mic tracks are retained separately; a post-recording RMS check on each tells you specifically which track is silent, instead of one ambiguous "audio is silent" warning.
 >
-> On macOS versions before 14.2, or if you pass `[audio] capture_backend = "screencapturekit"` in config, ownscribe falls back to ScreenCaptureKit, which does require the Screen Recording permission instead.
+> On macOS versions before 14.2, or if you pass `[audio] capture_backend = "screencapturekit"` in config, Clew falls back to ScreenCaptureKit, which does require the Screen Recording permission instead.
 
 ## Installation
+
+This fork is not published to PyPI (the name `clew` is squatted by an unrelated
+dead package; reclaiming it via PEP 541 is a future step, see
+[PUBLICATION_CHECKLIST.md](PUBLICATION_CHECKLIST.md)). Every command below installs
+straight from the `ynaamane/clew` repository.
 
 ### Quick start with uvx
 
 ```bash
-uvx ownscribe
+uvx --from git+https://github.com/ynaamane/clew clew
 ```
 
 On macOS, the Swift audio capture helper is downloaded automatically on first run.
 
 ### Alternative summarization backends
 
-The built-in local model works out of the box. If you'd rather call a hosted backend, install the matching extra:
+The built-in local model works out of the box. If you'd rather call a hosted backend,
+install the matching extra as a tool:
 
 ```bash
-uv add 'ownscribe[ollama]'   # use Ollama
-uv add 'ownscribe[openai]'   # use any OpenAI-compatible server (LM Studio, llama-server, etc.)
-uv add 'ownscribe[all]'      # install both
+uv tool install "clew[ollama] @ git+https://github.com/ynaamane/clew"   # use Ollama
+uv tool install "clew[openai] @ git+https://github.com/ynaamane/clew"   # use any OpenAI-compatible server (LM Studio, llama-server, etc.)
+uv tool install "clew[all] @ git+https://github.com/ynaamane/clew"      # install both
 ```
 
 ### Homebrew
 
-There is no brew formula: Homebrew builds Python dependencies from source, which doesn't work well for the PyTorch and llama-cpp-python stack. The closest thing is installing [uv](https://docs.astral.sh/uv/) via brew and letting it manage a global `ownscribe` command:
+There is no brew formula: Homebrew builds Python dependencies from source, which doesn't work well for the PyTorch and llama-cpp-python stack. The closest thing is installing [uv](https://docs.astral.sh/uv/) via brew and letting it manage a global `clew` command:
 
 ```bash
 brew install uv
-uv tool install 'ownscribe[all]'
+uv tool install "clew[all] @ git+https://github.com/ynaamane/clew"
 ```
 
 ### From source
 
 ```bash
 # Clone the repo
-git clone https://github.com/paberr/ownscribe.git
-cd ownscribe
+git clone https://github.com/ynaamane/clew.git
+cd clew
 
 # Build the Swift audio capture helper (optional - auto-downloads if skipped)
 bash swift/build.sh
@@ -125,28 +132,32 @@ bash swift/build.sh
 # Install with all backends
 uv sync --extra all
 
-# Make the `ownscribe` command available globally (editable: changes to the
+# Make the `clew` command available globally (editable: changes to the
 # checkout take effect without reinstalling)
 uv tool install --editable .
 ```
 
-When installed from source, the `ownscribe` command lives inside the project's
+When installed from source, the `clew` command lives inside the project's
 virtual environment, so run it with `uv run` from the repo directory:
 
 ```bash
-uv run ownscribe          # equivalent to the bare `ownscribe` used below
+uv run clew          # equivalent to the bare `clew` used below
 ```
 
 Alternatively, activate the environment once (`source .venv/bin/activate`) and
-then call `ownscribe` directly. The examples in [Usage](#usage) use the bare
-`ownscribe` form, which works after activation or via `uvx ownscribe`.
+then call `clew` directly. The examples in [Usage](#usage) use the bare
+`clew` form, which works after activation, after `uv tool install`, or via
+`uvx --from git+https://github.com/ynaamane/clew clew`.
+
+An `ownscribe` command is also installed alongside `clew` (same entry point,
+kept for muscle memory from before the rename).
 
 ## Usage
 
 ### Record, transcribe, and summarize a meeting
 
 ```bash
-ownscribe                    # records system audio, Ctrl+C to stop
+clew                    # records system audio, Ctrl+C to stop
 ```
 
 This will:
@@ -154,74 +165,74 @@ This will:
 1. Capture system audio until you press Ctrl+C (or auto-stop after 5 minutes of silence)
 2. Transcribe with WhisperX
 3. Summarize with your local LLM
-4. Save everything to `~/ownscribe/YYYY-MM-DD_HHMMSS/`
+4. Save everything to `~/clew/YYYY-MM-DD_HHMMSS/`
 
-> **Note:** By default, ownscribe records all system audio directly with no picker: every app's output (Zoom, WhatsApp, browser tabs, etc.) is captured at once. To show a source picker on each launch instead, set `capture_mode = "picker"` in the `[audio]` config section.
+> **Note:** By default, Clew records all system audio directly with no picker: every app's output (Zoom, WhatsApp, browser tabs, etc.) is captured at once. To show a source picker on each launch instead, set `capture_mode = "picker"` in the `[audio]` config section.
 
-On first run, WhisperX / pyannote and the summarization model may download model files. ownscribe shows a `Preparing models` step and best-effort download progress in the TUI while this happens. Use `ownscribe warmup` to pre-download all models.
+On first run, WhisperX / pyannote and the summarization model may download model files. Clew shows a `Preparing models` step and best-effort download progress in the TUI while this happens. Use `clew warmup` to pre-download all models.
 
 ### Options
 
 ```bash
-ownscribe --mic                               # capture system audio + default mic (press 'm' to mute/unmute)
-ownscribe --mic-device "MacBook Pro Microphone" # capture system audio + specific mic
-ownscribe --device "MacBook Pro Microphone"   # use mic instead of system audio
-ownscribe --no-summarize                      # skip LLM summarization
-ownscribe --diarize                           # enable speaker identification
-ownscribe --language en                       # set transcription language (default: auto-detect)
-ownscribe --model large-v3                    # use a larger Whisper model
-ownscribe --format json                       # output as JSON instead of markdown
-ownscribe --no-keep-recording                 # auto-delete WAV files after transcription
-ownscribe --template lecture                  # use the lecture summarization template
-ownscribe --silence-timeout 600               # auto-stop after 10 minutes of silence
-ownscribe --silence-timeout 0                 # disable silence auto-stop
+clew --mic                               # capture system audio + default mic (press 'm' to mute/unmute)
+clew --mic-device "MacBook Pro Microphone" # capture system audio + specific mic
+clew --device "MacBook Pro Microphone"   # use mic instead of system audio
+clew --no-summarize                      # skip LLM summarization
+clew --diarize                           # enable speaker identification
+clew --language en                       # set transcription language (default: auto-detect)
+clew --model large-v3                    # use a larger Whisper model
+clew --format json                       # output as JSON instead of markdown
+clew --no-keep-recording                 # auto-delete WAV files after transcription
+clew --template lecture                  # use the lecture summarization template
+clew --silence-timeout 600               # auto-stop after 10 minutes of silence
+clew --silence-timeout 0                 # disable silence auto-stop
 ```
 
 ### Subcommands
 
 ```bash
-ownscribe devices                  # list audio devices (uses native CoreAudio when available)
-ownscribe apps                     # list running apps with PIDs for use with --pid
-ownscribe watch                    # wait for a meeting to start, then record it automatically
-ownscribe warmup                   # prefetch WhisperX/pyannote models before a meeting
-ownscribe transcribe recording.wav # transcribe an audio or video file: wav/mp3/mp4/mov/mkv (saved alongside)
-ownscribe summarize transcript.md  # summarize a transcript (saves alongside the input)
-ownscribe resume ./2026-02-20_1736 # resume a partial run, or process a folder's audio/video recording
-ownscribe reprocess ./2026-02-20_1736 # force a full re-transcribe+summarize, even if output already exists
-ownscribe backfill ./2026-02-20_1736 # add missing envelope.json/anchors.json without re-running ASR or the LLM
-ownscribe backfill                 # same, scanning every meeting directory
-ownscribe purge --older-than 30    # delete retained audio older than N days
-ownscribe purge --all              # delete all retained audio regardless of age
-ownscribe purge --dry-run          # preview what a purge would remove, without deleting
-ownscribe ask "question"           # search your meetings with a natural-language question
-ownscribe enroll --name "Alice" clip.wav # enroll a speaker's voiceprint from a short reference clip
-ownscribe unenroll "Alice"         # remove an enrolled speaker's voiceprint
-ownscribe speakers                 # list all enrolled speaker names
-ownscribe config                   # open config file in $EDITOR
-ownscribe cleanup                  # remove ownscribe data from disk
+clew devices                  # list audio devices (uses native CoreAudio when available)
+clew apps                     # list running apps with PIDs for use with --pid
+clew watch                    # wait for a meeting to start, then record it automatically
+clew warmup                   # prefetch WhisperX/pyannote models before a meeting
+clew transcribe recording.wav # transcribe an audio or video file: wav/mp3/mp4/mov/mkv (saved alongside)
+clew summarize transcript.md  # summarize a transcript (saves alongside the input)
+clew resume ./2026-02-20_1736 # resume a partial run, or process a folder's audio/video recording
+clew reprocess ./2026-02-20_1736 # force a full re-transcribe+summarize, even if output already exists
+clew backfill ./2026-02-20_1736 # add missing envelope.json/anchors.json without re-running ASR or the LLM
+clew backfill                 # same, scanning every meeting directory
+clew purge --older-than 30    # delete retained audio older than N days
+clew purge --all              # delete all retained audio regardless of age
+clew purge --dry-run          # preview what a purge would remove, without deleting
+clew ask "question"           # search your meetings with a natural-language question
+clew enroll --name "Alice" clip.wav # enroll a speaker's voiceprint from a short reference clip
+clew unenroll "Alice"         # remove an enrolled speaker's voiceprint
+clew speakers                 # list all enrolled speaker names
+clew config                   # open config file in $EDITOR
+clew cleanup                  # remove clew data from disk
 ```
 
 ### Auto-Detecting a Meeting
 
-Instead of manually starting `ownscribe`, run `ownscribe watch` ahead of time: it polls whether BOTH the default input device (mic) and the default output device (speakers/headphones) are active at the same time (a permission-free, OS-level signal on both sides, since it only reads a hardware property and never opens an actual audio stream), and once that combined state holds continuously for a few seconds it starts recording automatically. Mic activity alone (dictation, a voice memo) does not trigger it, and output activity alone (music, a video) does not either: only mic AND output together, the pattern a live call produces.
+Instead of manually starting `clew`, run `clew watch` ahead of time: it polls whether BOTH the default input device (mic) and the default output device (speakers/headphones) are active at the same time (a permission-free, OS-level signal on both sides, since it only reads a hardware property and never opens an actual audio stream), and once that combined state holds continuously for a few seconds it starts recording automatically. Mic activity alone (dictation, a voice memo) does not trigger it, and output activity alone (music, a video) does not either: only mic AND output together, the pattern a live call produces.
 
 ```bash
-ownscribe watch                          # default: 3s of sustained mic+output activity before recording starts
-ownscribe watch --sustained-seconds 5    # require a longer sustained window (fewer false starts)
+clew watch                          # default: 3s of sustained mic+output activity before recording starts
+clew watch --sustained-seconds 5    # require a longer sustained window (fewer false starts)
 ```
 
 This works identically regardless of which app produces the audio: Zoom, WhatsApp, or a Meet/Teams/Discord tab in a browser all show up the same way at the OS device level, so there's no per-app integration or bundle-identifier polling to maintain. A brief notification sound does not trigger it; only activity that stays sustained on both devices for the full `--sustained-seconds` window does. Once triggered, `watch` hands off to the normal recording pipeline: everything else (capture mode, diarization, correction, output format) is controlled by your regular config.
 
-> **Known limitation**: `ownscribe`'s own `--mic` capture (via `AVAudioEngine`) makes the OS report the output device as "running" even while producing silence, an artifact of `AVAudioEngine`'s internal render graph, not of anything actually playing. This does not affect `watch` today, since `watch-activity` always exits before a recording starts (they never run concurrently), but it means the mic+output signal is not safe to reuse while `ownscribe`'s own mic capture is active.
+> **Known limitation**: `clew`'s own `--mic` capture (via `AVAudioEngine`) makes the OS report the output device as "running" even while producing silence, an artifact of `AVAudioEngine`'s internal render graph, not of anything actually playing. This does not affect `watch` today, since `watch-activity` always exits before a recording starts (they never run concurrently), but it means the mic+output signal is not safe to reuse while `clew`'s own mic capture is active.
 
-> **Video files work too.** Anywhere ownscribe accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v). It extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `ownscribe resume ./that-folder/` (transcript + summary); use `ownscribe transcribe meeting.mp4` for a transcript only.
+> **Video files work too.** Anywhere Clew accepts an audio file it also accepts a video container (mp4, mov, mkv, m4v). It extracts the audio track via ffmpeg. To turn a recording into full notes, drop it in a folder and run `clew resume ./that-folder/` (transcript + summary); use `clew transcribe meeting.mp4` for a transcript only.
 
 Use `warmup` ahead of time to avoid first-run model download delays while recording:
 
 ```bash
-ownscribe warmup                    # prefetch Whisper model (+ diarization if enabled in config)
-ownscribe warmup --language en      # also prefetch alignment model for English
-ownscribe warmup --with-diarization # force diarization warmup for this run
+clew warmup                    # prefetch Whisper model (+ diarization if enabled in config)
+clew warmup --language en      # also prefetch alignment model for English
+clew warmup --with-diarization # force diarization warmup for this run
 ```
 
 ### Searching Meeting Notes
@@ -229,9 +240,9 @@ ownscribe warmup --with-diarization # force diarization warmup for this run
 Use `ask` to search across all your meeting notes with natural-language questions:
 
 ```bash
-ownscribe ask "What did Anna say about the deadline?"
-ownscribe ask "budget decisions" --since 2026-01-01
-ownscribe ask "action items from last week" --limit 5
+clew ask "What did Anna say about the deadline?"
+clew ask "budget decisions" --since 2026-01-01
+clew ask "action items from last week" --limit 5
 ```
 
 This runs a two-stage pipeline:
@@ -244,13 +255,13 @@ If the LLM finds no relevant meetings, a keyword fallback searches summaries and
 ## The macOS app
 
 Everything above is the CLI. There is also a menu-bar app (`swift/Sources/OwnscribeMenuBar`) that
-drives the same pipeline: it shells out to this repo's `ownscribe`, so the CLI is the engine and the
+drives the same pipeline: it shells out to this repo's `clew`, so the CLI is the engine and the
 app is a front end, not a reimplementation.
 
 ```bash
 bash swift/build-app.sh                  # build, sign AND install to /Applications
 SKIP_INSTALL=1 bash swift/build-app.sh   # stop at dist/ without installing
-open /Applications/MeetingScribe.app     # always launch the INSTALLED copy
+open /Applications/Clew.app              # always launch the INSTALLED copy
 ```
 
 `build-app.sh` installs on purpose and fails if the installed binary differs from the one just
@@ -260,8 +271,8 @@ separate steps.
 What the app adds over the CLI:
 
 - **A three-column library window**: filters, meeting list, transcript with an inspector.
-  Meetings come from `~/ownscribe/` (or `[output] dir` in the config). Open it three ways: ⌘0,
-  the app menu, or `open "ownscribe://library"`. The URL route exists because until 2026-07-30 the
+  Meetings come from `~/clew/` (or `[output] dir` in the config). Open it three ways: ⌘0,
+  the app menu, or `open "clew://library"`. The URL route exists because until 2026-07-30 the
   window could only be reached by clicking the menu bar extra, and SwiftUI's `MenuBarExtra(.window)`
   popover exposes nothing to accessibility: a keyboard-only user was locked out, and so was any
   automated visual check.
@@ -295,10 +306,10 @@ Two caveats worth knowing before you build:
 Two paths, and the second is the one that keeps working:
 
 ```bash
-open "ownscribe://library"                                    # then, app frontmost, screen unlocked:
-bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev  # window-scoped PNG + AX tree
+open "clew://library"                                          # then, app frontmost, screen unlocked:
+bash scripts/ui-evidence/capture.sh Clew /tmp/ui-ev            # window-scoped PNG + AX tree
 
-bash scripts/ui-evidence/render.sh /tmp/ui-render             # off-screen; works with the screen LOCKED
+bash scripts/ui-evidence/render.sh /tmp/ui-render               # off-screen; works with the screen LOCKED
 ```
 
 `capture.sh` resolves the window id **by owner** and passes it to `screencapture -l`, so it cannot
@@ -313,7 +324,7 @@ Anything about materials still needs a human looking at a real screen. `APP_TEST
 
 ## Configuration
 
-Config is stored at `~/.config/ownscribe/config.toml`. Run `ownscribe config` to create and edit it.
+Config is stored at `~/.config/clew/config.toml`. Run `clew config` to create and edit it.
 
 ```toml
 [audio]
@@ -359,14 +370,23 @@ model = "phi-4-mini"      # local: "phi-4-mini", path to GGUF, or hf:owner/repo/
 # prompt = "List each person's update:\n{transcript}"
 
 [output]
-dir = "~/ownscribe"
+dir = "~/clew"
 audio_dir = ""            # directory for audio recordings; empty = same as dir
 format = "markdown"       # "markdown" or "json"
 keep_recording = true     # false = auto-delete WAV after transcription
-retention_days = 0        # days before `ownscribe purge` may remove audio; 0 = keep forever (manual purge only)
+retention_days = 0        # days before `clew purge` may remove audio; 0 = keep forever (manual purge only)
 ```
 
-**Precedence:** CLI flags > environment variables (`HF_TOKEN`, `OLLAMA_HOST`, `OPENAI_API_KEY`, `OWNSCRIBE_PROGRESS`) > config file > defaults.
+**Precedence:** CLI flags > environment variables (`HF_TOKEN`, `OLLAMA_HOST`, `OPENAI_API_KEY`, `CLEW_PROGRESS`) > config file > defaults. `OWNSCRIBE_PROGRESS` still works as a legacy alias for `CLEW_PROGRESS`.
+
+### Migrating from ownscribe / MeetingScribe
+
+If you're upgrading from a pre-rename install, Clew moves your existing config, voiceprints, and
+default output directory to their new locations automatically, once, the first time you run it:
+`~/.config/ownscribe` to `~/.config/clew`, `~/.config/meeting-scribe/voiceprints` to
+`~/.config/clew/voiceprints`, and `~/ownscribe` to `~/clew` (only if you never pointed `[output] dir`
+somewhere else). Nothing is deleted, only moved, and only when the new location doesn't already
+exist.
 
 ## Audio Retention
 
@@ -376,13 +396,13 @@ There are three ways to control how long retained audio sticks around:
 
 - **Keep forever (default)**: `retention_days = 0` and never run `purge`. Nothing is ever deleted automatically.
 - **Auto-delete after each meeting**: `keep_recording = false` deletes the WAV files immediately after transcription (no retention at all, so `reprocess` won't work on that meeting later).
-- **Keep for N days, then purge manually**: set `retention_days` in config, and periodically run `ownscribe purge` to remove anything older than that. This is _not_ a background job; retention only happens when you invoke `purge`.
+- **Keep for N days, then purge manually**: set `retention_days` in config, and periodically run `clew purge` to remove anything older than that. This is _not_ a background job; retention only happens when you invoke `purge`.
 
 ```bash
-ownscribe purge                    # purge using retention_days from config (no-op if retention_days = 0)
-ownscribe purge --older-than 14    # override config: purge anything older than 14 days
-ownscribe purge --all              # purge every retained recording, regardless of age
-ownscribe purge --dry-run          # preview what would be purged, without deleting anything
+clew purge                    # purge using retention_days from config (no-op if retention_days = 0)
+clew purge --older-than 14    # override config: purge anything older than 14 days
+clew purge --all              # purge every retained recording, regardless of age
+clew purge --dry-run          # preview what would be purged, without deleting anything
 ```
 
 `purge` only ever removes retained audio (WAV files and sidecars): transcripts and summaries are never touched, so past notes remain readable even after their source audio is gone.
@@ -392,8 +412,8 @@ ownscribe purge --dry-run          # preview what would be purged, without delet
 If a transcript or summary came out wrong (a bad model choice, a config change, a summarization backend swap), `reprocess` redoes the whole pipeline from the retained audio, overwriting the existing transcript and summary:
 
 ```bash
-ownscribe reprocess ./2026-02-20_1736
-ownscribe reprocess ./2026-02-20_1736 --model large-v3 --template lecture
+clew reprocess ./2026-02-20_1736
+clew reprocess ./2026-02-20_1736 --model large-v3 --template lecture
 ```
 
 Unlike `resume` (which skips work that's already done), `reprocess` always starts over from the audio: it errors out if no retained audio is found for that meeting (i.e. `keep_recording` was `false` when it was recorded, or it's already been purged).
@@ -403,8 +423,8 @@ Unlike `resume` (which skips work that's already done), `reprocess` always start
 Meetings recorded before `envelope.json` (the waveform strip) or `anchors.json` (clickable evidence for summary claims) existed have a transcript and summary but neither derived file. `backfill` adds whatever is missing, computed from what's already on disk:
 
 ```bash
-ownscribe backfill ./2026-02-20_1736   # backfill one meeting
-ownscribe backfill                     # scan every meeting directory, backfilling each that needs it
+clew backfill ./2026-02-20_1736   # backfill one meeting
+clew backfill                     # scan every meeting directory, backfilling each that needs it
 ```
 
 It never re-runs transcription or summarization, and it never rewrites or deletes an existing file: a meeting that already has both `envelope.json` and `anchors.json` is left untouched, and `envelope.json` is only added when retained audio is still present (no audio means no waveform, not a flat one). Running it again is always safe; it reports one line per directory and only ever adds files.
@@ -450,23 +470,23 @@ Voiceprints created by enrollment (below) are biometric data with real legal wei
 Enroll a speaker's voice from a short reference clip (a few seconds of them speaking, isolated) to have their real name appear in transcripts instead of a generic `SPEAKER_00` label:
 
 ```bash
-ownscribe enroll --name "Alice" alice-sample.wav
+clew enroll --name "Alice" alice-sample.wav
 ```
 
-This computes a voiceprint using the same embedding model diarization already loads (no extra download) and stores it in `~/.config/meeting-scribe/voiceprints/voiceprints.json`. Enrollment requires the same HuggingFace token as diarization (§ Speaker Diarization above).
+This computes a voiceprint using the same embedding model diarization already loads (no extra download) and stores it in `~/.config/clew/voiceprints/voiceprints.json`. Enrollment requires the same HuggingFace token as diarization (§ Speaker Diarization above).
 
 During a meeting, every diarized speaker cluster is compared against enrolled voiceprints by cosine similarity. A match above the threshold (default `0.65`) gets the enrolled name; anything below gets `Unknown-1`, `Unknown-2`, etc., never a forced wrong match. If you record with `--mic` (or `capture_mode` retains separate tracks), your own segments are always labeled `Owner` directly from the microphone track and are never sent through diarization or matching, since you're a known speaker by construction.
 
 ```bash
-ownscribe speakers            # list all enrolled names
-ownscribe unenroll "Alice"    # remove an enrolled voiceprint
+clew speakers            # list all enrolled names
+clew unenroll "Alice"    # remove an enrolled voiceprint
 ```
 
 ## Headphones vs Speakers (Owner Track Purity)
 
 The mic track (`mic.wav`, labeled `Owner`) and the system track (`system.wav`, the remote call audio) are captured from two physically separate sources, and on **headphones** that separation is perfect: your microphone only ever picks up your own voice, with nothing from the call bleeding in.
 
-On **Mac speakers**, the call audio plays out loud and the microphone can pick some of it back up (acoustic echo) before it ever reaches `ownscribe`. That bleed lands in `mic.wav` alongside your own voice, which can pollute the `Owner` track with fragments of the remote speaker's audio.
+On **Mac speakers**, the call audio plays out loud and the microphone can pick some of it back up (acoustic echo) before it ever reaches `clew`. That bleed lands in `mic.wav` alongside your own voice, which can pollute the `Owner` track with fragments of the remote speaker's audio.
 
 **Recommended: wear headphones for meetings recorded with `--mic`.** It's free, requires no configuration, and gives the cleanest possible separation between what you said and what you heard. See `--mic` under [Usage](#usage) and `[audio] mic` under [Configuration](#configuration).
 
@@ -509,7 +529,7 @@ max_segment_seconds = 10.0
 max_tokens_per_segment = 200
 ```
 
-Requires `uv` on PATH (already required to run ownscribe from source). `mlx-audio` is never installed into ownscribe's own environment: the engine spawns `uv run --with mlx-audio ...` per transcription, layering the dependency onto an ephemeral overlay so it never touches `pyproject.toml`, `uv.lock`, or your other transcription runs. The first invocation downloads the ~2GB checkpoint from HuggingFace (cached afterward). The first `uv run --with` invocation also resolves and downloads mlx-audio itself (cached in `~/.cache/uv` afterward, so only the very first Canary transcription pays this cost).
+Requires `uv` on PATH (already required to run Clew from source). `mlx-audio` is never installed into Clew's own environment: the engine spawns `uv run --with mlx-audio ...` per transcription, layering the dependency onto an ephemeral overlay so it never touches `pyproject.toml`, `uv.lock`, or your other transcription runs. The first invocation downloads the ~2GB checkpoint from HuggingFace (cached afterward). The first `uv run --with` invocation also resolves and downloads mlx-audio itself (cached in `~/.cache/uv` afterward, so only the very first Canary transcription pays this cost).
 
 Known scope limits for this engine, compared to the WhisperX default:
 
@@ -526,7 +546,7 @@ This project is a fork of [paberr/ownscribe](https://github.com/paberr/ownscribe
 Distinctive additions built in this fork, not present upstream:
 
 - **Claim anchoring**: each summary key point links back to the transcript timestamps where its source text appears, so a claim can be checked against the recording instead of trusted on faith.
-- **Voiceprint-based speaker enrollment and naming**: `ownscribe enroll` computes a voiceprint from a reference clip and matches it against future diarized speakers by cosine similarity, replacing generic `SPEAKER_00` labels with real names. Upstream has no speaker-identity system at all.
+- **Voiceprint-based speaker enrollment and naming**: `clew enroll` computes a voiceprint from a reference clip and matches it against future diarized speakers by cosine similarity, replacing generic `SPEAKER_00` labels with real names. Upstream has no speaker-identity system at all.
 - **Hardware-verified microphone mute**: the system-wide mute is verified by reading the device state back after setting it, instead of trusting that the set call succeeded.
 - **The SwiftUI menu-bar app** (`swift/Sources/OwnscribeMenuBar/`): a three-column library window, search, claim anchoring in the inspector, an RMS envelope strip, and settings, layered on the same CLI pipeline. Upstream's `swift/` directory holds a single Swift file, `swift/Sources/AudioCapture.swift`; this fork's `swift/Sources/` now holds 65.
 
@@ -546,11 +566,11 @@ transcription, diarization or summarization.
 
 **Voiceprints are biometric data.** Diarization on its own only separates speakers within
 a recording (Speaker 1, Speaker 2) and enrolls nobody. Naming a speaker is an explicit,
-separate step: `ownscribe enroll --name "Alice" clip.wav` stores a voice embedding in
-`~/.config/meeting-scribe/voiceprints/voiceprints.json`. Under the GDPR, a voiceprint used
+separate step: `clew enroll --name "Alice" clip.wav` stores a voice embedding in
+`~/.config/clew/voiceprints/voiceprints.json`. Under the GDPR, a voiceprint used
 to recognise a specific person is special category data, and if you record work meetings
-you are the controller of it. Run `ownscribe speakers` to list what is enrolled,
-`ownscribe unenroll "Alice"` to remove one person, or delete that file to remove all of
+you are the controller of it. Run `clew speakers` to list what is enrolled,
+`clew unenroll "Alice"` to remove one person, or delete that file to remove all of
 them.
 
 This notice is informational and is not legal advice. If you record conversations with
@@ -559,7 +579,7 @@ jurisdiction.
 
 ## Acknowledgments
 
-ownscribe builds on some excellent open-source projects:
+Clew builds on some excellent open-source projects:
 
 - [WhisperX](https://github.com/m-bain/whisperX): fast speech recognition with word-level timestamps and speaker diarization
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper): CTranslate2-based Whisper inference

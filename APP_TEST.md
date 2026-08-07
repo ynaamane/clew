@@ -1,4 +1,4 @@
-# MeetingScribe.app — first-launch checklist
+# Clew.app: first-launch checklist
 
 This covers the parts of the packaging that can only be verified
 interactively, on your machine, with your permission prompts. Everything
@@ -12,11 +12,11 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
 1. `bash scripts/setup-codesign-identity.sh` has been run once on this
    machine (see `BUILD.md`).
 2. `bash swift/build-app.sh` completed and printed `Built, signed and installed:
-/Applications/MeetingScribe.app` with no errors.
+/Applications/Clew.app` with no errors.
 
 ## First launch
 
-- [x] `open /Applications/MeetingScribe.app` (or double-click it in Finder — do NOT
+- [x] `open /Applications/Clew.app` (or double-click it in Finder; do NOT
       run the inner binary directly, see `BUILD.md` § 3).
 - [x] Gatekeeper shows an "unidentified developer" warning (expected —
       self-signed, no Apple notarization). Right-click → Open, confirm once.
@@ -38,13 +38,13 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
 ## Grants survive a rebuild (the whole point of the stable identity)
 
 - [ ] With permissions already granted, run `bash swift/build-app.sh` again
-      to rebuild `/Applications/MeetingScribe.app`.
-- [ ] `open /Applications/MeetingScribe.app` again and start a recording.
+      to rebuild `/Applications/Clew.app`.
+- [ ] `open /Applications/Clew.app` again and start a recording.
 - [ ] Confirm you are **not** re-prompted for System Audio Recording or
       Microphone — the earlier grant should still apply. If you ARE
       re-prompted, something is wrong (most likely: the app was signed with
       a different or ad-hoc identity). Check `codesign -dvvv
-/Applications/MeetingScribe.app` for `Authority=MeetingScribeDev`, not
+/Applications/Clew.app` for `Authority=MeetingScribeDev`, not
       `Signature=adhoc`.
 
 ## End-to-end recording
@@ -106,13 +106,13 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
       check System Settings → Sound → Input is NOT still muted — the app
       should have restored the unmuted state on quit.
 - [ ] Mute via the hotkey or menu button, then quit with **⌘Q** (NOT the
-      "Quit ownscribe" menu button). Check System Settings → Sound → Input
+      "Quit Clew" menu button). Check System Settings → Sound → Input
       — the mic should be unmuted, same as the button-quit case above. This
       is the path that was silently broken before the quit-path fix: ⌘Q
       bypasses the button's click handler entirely, so this only proves
       anything if you genuinely use ⌘Q, not the menu.
 - [ ] Repeat with `killall OwnscribeMenuBar` (the app's actual process
-      name, not the `MeetingScribe.app` bundle name) from a terminal instead
+      name, not the `Clew.app` bundle name) from a terminal instead
       of ⌘Q. This sends a raw SIGTERM directly to the process, bypassing
       the normal Quit Apple-Event entirely — it exercises the secondary
       signal-handler path, not just the notification path above. Same
@@ -165,14 +165,14 @@ number as progress on this pass.
 **UPDATE 2026-07-30 — an agent CAN now look, which changes the workflow but not the rule.**
 
 ```bash
-open "ownscribe://library"                                   # opens the window, no mouse needed
-bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev # window-scoped PNG + AX tree
+open "clew://library"                                   # opens the window, no mouse needed
+bash scripts/ui-evidence/capture.sh Clew /tmp/ui-ev # window-scoped PNG + AX tree
 ```
 
 The capture resolves the window id **by owner** and passes it to `screencapture -l`, so it
 cannot capture the screen. Activate the app first — `screencapture -l` fails on a window that
 is not frontmost ("could not create image from window"). The AX process name is
-**`OwnscribeMenuBar`** (the executable), not "MeetingScribe" — `System Events` lookups by the
+**`OwnscribeMenuBar`** (the executable), not "Clew": `System Events` lookups by the
 app's display name fail with "Can't get process".
 
 **UPDATE 2026-08-03 — an agent can also DRIVE the window, not only photograph it.** Selecting
@@ -247,7 +247,7 @@ bash scripts/ui-evidence/render.sh /tmp/ui-render    # library-light.png + libra
 ```
 
 Two fixture traps that made the first renders lie, both worth knowing before trusting a new one:
-`AppState.outputDir` resolves to **`homeDir/ownscribe`**, so copying meetings into `homeDir`
+`AppState.outputDir` resolves to **`homeDir/clew`**, so copying meetings into `homeDir`
 itself yields an empty library with `0` badges; and injecting `pipelineRunnerFactory = { nil }`
 makes `isCliAvailable` false, which fires the CLI banner. Both produced renders that looked
 broken while faithfully showing the state they were given.
@@ -281,7 +281,7 @@ STRONGER evidence: `AXStaticText ="Yanis"` at real coordinates in the live app b
 needing interpretation. Don't treat a failed screenshot as a failed verification before reading
 the tree. (2) The off-screen render harness CANNOT verify anything that lives in the real
 machine state outside the copied library — it isolates `homeDir` by design, so it never sees
-`~/.config/meeting-scribe/voiceprints/voiceprints.json` and the Personnes section renders empty
+`~/.config/clew/voiceprints/voiceprints.json` and the Personnes section renders empty
 there regardless of what is enrolled. Live-app AX is the only channel for that class of claim.
 Add it to the CANNOT-VERIFY list alongside glass/materials.
 
@@ -371,12 +371,12 @@ and `design/mockup.html`:
       the two-word backchannel, offering it as proof of a claim about
       architecture (fixed in `0ae9532`).
       *(An earlier version of this line said only a fresh recording could
-      exercise the path, because no meeting under `~/ownscribe/` has populated
+      exercise the path, because no meeting under `~/clew/` has populated
       anchors — one of six has the file and its `anchors` object is `{}`. That
       was wrong about the mechanism: `/tmp/ms-fixture/` is a derived copy of
       the same meeting WITH its anchors, which is exactly what the new tests
       use. A fresh recording is still the only way to see the chips **in the
-      app**, since the window reads `~/ownscribe/`, not `/tmp`.)*
+      app**, since the window reads `~/clew/`, not `/tmp`.)*
 - [ ] **Settings → the two new controls** (mic on/off, silence timeout) — new
       in `6c08eec`. The write path is tested and the HF token is provably
       preserved; how the pane READS is unverified, nobody has looked. Note it

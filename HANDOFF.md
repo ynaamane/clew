@@ -46,7 +46,7 @@ Chiffres au moment du dernier check.sh de la session (re-mesure-les, règle ci-d
 Trois directives/faits nouveaux à connaître avant de reprendre :
 - **« Aucune action n'est interdite aux agents »** (Yanis, 2026-08-03) : les agents font l'e2e
   complet, `build-app.sh` compris. Invariants conservés : ne jamais recréer/supprimer le cert de
-  signature ; capture de la fenêtre seule, jamais l'écran ; `~/ownscribe/` en ADD-only ;
+  signature ; capture de la fenêtre seule, jamais l'écran ; `~/clew/` en ADD-only ;
   restaurer tout état système modifié.
 - **La sélection de liste suit l'accent SYSTÈME** (vert sur cette machine), pas le `.tint` —
   c'est macOS, pas un bug ; le violet s'applique aux puces/liens.
@@ -152,11 +152,11 @@ central de tout ce projet : chaque revue de design dépendait d'un humain avec u
   sous-arbre est juste `AXMenuBarItem "Audio Waveform"`), aucun `CFBundleURLTypes`, et `⌘0`
   était déclaré sur un `Button` **à l'intérieur** du popover donc inerte quand il est fermé.
   C'était aussi un vrai trou d'accessibilité clavier.
-- **Corrigé** (`c41e387`) : `open "ownscribe://library"` ouvre la fenêtre, plus une commande de
+- **Corrigé** (`c41e387`) : `open "clew://library"` ouvre la fenêtre, plus une commande de
   menu portant `⌘0` au niveau app. Le handler est installé via `NSAppleEventManager` au niveau
   AppKit — un `.onOpenURL` sur une scène n'existerait que pendant que la scène est rendue, soit
   le même piège une couche plus haut.
-- **L'outil de revue** : `bash scripts/ui-evidence/capture.sh MeetingScribe /tmp/ui-ev` →
+- **L'outil de revue** : `bash scripts/ui-evidence/capture.sh Clew /tmp/ui-ev` →
   screenshot **ciblé sur la fenêtre** + arbre d'accessibilité. Il résout le window-id **par
   propriétaire** puis le passe à `screencapture -l`, donc il ne peut structurellement pas
   capturer l'écran (la seule tentative plein écran avait attrapé du contenu confidentiel).
@@ -316,7 +316,7 @@ Cette boucle a attrapé, entre autres : une preuve de vérification inexacte, un
 
 ## Ce que le token et le build ne demandent plus
 
-- **Le token HF n'est plus à exporter.** Il vit dans `~/.config/ownscribe/config.toml` (chmod 600, hors du repo) pour le CLI, et dans le Keychain login (`com.ownscribe.menubar` / `hf_token`) pour l'app. `export HF_TOKEN=...` reste un override ponctuel.
+- **Le token HF n'est plus à exporter.** Il vit dans `~/.config/clew/config.toml` (chmod 600, hors du repo) pour le CLI, et dans le Keychain login (`com.ownscribe.menubar` / `hf_token`) pour l'app. `export HF_TOKEN=...` reste un override ponctuel.
 - **`swift/build-app.sh` installe lui-même dans `/Applications`** et échoue si le binaire installé diffère de celui buildé. Raison : un call de 17 min a été enregistré contre un bundle périmé parce que builder et installer étaient deux gestes manuels séparés.
 
 ## Performance — le levier trouvé
