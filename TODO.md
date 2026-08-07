@@ -78,26 +78,26 @@ selection ruling: DECIDED 2026-08-06, not forced, see OPEN LIST item 2.
 verification; every item TDD'd and mutation-checked; final gate CHECK=0, 10/10, 479+47 Swift /
 676 Python; off-screen render read by the lead confirms subtitle, row meta, pills, amber
 callout, turn grouping, flat tracked inspector rail with the N/M ratio):
-3. ~~Backfill command + real run~~ **DONE** — `ownscribe backfill` (8f96085) run on the real
+3. ~~Backfill command + real run~~ **DONE** — `ownscribe backfill` (c87e271) run on the real
    library 2026-08-03 after the user's GO: `2026-07-27_1536` and `2026-07-24_1756` gained
    envelope.json + anchors.json; before/after `find -exec stat` diff proves exactly 4 additions
    and zero modifications. The 27-Jul anchors are non-empty (9 tokens); 24-Jul's are empty —
    legitimate, its transcript is 317 bytes.
-4. ~~Sidebar glass on the List~~ **DONE** (`9ccbf79`): glass on the ZStack container with
+4. ~~Sidebar glass on the List~~ **DONE** (`238619a`): glass on the ZStack container with
    `.rect(cornerRadius: 12)`; `GlassPlacementTests` rewritten to pin the modifier's TARGET by
-   brace-balancing. **Second instance found by the pair-landing** (`eeaae05` + `aa05cd9`): the
+   brace-balancing. **Second instance found by the pair-landing** (`aef350c` + `39b9fd1`): the
    inspector rewrite had silently changed the modifier's receiver to the ScrollView — the line
    never moved, the target did — caught by lane cross-review, fixed, and both rails are now
    target-pinned; the bare-literal `.glassEffect()` matcher also fixed (it declared "no glass"
    on explicit-shape calls).
-5. ~~Turn grouping~~ **DONE** (`b8963ff`): `TranscriptTurnGrouping` pure function, one
+5. ~~Turn grouping~~ **DONE** (`07bacab`): `TranscriptTurnGrouping` pure function, one
    avatar+name header per turn, `UtteranceRow` deleted (not just unused).
-6. ~~Inspector rail~~ **DONE** (`b8963ff`, `eeaae05`): flat rail, uppercase tracked captions,
+6. ~~Inspector rail~~ **DONE** (`07bacab`, `aef350c`): flat rail, uppercase tracked captions,
    hairlines, `Points clés · N/M ancrés` from `AnchoringSummaryCalculator` (nil when never
    checked — no false 0/0; a real found-nothing renders 0/N).
-7. ~~Row meta + badge~~ **DONE** (`9ccbf79`, `82297f0`): `date · durée · N voix` shared with
+7. ~~Row meta + badge~~ **DONE** (`238619a`, `3ca2beb`): `date · durée · N voix` shared with
    `MeetingHeaderDetail` (absent stays absent), "non indexée" is the grey pill.
-8. ~~Python refusal guard~~ **DONE** (`851aede`): structural on the raw title, 12 catch + 10
+8. ~~Python refusal guard~~ **DONE** (`c0a502d`): structural on the raw title, 12 catch + 10
    keep tests; reverting to the substring list turns 5 keep-tests red (the real false positives
    it was producing). Bonus latent bug fixed: `run_summarize` wraps `summary.json` with the
    markdown header — stripped before anchoring so "Summary" can't leak in as an anchored token.
@@ -298,7 +298,7 @@ needs a mechanism before it becomes a defect.
    independent reproduction** off-screen from the real view tree, so this one has a mechanism, not
    just a sighting. The mockup treats the rail as a container background
    (`mockup.html:95` — `background: var(--bg-sidebar); backdrop-filter: blur(28px)`).
-   **Only HALF-fixed by `f0e7bd6`** (2026-08-03 audit): that commit removed the opaque
+   **Only HALF-fixed by `c2fef97`** (2026-08-03 audit): that commit removed the opaque
    `.background(.background)` over the glass but **never moved `.glassEffect()` off the `List`**
    — at HEAD it still sits there (`LibraryWindow.swift:36`), the exact configuration this finding
    blames, while the inspector has it on its container. See the open list, item 4.
@@ -314,7 +314,7 @@ needs a mechanism before it becomes a defect.
    `LibraryEmptyState` and everything in `MeetingDetailView` is off-screen. Avatars and the
    envelope strip were reported "absent" because **nothing in that column was rendering at all.**
    So selecting a meeting by default is not cosmetic: it reveals two features already paid for.
-6. ~~**Five rows read "Sans titre"**~~ — **DONE** (`d018728`), see § 2.7.
+6. ~~**Five rows read "Sans titre"**~~ — **DONE** (`b3b8628`), see § 2.7.
 7. **The search field renders top-right, marooned from "Réunions"** — the observation stands; the
    first diagnosis and the first FIX proposal were both wrong. It is not in the detail column: it
    is attached to the list column (`LibraryWindow.swift:113`) with `placement: .toolbar`, which
@@ -379,13 +379,13 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    `@testable import OwnscribeMenuBar` — the standalone-`swiftc` route hits a type-checker timeout and
    pushes you toward a hand-built replica, which is how a harness ends up validating a design the app
    does not have). It prints its own CANNOT-VERIFY list; read it before trusting a render.
-   **It found a user-visible bug on its first correct reading** (`4b1fcfc`): the header was printing
+   **It found a user-visible bug on its first correct reading** (`878de73`): the header was printing
    `^[1 voix](inflect: true)` verbatim, guarded by a test that asserted the broken string.
 1. ~~**Make the window honour Dark mode.**~~ **STRUCK — it already does; the machine is in light
    mode.** See § 0 finding 1. Hardcoding dark would override the user's auto-switch setting.
 2. **Fix the sidebar glass** — **NOT DONE, and this entry previously said "CODE DONE" — that was
    an intention recorded as a delivery, third instance in this repo (2026-08-03 audit).**
-   What `f0e7bd6` actually did: removed the opaque `.background(.background)` that painted OVER
+   What `c2fef97` actually did: removed the opaque `.background(.background)` that painted OVER
    the glass (real, kept). What it never did: move `.glassEffect()` onto a container —
    `LibraryWindow.swift:36` still chains it on the `List`, the configuration § 0 finding 2 blames
    for the deformed oval rail, while `MeetingInspector.swift:78` correctly has it on its ZStack.
@@ -408,7 +408,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 4. ~~**Render speaker avatars.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:129`.
 5. ~~**Draw the envelope strip.**~~ **STRUCK — built and wired** at `MeetingDetailView.swift:15-19`.
    (Both were invisible only because no meeting is selected — see item 6.)
-6. ~~**Select the most recent meeting by default.**~~ **DONE** (`46e1810`) via a pure
+6. ~~**Select the most recent meeting by default.**~~ **DONE** (`1cbb570`) via a pure
    `LibrarySelection.resolve(current:shown:)` — nil→first, filtered-out→first visible, empty→nil, and
    a **still-valid selection stays UNCHANGED** so a finishing pipeline cannot yank you out of what you
    are reading. Confirmed by render: the right column now shows résumé, points clés, actions, pistes,
@@ -419,7 +419,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    they cannot drift: slug → first non-backchannel transcript line (60 chars) → bare time, and when
    the title IS the time the subtitle drops it (`29 Jul`, not `29 Jul · 15:37`). Confirmed by reading
    a render, not by the test count.
-   **The LLM-refusal guard is the part worth remembering** (`3dffe4d`): its first version
+   **The LLM-refusal guard is the part worth remembering** (`8ead39f`): its first version
    substring-matched bare common words (`transcript`, `need`, `please`) and **erased 7 of 10
    legitimate titles** — in an app whose meetings are often *about* transcripts. Both its tests
    passed, because both only asserted the true-positive direction. Now **1/14 false positives, 0/7
@@ -428,7 +428,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    **CORRECTION (2026-08-03 audit): the "real defence" never got this refinement.** The intended
    design — Python guard on the RAW title before `_slugify`, structural, since slugification
    destroys the punctuation a structural test needs — was never built: `pipeline.py:420-432` is
-   the ORIGINAL bare-substring list from `328ad22` (`"sorry"`, `"please provide"`,
+   the ORIGINAL bare-substring list from `2417a93` (`"sorry"`, `"please provide"`,
    `"transcript of"`…), untouched since, with zero keep-a-legitimate-title tests
    (`TestGenerateTitleSlug` asserts only the reject direction). The 1/14 FP / 0/7 FN numbers
    above describe the Swift BACKSTOP; the guard that runs FIRST still has the 7-of-10-titles bug
@@ -436,7 +436,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
 8. **Add `.accessibilityIdentifier` to the interactive views.** The AX tree already yields 55 lines
    with pixel frames, so spacing CAN be measured today; what identifiers add is stable ADDRESSING of
    controls. Lower priority than previously recorded.
-9. ~~**Sidebar labels truncate.**~~ **FIXED** (`f10d3c7`) — at the third diagnosis, and the first two
+9. ~~**Sidebar labels truncate.**~~ **FIXED** (`0736ed1`) — at the third diagnosis, and the first two
    are worth keeping because both were plausible and both were wrong.
    `.navigationSplitViewColumnWidth` was applied to the **`List` inside** the sidebar's `ZStack`
    (the `ZStack` exists to host the banner overlay), so `NavigationSplitView` measured a container
@@ -445,7 +445,7 @@ was a mis-diagnosis of the machine's own setting. What is left is smaller and be
    distinguishes a root cause from a plausible one.
    - **Wrong diagnosis 1: "the labels are too long."** Measured with `NSFont`: the longest,
      `Toutes les réunions`, is **117pt**; a row spends ~73pt on inset + icon + gaps + badge, so ~190pt
-     of a 216pt column. They fit. Shortening them was tried and **reverted** (`d7bbf16`) — it fixed
+     of a 216pt column. They fit. Shortening them was tried and **reverted** (`db59d2b`) — it fixed
      nothing and turned `Non ancrées` into `Ancres`, naming the PRESENCE of anchors on the row that
      selects meetings whose claims **LACK** evidence. No test asserted any sidebar label, so the
      inversion passed the entire suite.
@@ -481,12 +481,12 @@ Closed on 2026-07-30 by a real 8-second test recording, which is the argument fo
   intended).
 - ~~**Whether `resume` writes `anchors.json` + `envelope.json`.**~~ It does. All four artifacts
   produced.
-- **But the recording exposed a worse bug, now fixed** (`a455646`): the pipeline exited 1 six
+- **But the recording exposed a worse bug, now fixed** (`e345bf8`): the pipeline exited 1 six
   seconds after stop with `ffmpeg is not installed`. A Finder-launched app inherits launchd's
   minimal PATH, which has no `/opt/homebrew/bin`, so **transcription worked from a terminal and
   could never work from the app** — and the failure lands after the audio exists. Fixed by
   resolving the child's PATH rather than special-casing ffmpeg.
-- ~~**Cosmetic fallout:**~~ **FIXED** (`3dffe4d`, `d018728`). An empty transcript made the summariser
+- ~~**Cosmetic fallout:**~~ **FIXED** (`8ead39f`, `b3b8628`). An empty transcript made the summariser
   reply "I'm sorry, but I need the transcript…" and that reply became the directory name —
   `2026-07-30_1141_sure-please-provide-the-transcript-of-the-meeting` is still on disk and is
   deliberately NOT renamed (real user data). The generator now guards the RAW title before
@@ -674,9 +674,9 @@ spacing or colour and iterate blind against a target nobody has seen.
 
 **⚠️ BUG5 WAS STILL LIVE UNTIL TODAY, in the binary the pipeline actually runs.** The July fix landed in Swift and never reached production: `coreaudio.py` prefers `bin/ownscribe-audio` over anything in `.build`, `bin/` is gitignored, and only `swift/build.sh` copies into it — so the shipped binary sat three days older than the fix and still halved playback speed. Measured on one real dual-track capture: `bin/` gave `recording.wav` **12.81s @24000Hz** from 48 kHz sources; `.build/` gave **5.52s @48000Hz**. The signature is in your retained meetings — the two from July 24 are 24000Hz.
 
-Fixed in `4be4e08`: `bin/` rebuilt, the e2e test now resolves the binary through production's own `_BINARY_CANDIDATES` and asserts the merged sample rate **equals** its sources', and `check.sh` gained a staleness gate that names the newer Swift file. **Any recording made before today from the CLI plays back at half speed — `./rec.sh redo <dir>` re-merges it correctly from the retained tracks.**
+Fixed in `001e93e`: `bin/` rebuilt, the e2e test now resolves the binary through production's own `_BINARY_CANDIDATES` and asserts the merged sample rate **equals** its sources', and `check.sh` gained a staleness gate that names the newer Swift file. **Any recording made before today from the CLI plays back at half speed — `./rec.sh redo <dir>` re-merges it correctly from the retained tracks.**
 
-**The window now surfaces `.failed` and the unverified-mute warning** (`7c02399`, W0-7). A banner in the glass rail — never the content layer — with the decision in a pure `bannerState()`: an error outranks the mute warning, and the mute banner is deliberately **not dismissible**, because a warning that the call can still hear you must not be silenceable while it is true. `dismissFailure()` is what makes the error surface usable at all: `.failed` previously had no exit but a retry, and when the cause persists the retry re-fails. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
+**The window now surfaces `.failed` and the unverified-mute warning** (`b8596e7`, W0-7). A banner in the glass rail — never the content layer — with the decision in a pure `bannerState()`: an error outranks the mute warning, and the mute banner is deliberately **not dismissible**, because a warning that the call can still hear you must not be silenceable while it is true. `dismissFailure()` is what makes the error surface usable at all: `.failed` previously had no exit but a retry, and when the cause persists the retry re-fails. `scripts/check.sh` is the CI replacement — 9 checks, including the release build.
 
 **THE TWO MUTE CHECKS THAT GATED EVERYTHING ARE DONE — automated, not deferred to you.** With the AirPods disconnected the built-in mic became the default, which removed the one case the suite cannot assert against (the documented macOS Bluetooth mute bug), so both checks were written as real hardware tests and passed:
 
@@ -698,15 +698,15 @@ uv run pytest tests/test_real_capture_e2e.py -m hardware    # 5 passed
 
 Writing them corrected three assumptions about the binary, which is the argument for having them: it has no `--duration` flag (it records until SIGINT, so the tests stop it the way `rec.sh` does), it prints usage on **stderr**, and it writes **IEEE float32** — which Python's stdlib `wave` refuses outright, so the tests read via `soundfile`, the same float32 `envelope.py` depends on. They also PLAY sound while capturing, which is load-bearing: the tap records what the machine OUTPUTS, so on a muted system it correctly produces a valid 48 kHz stereo float header with **zero frames**. My first version captured that silence and blamed the binary. Mutation: replacing `afplay` with a sleep turns 2 of 5 red.
 
-**The test suite no longer touches your microphone.** Running `swift test` used to degrade the machine's audio: 0 CoreAudio PauseIO/ResumeIO cycles before a run, **7920 after**, with the AirPods Max input dropped to 24 kHz (the HFP phone-call profile) instead of 48 kHz — which dulls playback in every app until macOS renegotiates. Three suites reached the real input device. Fixed in `e51000f`; a full run now measures **0 cycles**. If you ever see the mic sitting at 24 kHz again, that is the symptom, and `/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'` is the meter (use the absolute path — a zsh function shadows `log`).
+**The test suite no longer touches your microphone.** Running `swift test` used to degrade the machine's audio: 0 CoreAudio PauseIO/ResumeIO cycles before a run, **7920 after**, with the AirPods Max input dropped to 24 kHz (the HFP phone-call profile) instead of 48 kHz — which dulls playback in every app until macOS renegotiates. Three suites reached the real input device. Fixed in `25d3282`; a full run now measures **0 cycles**. If you ever see the mic sitting at 24 kHz again, that is the symptom, and `/usr/bin/log show --last 30s | grep -cE 'PauseIO|ResumeIO'` is the meter (use the absolute path — a zsh function shadows `log`).
 
 One test is deliberately skipped: the merge-failure path only runs with a live `MicCapture`, so it needs `OWNSCRIBE_TEST_REAL_MIC=1` and built-in hardware. A hardware-free test covers the same guarantee.
 
-**⚠️ `b0ce8db` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
+**⚠️ `5c00efd` is COMMITTED BUT NOT PUSHED, deliberately.** It changes the system-wide mute path, and its central guarantee — that the app never unmutes a mute you made yourself — cannot be verified without hardware. See "What W0-2/W0-3 changed" below for the two checks that need you; once they pass, push it. The app is signed and installed at `/Applications/MeetingScribe.app`; `swift/build-app.sh` installs it and refuses to leave a stale bundle behind. There is no CI — `bash scripts/check.sh` is the replacement and runs 9 checks locally, including the release build.
 
 **⚠️ ONE THING NEEDS YOU: which part of the design is wrong.** The window HAS now been seen — twice on 2026-07-28, and rejected both times (see the top of this file). What has never happened is a *specific* reading: "pas bon du tout" is a verdict on the whole, and nobody has named a part. So this is not "open it and say what you think" any more; it is "open ⌘0 and tell me which of the eight checks in `APP_TEST.md` § Design pass fails, and how". No audit can close this, and no amount of guessing at spacing can either.
 
-**The installed bundle predates `950799c` and `178b05d`.** Re-run `bash swift/build-app.sh` before judging appearance — otherwise you are looking at older code. (Never let an agent run it: it `rm -rf`s the installed bundle and its TCC grants.)
+**The installed bundle predates `0834f14` and `7a95e66`.** Re-run `bash swift/build-app.sh` before judging appearance — otherwise you are looking at older code. (Never let an agent run it: it `rm -rf`s the installed bundle and its TCC grants.)
 
 **A full code review (2026-07-27) found 14 issues; 11 were real and are now fixed.** Four independent readings ran over the same diff — an automated pass, a lead audit, an adversarial reviewer that re-executed every claim, and a late planner — and *each one found defects the other three missed*. The worst was found two hours after everyone had declared the batch done: `silence_timeout` was plumbed all the way to the tap but the callback reached nothing, so the app still never auto-stopped. See "What the review changed" below.
 
@@ -714,7 +714,7 @@ One test is deliberately skipped: the merge-failure path only runs with a live `
 
 **Proven on real audio (2026-07-27, a 17.5-min bilingual work call in Google Meet inside Dia):** the CoreAudio tap held for the whole call across app switches and network drops — RMS measured minute-by-minute, zero silent minutes. Diarization separated 3 speakers. The summary stayed factual and wrote "Action Items: None mentioned." rather than inventing commitments, so the BUG2 grounding net holds on real content.
 
-**Transcription is 34% faster** since `c1e1f3d`: it now sizes CTranslate2 to the performance-core count instead of whisperx's `threads=4` default. Measured on a 90s slice of that call: 30.9s → 20.5s with a word-identical transcript. ⚠️ **NOT REPRODUCIBLE as recorded** — neither the slice file nor the command was kept, so this number cannot be re-derived today. It is reported as a historical measurement, not a live claim; re-measure before relying on it, and keep the input and the command next time.
+**Transcription is 34% faster** since `8d9943c`: it now sizes CTranslate2 to the performance-core count instead of whisperx's `threads=4` default. Measured on a 90s slice of that call: 30.9s → 20.5s with a word-identical transcript. ⚠️ **NOT REPRODUCIBLE as recorded** — neither the slice file nor the command was kept, so this number cannot be re-derived today. It is reported as a historical measurement, not a live claim; re-measure before relying on it, and keep the input and the command next time.
 
 ## What shipped (2026-07-28)
 
@@ -726,14 +726,14 @@ Both defects had the same shape: values plumbed to consumers that were never cal
 
 ## Open bugs
 
-**None of the W0 series.** W0-5 closed 2026-07-28 in `9d2ee15`.
+**None of the W0 series.** W0-5 closed 2026-07-28 in `833c292`.
 
 Deliberately unbuilt, not bugs:
 
-- ~~**Scroll-to-evidence.**~~ **BUILT since `8067322` (2026-07-29) — this entry was stale and
+- ~~**Scroll-to-evidence.**~~ **BUILT since `5c481af` (2026-07-29) — this entry was stale and
   contradicted § 3 of this same file (2026-08-03 audit).** The `ScrollViewReader` lives in
   `MeetingDetailView.swift:11` with `scrollToAnchor(_:using:)` at `:44-59`, wired from
-  `MeetingInspector`'s `onScrollToAnchor`. (The `a516cc7` removal of the dead button predates
+  `MeetingInspector`'s `onScrollToAnchor`. (The `21ccb02` removal of the dead button predates
   that.) The remaining gap is § 3's: no meeting on disk has non-empty anchors, so it has never
   fired on live data.
 - **The badge call site is review-guarded, not test-guarded.** `.badge(BadgeText.badgeText(for:
@@ -741,14 +741,14 @@ Deliberately unbuilt, not bugs:
   deadlocked this project twice for 29 minutes with the SwiftPM lock held. One named line on a
   cosmetic badge against that risk.
 - ~~**`SpeakerAvatarStyle.color` maps `SPEAKER_00` and `SPEAKER_10` to the same colour**
-  (`hasSuffix("0")`).~~ **CLOSED in `d448e2b`, and it was worse than this entry said.** The collapse
+  (`hasSuffix("0")`).~~ **CLOSED in `5c49061`, and it was worse than this entry said.** The collapse
   was not two labels but *all* of them: seven concurrent speakers produced **two** colours. Filing it
   as "unreachable on current data" was accurate about the data and missed that
   `SpeakerAvatarStyleTests.speakerEndingIn0GetsBlue` **asserted the collision**, so the suite would
   have gone red on a correct fix — a named test had locked the bug in place. Fixed by indexing the
   palette on the parsed number, which keeps `_00` blue and `_01` purple so the honest assertions stay
   true. Restoring `hasSuffix` turns **5** tests red as the suite now stands, measured 2026-07-29 —
-  `d448e2b`'s message claimed "exactly the two new tests", which an independent reviewer measured as
+  `5c49061`'s message claimed "exactly the two new tests", which an independent reviewer measured as
   4 at that commit and I re-measured as 5 after two more tests landed. The fix was better guarded
   than its own commit message claimed, and the failure mode is worth naming: the reds are all in
   **swift-testing**, so an XCTest-only grep shows zero and reads as "the mutation survived". A wrong
@@ -760,7 +760,7 @@ Deliberately unbuilt, not bugs:
   colour is now pinned as a known limit rather than left to be discovered in a ten-person call.
 - **`AudioTracksPresence` checks existence only.** A zero-byte `mic.wav` would show a green
   checkmark. BUG4 shipped 33.5s of silence past a green suite, so this is the shape to watch.
-  *(Now closed in `71de1ee` — it reads real frames and excludes zero-byte files. An independent
+  *(Now closed in `d6bb0dc` — it reads real frames and excludes zero-byte files. An independent
   mutation confirmed it: replacing the frame check with `duration > 0` turns the real-silent-file
   test RED against the actual BUG4 artifact.)*
 - **`SpeakerAvatarStyle`'s and `BadgeText`'s call sites in the views are untested.** Re-grepped
@@ -771,11 +771,11 @@ Deliberately unbuilt, not bugs:
   well covered; their consumption at the render site is review-guarded only. Closing it needs a
   view-host test — the thing that deadlocked this project twice for 29 minutes holding the SwiftPM
   lock — so it stays a NAMED gap rather than a pretended pass. Note the avatar *colour* half of this
-  is now genuinely guarded (`d448e2b`): the helper's collapse-to-two-colours behaviour would fail
+  is now genuinely guarded (`5c49061`): the helper's collapse-to-two-colours behaviour would fail
   the suite, even though the call site still would not.
 
-W0-6 (same-minute audio overwrite) is CLOSED in `d626e72`. W0-8's wedge and tap leak were
-investigated and **REFUTED** on shipped code — `b0ce8db`'s run-identity guard closed them as a side
+W0-6 (same-minute audio overwrite) is CLOSED in `fe4aba7`. W0-8's wedge and tap leak were
+investigated and **REFUTED** on shipped code — `5c00efd`'s run-identity guard closed them as a side
 effect; what remains is a latent note. BUG0/1/2/3/4/5 + all 11 review findings + W0-1/2/3/6/7 are
 closed, each verified by mutation. See LESSONS_LEARNED.md.
 
@@ -802,7 +802,7 @@ against the real RMS envelope of the 27 July call rather than invented bars.
   SwiftUI. Raising the deployment target had been taken for the whole job. It is not: what the
   mockup calls Glass is a LAYOUT — speaker avatars, the envelope strip, the HIG type scale, glass
   on the rails — and none of it arrives with a target.
-  So the appearance work was done in `82ed390`. Then the status line was rewritten to say the
+  So the appearance work was done in `45a4f23`. Then the status line was rewritten to say the
   window matched the validated design — **on the strength of a green suite, with nobody having
   looked** — and the user rejected it on sight. Correcting a claim-without-evidence by writing a
   different claim-without-evidence is not a correction.
@@ -871,7 +871,7 @@ Two of these were closed by automation on 2026-07-28 rather than waiting for you
 - [x] First launch: permission prompts appear (System Audio Recording + Microphone) and were granted — the 17.5-min call recorded through them
 - [ ] Grants SURVIVE a rebuild (re-run build-app.sh → permissions still there; this is what the stable cert is for)
 - [ ] **A call recorded with the CURRENT bundle produces `mic.wav` + `system.wav` and labels your voice `Owner`** ← the BUG4 fix; the 17.5-min call predates it, so it captured only the other participants
-- [ ] **Auto-stop on silence**: start a recording, leave it silent, confirm it stops on its own after 5 minutes AND that the meeting is transcribed (not merely cut). This never worked before `eec7be4` — the value was plumbed but the callback reached nothing. Note the app must be rebuilt+reinstalled first: the installed bundle predates the fix.
+- [ ] **Auto-stop on silence**: start a recording, leave it silent, confirm it stops on its own after 5 minutes AND that the meeting is transcribed (not merely cut). This never worked before `2000055` — the value was plumbed but the callback reached nothing. Note the app must be rebuilt+reinstalled first: the installed bundle predates the fix.
 - [x] **Master mute on the built-in mic — AUTOMATED 2026-07-28.** `OWNSCRIBE_TEST_REAL_MUTE=1 swift test --filter RealHardwareMuteTests` mutes and reads back the real device, and mutation-verified that removing the ownership guard turns it RED. What it still does NOT prove is that a *third-party app* (Zoom) observes the mute — the test asserts the CoreAudio property, not what Zoom's meter shows. That last mile is a genuine you-only check, and cheap: mute from the menu bar during any call and watch their side.
 - [ ] Master mute on **AirPods Max 2 / Pro 3** → the fragile case (documented macOS Bluetooth mute bug); if the fail-loud warning fires, that's the guard working, not a break. The automated suite deliberately SKIPS itself when the default input is Bluetooth, because a red there would not distinguish our logic from the platform fault — so this one is irreducibly manual.
 - [ ] Global hotkey ⌘⇧M while **Zoom has focus** (only one dev-time positive so far; display-sleep blocked re-verification)
@@ -919,7 +919,7 @@ unverified state, same class as the mute-icon bug) and the parser's double-count
 stamped line → bare line invents an utterance and puts it out of chronological order). A property
 with a single consumer is the shape that escapes coverage.
 
-## What W0-2/W0-3 changed (2026-07-28) — commit `b0ce8db`, needs 2 hardware checks
+## What W0-2/W0-3 changed (2026-07-28) — commit `5c00efd`, needs 2 hardware checks
 
 Two ways the app asserted state it had never checked. Both mutation-verified in a `git worktree`
 (not a copied tree — a copied `swift/.build` fails to compile on a path-pinned module cache, which
@@ -943,7 +943,7 @@ reads exactly like a discriminating test).
 Mutations: success guard dropped → 4 of 7 red · failure guard dropped → 1 of 7 (guarded
 independently) · ownership check reverted → 2 red · hardware seeding reverted → 8 red.
 
-**The two checks that decide whether `b0ce8db` gets pushed** (rebuild first — `bash swift/build-app.sh`):
+**The two checks that decide whether `5c00efd` gets pushed** (rebuild first — `bash swift/build-app.sh`):
 
 - [ ] Mute yourself in **System Settings → Sound → Input**, launch the app, confirm the menu shows
       "Unmute" (not "Mute"), then quit with ⌘Q and confirm **the mic is STILL muted**. If the app
@@ -955,11 +955,11 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
 
 1. **Look at the window** (⌘0). Everything below is cheaper to do once you have said whether the
    Glass direction reads right in practice.
-2. ~~**W0-2** — seed the mute state from the hardware at launch.~~ **DONE** in `b0ce8db`, pending
+2. ~~**W0-2** — seed the mute state from the hardware at launch.~~ **DONE** in `5c00efd`, pending
    the two hardware checks above.
-3. ~~**W0-3** — keep Start Recording alive during transcription.~~ **DONE** in `b0ce8db`.
+3. ~~**W0-3** — keep Start Recording alive during transcription.~~ **DONE** in `5c00efd`.
 4. ~~**W0-6** — two recordings in the same minute overwrite each other's audio.~~ **DONE** in
-   `d626e72` + `8b9775c`. Swift adds a `_N` suffix; Python strips it before appending the title slug.
+   `fe4aba7` + `36fa0b7`. Swift adds a `_N` suffix; Python strips it before appending the title slug.
    Six attempts, because every candidate name parses the DATE and only one keeps the TITLE — the
    discriminator was never `displayDate`. Worth reading the commit if you touch the directory format:
    a `-2` inside the minute field blanks the date, a `_2` between timestamp and slug makes the title
@@ -967,7 +967,7 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
    meeting because `1234` is itself `\d+`. All measured through the real `MeetingSummary`, and each is
    now a mutation the tests fail against.
 5. ~~**W0-7** — surface `.failed` and the unverified-mute warning in the window.~~ **DONE** in
-   `7c02399`. Reuse `bannerState()` for any further status surface rather than adding a second
+   `b8596e7`. Reuse `bannerState()` for any further status surface rather than adding a second
    mechanism.
 6. **W0-9 — pre-flight the CLI check.** Disable or warn on the record button when `isCliAvailable` is
    false, and when a recording ends that way, say the audio is retained and can be resumed.
@@ -985,7 +985,7 @@ independently) · ownership check reverted → 2 red · hardware seeding reverte
 9. **Wire the inspector's anchors to the transcript** — clicking a key point should scroll to its
    evidence. Depends on W0-4's reader.
 10. **Settings.** ~~Still a single token field.~~ **Mic on/off and silence timeout are now in the
-    pane** (`558da55`) — the rest (diarization, language, output dir) is still TOML-only, named as
+    pane** (`6c08eec`) — the rest (diarization, language, output dir) is still TOML-only, named as
     deliberately out of scope rather than forgotten. The writer is the interesting part: the config
     holds your HF token under `[diarization]` and had no `[audio]` section at all, so a
     serialize-the-struct writer would have destroyed the token and its four neighbours. It is

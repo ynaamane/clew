@@ -9,7 +9,7 @@ means PENDING, not "almost done."
 **Caveat on every SHA and run URL cited below**: A3 (git history treatment) is still an open
 decision. If Yanis chooses the excision path, the rewrite changes every commit hash after the
 first touched commit (measured: 302 of 317 commits shift). Any proof here that cites a SHA or a
-CI run URL, including `3978b62`, `e96ba37`, `da97168` and `dcc91d2` below, was captured before
+CI run URL, including `285a5c6`, `879cea5`, `4eab296` and `007832f` below, was captured before
 that rewrite and is provisional: it will need to be re-captured against the post-rewrite history
 before the actual visibility flip. The plan's own ordering rule: no proof citing a SHA or run URL
 is trustworthy until it is captured after the rewrite (if the rewrite happens).
@@ -23,16 +23,16 @@ employer name and the client project codename appear below as descriptions rathe
 ## Checklist
 
 - [x] **A1: Purge of the 3 identified docs (screenshot-incident narrative)**
-  Done. Evidence: commit `3978b62` ("docs: genericize the screenshot-incident narrative across
+  Done. Evidence: commit `285a5c6` ("docs: genericize the screenshot-incident narrative across
   all docs (A1+A2)"), touching `HANDOFF.md`, `LESSONS_LEARNED.md`, `TODO.md` (plus `APP_TEST.md`,
   `CLAUDE.md`, `design/mockup.html`, folded in under A2 below). Done criterion from the plan: the
   narrow purge pattern returns zero matches across those three docs. Re-verified fresh this
   session (2026-08-06) against current HEAD
-  (`e96ba37`): still zero matches, and the technical lesson (never `screencapture` the full
+  (`879cea5`): still zero matches, and the technical lesson (never `screencapture` the full
   screen, target the window via `-l <windowid>` or `-R`) reads intact in all three docs.
 
 - [x] **A2: Widened-pattern NDA sweep at HEAD**
-  Done at HEAD `e96ba37` (same content as `3978b62`, no NDA-relevant edits since, other than the
+  Done at HEAD `879cea5` (same content as `285a5c6`, no NDA-relevant edits since, other than the
   two items below closing). Pattern: the widened NDA pattern described at the top of this file,
   all tracked files, `.git` excluded. Full occurrence table with a verdict per line is in
   `/Users/yanisnaamane/taff/docs/handoffs/reports/2026-08-04-meeting-scribe.md`. Re-run that
@@ -41,7 +41,7 @@ employer name and the client project codename appear below as descriptions rathe
   criteria (generic colleague-voice examples, internal project-ticket references with no
   employer identified, the employer name used alone as a nameable career fact per the project's
   own NDA read). Zero occurrences of the codename. Two items the report flagged as needing a
-  human decision: **both RESOLVED**, commit `44b9f2c` ("docs: reframe pilot as global-recorder,
+  human decision: **both RESOLVED**, commit `d154869` ("docs: reframe pilot as global-recorder,
   not client-fed (pre-publication)"), landed the same day, before either reached Yanis as an
   open question. Stale citation refreshed this session (2026-08-07), re-checked directly rather
   than trusted:
@@ -57,7 +57,9 @@ employer name and the client project codename appear below as descriptions rathe
     session: the line now says "Voiceprint embeddings are biometric data (GDPR Art. 9, cleared
     for this use) and live outside the tracked tree, under `~/.config` and `~/ownscribe`: never
     commit them into the repo", no false claim about repo contents.
-  Also DONE (same anonymization pass, commit `a35d03c`, plus this session's `6760942`): the
+  Also DONE (same anonymization pass, commit `e5b2202`; the follow-up commit that carried it into
+  `HANDOFF.md` and `LESSONS_LEARNED.md` no longer exists as a separate commit, because the history
+  rewrite applied that same rename to every version of those files and left it empty): the
   remaining 3 of the 5 tracked micro-validations from the morning-review queue (colleague first
   names anonymized project-wide across `TODO.md`, `rec.sh`,
   `HANDOFF.md`, `LESSONS_LEARNED.md`; the forced-purple-selection question decided in place, kept
@@ -83,7 +85,7 @@ employer name and the client project codename appear below as descriptions rathe
 
 - [ ] **A4: `scripts/check.sh` green + real visual verification**
   Partially done. `check.sh` evidence: `CHECK_EXIT=0` read from a captured variable (not off a
-  pipe), 10/10 gates, at commit `3978b62`, Python 676 passed / 1 skipped / 7 deselected
+  pipe), 10/10 gates, at commit `285a5c6`, Python 676 passed / 1 skipped / 7 deselected
   (hardware), Swift 488 XCTest (9 skipped) + 47 swift-testing, 0 failures (session report,
   Mission 3). Off-screen renderer pre-verdicts are written into
   `/Users/yanisnaamane/meeting-scribe/APP_TEST.md` (`§ Design pass`, the "Pre-capture
@@ -107,7 +109,7 @@ employer name and the client project codename appear below as descriptions rathe
 
 - [ ] **A6: CI resurrected**
   BLOCKED at the account level, not a code problem. Workflow file is real and pushed: branch
-  `ci-resurrection`, remote SHA `dcc91d2`, `.github/workflows/ci.yml`, two jobs as specced
+  `ci-resurrection`, remote SHA `007832f`, `.github/workflows/ci.yml`, two jobs as specced
   (`lint-and-test-python` on `ubuntu-latest`, `full-check-macos` gated to `workflow_dispatch`),
   YAML validated. Test run
   `https://github.com/ynaamane/meeting-scribe/actions/runs/31089951064` shows `startup_failure`
@@ -122,7 +124,7 @@ employer name and the client project codename appear below as descriptions rathe
   not met. The run URL above is evidence of the diagnosis, not of completion.
 
 - [x] **A7: README attribution section + CI badge fix**
-  Done. Local commit `da97168` on `main`, verified: `README.md` only, 13 insertions. Section
+  Done. Local commit `4eab296` on `main`, verified: `README.md` only, 13 insertions. Section
   "What I Inherited vs What I Built" added around `README.md:518`, with a table-of-contents
   entry at `README.md:26`; the CI badge at `README.md:4` now points to
   `ynaamane/meeting-scribe/actions/workflows/ci.yml` instead of the upstream repo. Attribution
@@ -144,7 +146,7 @@ employer name and the client project codename appear below as descriptions rathe
   moment `--all` genuinely started removing it, since they never mocked the new path; patched all
   three and added coverage for the previously-untested flagless interactive path too. Verified
   with a fake-HOME sentinel file that now survives the full `TestCleanup` suite. 48/48
-  `test_cli.py`, 678 passed project-wide, `scripts/check.sh` 10/10 (`EXIT=0`). Commit `b210cc1`.
+  `test_cli.py`, 678 passed project-wide, `scripts/check.sh` 10/10 (`EXIT=0`). Commit `30c87ea`.
 
 - [x] **Legal and privacy notice inserted (queue task 3, disclaimer)**
   Done this session. `README.md`, new `## Legal and privacy notice` section placed just before
@@ -198,7 +200,7 @@ employer name and the client project codename appear below as descriptions rathe
 - [ ] **Final NDA sweep (widened pattern, blobs AND commit messages)**
   PENDING, to run after the A3 decision is executed (if a rewrite happens) or explicitly
   confirmed as HEAD-only (if not). Must cover both surfaces per the report's Decouverte 4: a
-  blob-only sweep already missed a commit message once (`178b05d`'s message quoted the old
+  blob-only sweep already missed a commit message once (`7a95e66`'s message quoted the old
   CLAUDE.md leak narrative verbatim, found only by `git log --all -p`, not by an
   enumerate-blobs approach). Command for the re-run: pipe `git log --all -p` through a
   case-insensitive grep for the widened NDA pattern described at the top of this file, against

@@ -521,7 +521,7 @@ Known scope limits for this engine, compared to the WhisperX default:
 
 ## What I Inherited vs What I Built
 
-This project is a fork of [paberr/ownscribe](https://github.com/paberr/ownscribe) at commit `afc1d18` (2026-07-20). As of this writing, 237 of the 318 commits on this branch were made by me, all after that fork point.
+This project is a fork of [paberr/ownscribe](https://github.com/paberr/ownscribe) at commit `fc8198e` (2026-07-20). As of this writing, 237 of the 318 commits on this branch were made by me, all after that fork point.
 
 Distinctive additions built in this fork, not present upstream:
 

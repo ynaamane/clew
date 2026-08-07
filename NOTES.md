@@ -39,7 +39,7 @@ layout iteration.
 
 ## Origin
 
-Forked via `git clone https://github.com/paberr/ownscribe` (MIT), commit `afc1d18` (`Fix audio dir cleanup and rename edge cases`) on 2026-07-23. `.git` history kept. Working branch: `meeting-scribe-build`. No upstream remote push planned — this is a personal fork, diverging intentionally (privacy defaults inverted, new enrollment/naming layer, Canary A/B).
+Forked via `git clone https://github.com/paberr/ownscribe` (MIT), commit `fc8198e` (`Fix audio dir cleanup and rename edge cases`) on 2026-07-23. `.git` history kept. Working branch: `meeting-scribe-build`. No upstream remote push planned — this is a personal fork, diverging intentionally (privacy defaults inverted, new enrollment/naming layer, Canary A/B).
 
 ## Pinned toolchain (2026-07-23, Apple Silicon, macOS 27.0 build 26A5388g)
 
@@ -111,7 +111,7 @@ All 5 target sources plus mic are captured by the SAME two taps (`SystemAudioCap
 
 Two of the three asks in this task were already true upstream, confirmed by reading code rather than assumed:
 
-- **pyannote model default is already `community-1`.** `whisperx.diarize.DiarizationPipeline.__init__` (installed 3.8.5) resolves `model_config = model_name or "pyannote/speaker-diarization-community-1"`, and `_load_diarization_pipeline()` in `whisperx_transcriber.py` never passes `model_name`. Upstream's own commit `26f5fc3` ("Require pyannote-audio>=4 and cover DiarizeOutput unwrap with a test") plus the existing `test_diarize_unwraps_speaker_diarization_from_diarize_output` test already pin this. No patch needed.
+- **pyannote model default is already `community-1`.** `whisperx.diarize.DiarizationPipeline.__init__` (installed 3.8.5) resolves `model_config = model_name or "pyannote/speaker-diarization-community-1"`, and `_load_diarization_pipeline()` in `whisperx_transcriber.py` never passes `model_name`. Upstream's own commit `f58c04b` ("Require pyannote-audio>=4 and cover DiarizeOutput unwrap with a test") plus the existing `test_diarize_unwraps_speaker_diarization_from_diarize_output` test already pin this. No patch needed.
 - **`HF_TOKEN` env var already flows into config.** `config.py::Config.load()` does `if hf_token := os.environ.get("HF_TOKEN"): config.diarization.hf_token = hf_token`. No patch needed.
 
 What changed: **removed the `diarization.device` config knob** (`"auto"` / `"mps"` / `"cpu"`) and the `_resolve_diarization_device()` static method entirely. `_load_diarization_pipeline()` now always passes `device="cpu"` as a hardcoded literal to `DiarizationPipeline(...)`, which forwards it to pyannote's `Pipeline.from_pretrained(...).to(torch.device("cpu"))` — confirmed by reading `whisperx/diarize.py::DiarizationPipeline.__init__` directly.
@@ -425,7 +425,7 @@ Team-lead's message specified the fix shape explicitly: fail-loud detection, not
 
 ### The probe: watch-activity's own existence as the version marker
 
-Confirmed via `git log --oneline afc1d18..HEAD -- swift/Sources/AudioCapture.swift` that `f49461e` (Task#4, separate-track retention) landed strictly BEFORE `3da343a` (Task#9/10, `watch-activity`) in this fork's history — so any binary new enough to recognize the `watch-activity` subcommand is guaranteed new enough to have separate-track support too. Confirmed the negative side too: `git show afc1d18:swift/Sources/AudioCapture.swift | grep watch-activity` returns nothing — upstream's fork-point commit has zero knowledge of that subcommand, so it would hit the `default:` case (`Unknown command: ...`, exit 1) for any invocation naming it.
+Confirmed via `git log --oneline fc8198e..HEAD -- swift/Sources/AudioCapture.swift` that `e4c20af` (Task#4, separate-track retention) landed strictly BEFORE `d7d37b0` (Task#9/10, `watch-activity`) in this fork's history — so any binary new enough to recognize the `watch-activity` subcommand is guaranteed new enough to have separate-track support too. Confirmed the negative side too: `git show fc8198e:swift/Sources/AudioCapture.swift | grep watch-activity` returns nothing — upstream's fork-point commit has zero knowledge of that subcommand, so it would hit the `default:` case (`Unknown command: ...`, exit 1) for any invocation naming it.
 
 `binary_supports_separate_tracks(binary)` in `coreaudio.py` runs `<binary> watch-activity --sustained-seconds not-a-number` and checks for the specific string `"requires a number of seconds"` in the output — this is the patched binary's own arg-parsing error, reached only because it recognized `watch-activity` as a real subcommand in the first place. Deliberately side-effect-free: an invalid numeric value fails inside `watch-activity`'s own flag parsing before the poll timer/loop ever starts, so this never actually watches audio or needs any permission.
 
@@ -839,7 +839,7 @@ already sorted about one run in six, so the single run the protocol asks for had
 certifying a guard that does not guard. At eight tokens it is 8/8. Anything seeded per process
 (dictionary/set order, hashes, clocks, interleaving) needs the kill *rate*, not a verdict.
 
-**And a mutation's kills can hide in the other framework.** `d448e2b`'s message claimed "exactly the
+**And a mutation's kills can hide in the other framework.** `5c49061`'s message claimed "exactly the
 two new tests red"; an independent reviewer measured **4**, I re-measured **5** after two more tests
 landed. All of them are swift-testing (`✘ Test name()`), so a grep for XCTest's format
 (`Test Case '-[Suite name]' failed`) returns zero hits and reads exactly like a survived mutation.

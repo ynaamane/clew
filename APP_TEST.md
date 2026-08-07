@@ -234,7 +234,7 @@ no-entry placeholder and `glassEffect` as nothing at all.
 **It works — and the first reading of a correct render found a bug no test could reach.** The
 meeting header was displaying `^[1 voix](inflect: true)` to the user, because SwiftUI resolves
 inflection markup only in a literal or `LocalizedStringKey` and `MeetingDetailView` handed
-`Text(_:)` a `String` variable. Fixed in `4b1fcfc`. The reason no suite caught it is the part
+`Text(_:)` a `String` variable. Fixed in `878de73`. The reason no suite caught it is the part
 worth keeping: a test named `testTheCountKeepsItsInflectionMarkup` **asserted the broken
 string**, on the reasoning that "SwiftUI does the pluralisation" — so a correct fix would have
 turned it red. Same shape as the avatar test that once asserted a colour collision. A suite can
@@ -289,7 +289,7 @@ Add it to the CANNOT-VERIFY list alongside glass/materials.
 project decision log). Renderer pre-verdicts above stand; no per-item formal pass was
 performed.
 
-**Pre-capture 2026-08-04 (off-screen renderer, agent), at `3978b62`, against
+**Pre-capture 2026-08-04 (off-screen renderer, agent), at `285a5c6`, against
 `/tmp/ui-render/library-light.png` and `library-dark.png`.** These are pre-verdicts on the
 observables the renderer CAN see (layout, spacing, type hierarchy, text content, light/dark).
 They are not the design verdict: no item below is globally VERIFIED, the final call on every
@@ -339,7 +339,7 @@ and `design/mockup.html`:
 - [ ] Density and spacing versus the mockup — the mockup's `:root` block
       carries the intended values.
 - [ ] Speaker avatars: legible at 18pt, and do two speakers in one meeting
-      ever look alike? *(The code-level collision is fixed as of `d448e2b` —
+      ever look alike? *(The code-level collision is fixed as of `5c49061` —
       seven speakers now get seven distinct palette colours, where every
       diarized label previously collapsed to two. So this check is now purely
       about whether the colours are DISTINGUISHABLE to your eye at 18pt,
@@ -358,7 +358,7 @@ and `design/mockup.html`:
       word cannot anchor to its French equivalent in the transcript.)*
 - [ ] **Click an anchor timestamp chip** (`Gary→08:30`) — it should scroll the
       transcript to that utterance, and reveal it if the backchannel toggle
-      was hiding it. New in `a5a2056`. Two things only you can judge: whether
+      was hiding it. New in `c640161`. Two things only you can judge: whether
       a `.link`-styled chip reads as clickable in the inspector, and whether
       the scroll lands somewhere legible rather than pinning the line to the
       very top or bottom.
@@ -369,7 +369,7 @@ and `design/mockup.html`:
       synthetic fixture could — `SPEAKER_00`'s "OK." and the sentence
       containing "Lambda" are BOTH stamped `[05:09]`, and the chip resolved to
       the two-word backchannel, offering it as proof of a claim about
-      architecture (fixed in `c4659cb`).
+      architecture (fixed in `0ae9532`).
       *(An earlier version of this line said only a fresh recording could
       exercise the path, because no meeting under `~/ownscribe/` has populated
       anchors — one of six has the file and its `anchors` object is `{}`. That
@@ -378,7 +378,7 @@ and `design/mockup.html`:
       use. A fresh recording is still the only way to see the chips **in the
       app**, since the window reads `~/ownscribe/`, not `/tmp`.)*
 - [ ] **Settings → the two new controls** (mic on/off, silence timeout) — new
-      in `558da55`. The write path is tested and the HF token is provably
+      in `6c08eec`. The write path is tested and the HF token is provably
       preserved; how the pane READS is unverified, nobody has looked. Note it
       says a restart is needed, because `AppState` reads the config once at
       launch.

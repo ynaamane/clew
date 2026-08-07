@@ -172,7 +172,7 @@ instinct will be to "simplify" the very line the guard exists to keep.
 **A proximity assertion is not a target assertion.** `GlassPlacementTests` asserted that
 `.scrollContentBackground(.hidden)` appears within 6 lines above `.glassEffect()` — which is
 true whether the glass sits on the `List` or on its container. On that guard's word, the TODO
-recorded "glass moved to the container" (`f0e7bd6`) as CODE DONE while `LibraryWindow.swift`
+recorded "glass moved to the container" (`c2fef97`) as CODE DONE while `LibraryWindow.swift`
 still chained the modifier on the `List` — the exact configuration the original deformed-rail
 finding blamed. Found only by the 2026-08-03 audit reading the attachment point itself; third
 intention-recorded-as-delivery in this repo. When a source guard exists to pin WHERE a modifier
