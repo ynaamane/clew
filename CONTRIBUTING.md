@@ -6,8 +6,8 @@ Thanks for your interest in contributing! This project is fully local meeting tr
 
 ```bash
 # Clone the repo
-git clone https://github.com/paberr/ownscribe.git
-cd ownscribe
+git clone https://github.com/ynaamane/meeting-scribe.git
+cd meeting-scribe
 
 # Install dependencies (including dev tools)
 uv sync --dev
@@ -24,9 +24,12 @@ uv run ruff check src/ tests/ scripts/
 
 ## Running tests
 
-**There is no CI.** GitHub Actions never ran on this repo — 29 consecutive `startup_failure`s with
-zero jobs created. `scripts/check.sh` is the replacement, and it is the thing to run before
-submitting anything non-trivial:
+**CI exists but is not live on `main` yet.** `.github/workflows/ci.yml` is written and pushed on
+branch `ci-resurrection`: a `lint-and-test-python` job (ruff + pytest) that runs automatically on
+`ubuntu-latest`, and a `full-check-macos` job (the full `scripts/check.sh`) gated to manual
+trigger via `workflow_dispatch`, since a hosted macOS runner is not something to burn on every
+push. It will start running once the repo goes public and the workflow merges to `main`. Until
+then, `scripts/check.sh` is the thing to run before submitting anything non-trivial:
 
 ```bash
 bash scripts/check.sh   # 10 gates: lint, format, both suites, a RELEASE build, shell syntax
@@ -113,7 +116,7 @@ Run `--help` to see every supported clip flag. Each check is independent and pri
 
 ## Code style
 
-This project uses [ruff](https://docs.astral.sh/ruff/) for linting. Run `uv run ruff check src/ tests/ scripts/` before submitting a PR — or just `bash scripts/check.sh`, which includes it along with `ruff format --check`. Nothing checks this for you: there is no CI, so an unlinted PR stays unlinted until someone runs it locally.
+This project uses [ruff](https://docs.astral.sh/ruff/) for linting. Run `uv run ruff check src/ tests/ scripts/` before submitting a PR — or just `bash scripts/check.sh`, which includes it along with `ruff format --check`. Nothing checks this automatically on `main` yet (see "Running tests" above), so an unlinted PR stays unlinted until someone runs it locally or the `ci-resurrection` workflow lands.
 
 ## Open contribution areas
 
