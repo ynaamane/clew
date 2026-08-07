@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from ownscribe.search import (
+from clew.search import (
     _answer_from_transcripts,
     _build_summary_chunks,
     _discover_meetings,
@@ -564,7 +564,7 @@ class TestAskIntegration:
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(find_response)
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(answer_response)
 
-        from ownscribe.config import Config
+        from clew.config import Config
 
         config = Config()
         config.output.dir = str(tmp_path)
@@ -572,7 +572,7 @@ class TestAskIntegration:
         config.summarization.backend = "ollama"
         config.summarization.model = "test-model"
 
-        from ownscribe.search import ask
+        from clew.search import ask
 
         output_lines: list[str] = []
         monkeypatch.setattr(click, "echo", lambda msg="": output_lines.append(str(msg)))
@@ -617,8 +617,8 @@ def _openai_400_response() -> tuple[dict, int]:
 class TestOpenAIChatJsonModeFallback:
     def test_openai_chat_json_mode_fallback(self, httpserver):
         """json_object and json_schema both fail → falls back to no response_format."""
-        from ownscribe.config import SummarizationConfig
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.config import SummarizationConfig
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         body_400, status_400 = _openai_400_response()
         ep = "/v1/chat/completions"
@@ -648,8 +648,8 @@ class TestOpenAIChatJsonModeFallback:
 
     def test_openai_chat_json_schema_fallback(self, httpserver):
         """json_object fails → falls back to json_schema which succeeds."""
-        from ownscribe.config import SummarizationConfig
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.config import SummarizationConfig
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         body_400, status_400 = _openai_400_response()
         ep = "/v1/chat/completions"

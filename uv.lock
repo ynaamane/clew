@@ -263,6 +263,70 @@ wheels = [
 ]
 
 [[package]]
+name = "clew"
+version = "0.13.1"
+source = { editable = "." }
+dependencies = [
+    { name = "click" },
+    { name = "huggingface-hub" },
+    { name = "llama-cpp-python" },
+    { name = "pyannote-audio" },
+    { name = "sounddevice" },
+    { name = "soundfile" },
+    { name = "torchaudio" },
+    { name = "whisperx" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "ollama" },
+    { name = "openai" },
+]
+ollama = [
+    { name = "ollama" },
+]
+openai = [
+    { name = "openai" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "jiwer" },
+    { name = "ollama" },
+    { name = "openai" },
+    { name = "pytest" },
+    { name = "pytest-httpserver" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.1" },
+    { name = "huggingface-hub", specifier = ">=0.20" },
+    { name = "llama-cpp-python", specifier = ">=0.3" },
+    { name = "ollama", marker = "extra == 'all'", specifier = ">=0.4" },
+    { name = "ollama", marker = "extra == 'ollama'", specifier = ">=0.4" },
+    { name = "openai", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
+    { name = "pyannote-audio", specifier = ">=4.0" },
+    { name = "sounddevice", specifier = ">=0.5" },
+    { name = "soundfile", specifier = ">=0.13" },
+    { name = "torchaudio", specifier = ">=2.8,<2.9" },
+    { name = "whisperx", specifier = ">=3.8" },
+]
+provides-extras = ["ollama", "openai", "all"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "jiwer", specifier = ">=4.0" },
+    { name = "ollama", specifier = ">=0.4" },
+    { name = "openai", specifier = ">=1.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-httpserver", specifier = ">=1.1" },
+    { name = "ruff", specifier = ">=0.9" },
+]
+
+[[package]]
 name = "click"
 version = "8.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1453,70 +1517,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/58/b2/b5e12de7b4486556fe2257611b55dbabf30d0300bdb031831aa943ad20e4/optuna-4.7.0.tar.gz", hash = "sha256:d91817e2079825557bd2e97de2e8c9ae260bfc99b32712502aef8a5095b2d2c0", size = 479740, upload-time = "2026-01-19T05:45:52.604Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/75/d1/6c8a4fbb38a9e3565f5c36b871262a85ecab3da48120af036b1e4937a15c/optuna-4.7.0-py3-none-any.whl", hash = "sha256:e41ec84018cecc10eabf28143573b1f0bde0ba56dba8151631a590ecbebc1186", size = 413894, upload-time = "2026-01-19T05:45:50.815Z" },
-]
-
-[[package]]
-name = "ownscribe"
-version = "0.13.1"
-source = { editable = "." }
-dependencies = [
-    { name = "click" },
-    { name = "huggingface-hub" },
-    { name = "llama-cpp-python" },
-    { name = "pyannote-audio" },
-    { name = "sounddevice" },
-    { name = "soundfile" },
-    { name = "torchaudio" },
-    { name = "whisperx" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "ollama" },
-    { name = "openai" },
-]
-ollama = [
-    { name = "ollama" },
-]
-openai = [
-    { name = "openai" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "jiwer" },
-    { name = "ollama" },
-    { name = "openai" },
-    { name = "pytest" },
-    { name = "pytest-httpserver" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.1" },
-    { name = "huggingface-hub", specifier = ">=0.20" },
-    { name = "llama-cpp-python", specifier = ">=0.3" },
-    { name = "ollama", marker = "extra == 'all'", specifier = ">=0.4" },
-    { name = "ollama", marker = "extra == 'ollama'", specifier = ">=0.4" },
-    { name = "openai", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
-    { name = "pyannote-audio", specifier = ">=4.0" },
-    { name = "sounddevice", specifier = ">=0.5" },
-    { name = "soundfile", specifier = ">=0.13" },
-    { name = "torchaudio", specifier = ">=2.8,<2.9" },
-    { name = "whisperx", specifier = ">=3.8" },
-]
-provides-extras = ["ollama", "openai", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "jiwer", specifier = ">=4.0" },
-    { name = "ollama", specifier = ">=0.4" },
-    { name = "openai", specifier = ">=1.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-httpserver", specifier = ">=1.1" },
-    { name = "ruff", specifier = ">=0.9" },
 ]
 
 [[package]]

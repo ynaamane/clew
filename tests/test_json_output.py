@@ -2,8 +2,8 @@
 
 import json
 
-from ownscribe.output.json_output import format_transcript_json
-from ownscribe.transcription.models import Segment, TranscriptResult
+from clew.output.json_output import format_transcript_json
+from clew.transcription.models import Segment, TranscriptResult
 
 
 class TestFormatTranscriptJson:

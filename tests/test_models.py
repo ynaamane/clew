@@ -1,6 +1,6 @@
 """Tests for transcription data models."""
 
-from ownscribe.transcription.models import Segment, TranscriptResult
+from clew.transcription.models import Segment, TranscriptResult
 
 
 class TestFullText:

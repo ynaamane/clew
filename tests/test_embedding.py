@@ -7,7 +7,7 @@ from unittest import mock
 
 import numpy as np
 
-from ownscribe.speakers.embedding import SpeakerEmbedder
+from clew.speakers.embedding import SpeakerEmbedder
 
 
 class TestEmbedFileNeverTouchesTorchcodec:

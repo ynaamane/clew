@@ -2,28 +2,28 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ownscribe.config import TranscriptionConfig
-from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber, default_cpu_threads
+from clew.config import TranscriptionConfig
+from clew.transcription.whisperx_transcriber import WhisperXTranscriber, default_cpu_threads
 
 
 class TestDefaultCpuThreads:
     def test_uses_performance_cores_not_every_core(self):
         with (
-            patch("ownscribe.transcription.whisperx_transcriber._performance_core_count", return_value=12),
+            patch("clew.transcription.whisperx_transcriber._performance_core_count", return_value=12),
             patch("os.cpu_count", return_value=16),
         ):
             assert default_cpu_threads() == 12
 
     def test_falls_back_to_logical_cores_when_performance_count_unavailable(self):
         with (
-            patch("ownscribe.transcription.whisperx_transcriber._performance_core_count", return_value=None),
+            patch("clew.transcription.whisperx_transcriber._performance_core_count", return_value=None),
             patch("os.cpu_count", return_value=8),
         ):
             assert default_cpu_threads() == 8
 
     def test_never_returns_less_than_one(self):
         with (
-            patch("ownscribe.transcription.whisperx_transcriber._performance_core_count", return_value=None),
+            patch("clew.transcription.whisperx_transcriber._performance_core_count", return_value=None),
             patch("os.cpu_count", return_value=None),
         ):
             assert default_cpu_threads() >= 1
@@ -51,7 +51,7 @@ class TestThreadsArePassedToWhisperx:
 
         fake_whisperx = MagicMock()
         with (
-            patch("ownscribe.transcription.whisperx_transcriber.default_cpu_threads", return_value=12),
+            patch("clew.transcription.whisperx_transcriber.default_cpu_threads", return_value=12),
             patch.dict("sys.modules", {"whisperx": fake_whisperx}),
         ):
             transcriber._load_model()

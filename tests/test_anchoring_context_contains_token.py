@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ownscribe.summarization.anchoring import anchor_summary_claims
+from clew.summarization.anchoring import anchor_summary_claims
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def test_all_anchors_contain_their_token(real_meeting_data):
 
 def test_context_centered_on_long_line():
     """Context window should be centered on token for lines > 100 chars."""
-    from ownscribe.summarization.anchoring import _center_context_on_token
+    from clew.summarization.anchoring import _center_context_on_token
 
     long_line = (
         "Et sur la partie architecture, du coup, là, maintenant, "
@@ -76,7 +76,7 @@ def test_context_centered_on_long_line():
 
 def test_context_centered_on_short_line():
     """Short lines should not be truncated."""
-    from ownscribe.summarization.anchoring import _center_context_on_token
+    from clew.summarization.anchoring import _center_context_on_token
 
     short_line = "Gary discussed the bug"
     context = _center_context_on_token(short_line, "Gary", window_size=100)
@@ -87,7 +87,7 @@ def test_context_centered_on_short_line():
 
 def test_context_token_at_end():
     """Token at end of long line should still be included."""
-    from ownscribe.summarization.anchoring import _center_context_on_token
+    from clew.summarization.anchoring import _center_context_on_token
 
     line_with_token_at_end = "A" * 90 + " Lambda"
     context = _center_context_on_token(line_with_token_at_end, "Lambda", window_size=100)
@@ -98,7 +98,7 @@ def test_context_token_at_end():
 
 def test_context_token_at_start():
     """Token at start of long line should still be included."""
-    from ownscribe.summarization.anchoring import _center_context_on_token
+    from clew.summarization.anchoring import _center_context_on_token
 
     line_with_token_at_start = "Lambda " + "B" * 120
     context = _center_context_on_token(line_with_token_at_start, "Lambda", window_size=100)

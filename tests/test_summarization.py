@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ownscribe.config import Config, SummarizationConfig, TemplateConfig
-from ownscribe.summarization import create_summarizer
-from ownscribe.summarization.prompts import (
+from clew.config import Config, SummarizationConfig, TemplateConfig
+from clew.summarization import create_summarizer
+from clew.summarization.prompts import (
     LECTURE_SUMMARY_SYSTEM,
     clean_response,
 )
@@ -20,15 +20,15 @@ class TestCreateSummarizerMissingDeps:
     @pytest.mark.parametrize(
         "backend,module,extra",
         [
-            ("ollama", "ownscribe.summarization.ollama_summarizer", "ollama"),
-            ("openai", "ownscribe.summarization.openai_summarizer", "openai"),
+            ("ollama", "clew.summarization.ollama_summarizer", "ollama"),
+            ("openai", "clew.summarization.openai_summarizer", "openai"),
         ],
     )
     def test_missing_backend_dep(self, backend, module, extra):
         config = Config()
         config.summarization.backend = backend
 
-        with patch.dict("sys.modules", {module: None}), pytest.raises(ImportError, match=f"ownscribe\\[{extra}\\]"):
+        with patch.dict("sys.modules", {module: None}), pytest.raises(ImportError, match=f"clew\\[{extra}\\]"):
             create_summarizer(config)
 
 
@@ -83,7 +83,7 @@ class TestOllamaCustomPrompts:
             ),
         }
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config, templates)
         summarizer.summarize("Alice: Hello")
@@ -127,7 +127,7 @@ class TestOpenAICustomPrompts:
             ),
         }
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config, templates)
         summarizer.summarize("Alice: Hello")
@@ -157,7 +157,7 @@ class TestOllamaTemplatePassthrough:
             template="lecture",
         )
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         summarizer.summarize("Today we discuss photosynthesis.")
@@ -196,7 +196,7 @@ class TestOpenAITemplatePassthrough:
             template="lecture",
         )
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         summarizer.summarize("Today we discuss photosynthesis.")
@@ -222,7 +222,7 @@ class TestOllamaGenerateTitle:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         result = summarizer.generate_title("The meeting covered Q3 budget.")
@@ -243,7 +243,7 @@ class TestOllamaGenerateTitle:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         result = summarizer.generate_title("summary text")
@@ -264,7 +264,7 @@ class TestOllamaSummarizer:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         result = summarizer.summarize("Alice: Hello\nBob: Hi")
@@ -279,7 +279,7 @@ class TestOllamaSummarizer:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         assert summarizer.is_available() is True
@@ -287,7 +287,7 @@ class TestOllamaSummarizer:
     def test_is_available_failure(self):
         config = SummarizationConfig(host="http://localhost:1", backend="ollama", model="test-model")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         assert summarizer.is_available() is False
@@ -315,7 +315,7 @@ class TestOpenAIGenerateTitle:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         result = summarizer.generate_title("The meeting covered Q3 budget.")
@@ -344,7 +344,7 @@ class TestOpenAIGenerateTitle:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         result = summarizer.generate_title("summary text")
@@ -373,7 +373,7 @@ class TestOpenAISummarizer:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         result = summarizer.summarize("Alice: Hello\nBob: Hi")
@@ -386,7 +386,7 @@ class TestOpenAISummarizer:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         assert summarizer.is_available() is True
@@ -394,7 +394,7 @@ class TestOpenAISummarizer:
     def test_is_available_failure(self):
         config = SummarizationConfig(host="http://localhost:1", backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         assert summarizer.is_available() is False
@@ -419,7 +419,7 @@ class TestOpenAISummarizer:
 
         config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
 
-        from ownscribe.summarization.openai_summarizer import OpenAISummarizer
+        from clew.summarization.openai_summarizer import OpenAISummarizer
 
         summarizer = OpenAISummarizer(config)
         result = summarizer.summarize("transcript text")
@@ -445,11 +445,11 @@ def mock_llama():
     llm_instance = MagicMock()
     with (
         patch(
-            "ownscribe.summarization.llama_cpp_summarizer._ensure_model",
+            "clew.summarization.llama_cpp_summarizer._ensure_model",
             return_value="/fake/model.gguf",
         ),
         patch(
-            "ownscribe.summarization.llama_cpp_summarizer.Llama",
+            "clew.summarization.llama_cpp_summarizer.Llama",
             return_value=llm_instance,
             create=True,
         ) as llama_cls,
@@ -470,7 +470,7 @@ class TestLlamaCppSummarizer:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.summarize("Alice: Hello\nBob: Hi")
@@ -486,7 +486,7 @@ class TestLlamaCppSummarizer:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.summarize("transcript")
@@ -498,7 +498,7 @@ class TestLlamaCppSummarizer:
     def test_is_available(self, mock_llama):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         assert summarizer.is_available() is True
@@ -506,7 +506,7 @@ class TestLlamaCppSummarizer:
     def test_is_available_without_llama_cpp(self):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         with patch.dict("sys.modules", {"llama_cpp": None}):
@@ -521,7 +521,7 @@ class TestLlamaCppGenerateTitle:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.generate_title("The meeting covered Q3 budget.")
@@ -536,7 +536,7 @@ class TestLlamaCppGenerateTitle:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.generate_title("summary text")
@@ -553,7 +553,7 @@ class TestLlamaCppChat:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.chat("system", "user")
@@ -567,7 +567,7 @@ class TestLlamaCppChat:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.chat("system", "user", json_mode=True)
@@ -587,7 +587,7 @@ class TestLlamaCppChat:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         result = summarizer.chat("system", "user", json_mode=True, json_schema=schema)
@@ -610,7 +610,7 @@ class TestLlamaCppCustomPrompts:
             ),
         }
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config, templates)
         summarizer.summarize("Alice: Hello")
@@ -628,7 +628,7 @@ class TestLlamaCppTemplatePassthrough:
 
         config = SummarizationConfig(backend="local", model="phi-4-mini", template="lecture")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         summarizer.summarize("Today we discuss photosynthesis.")
@@ -645,7 +645,7 @@ class TestLlamaCppClose:
     def test_close_frees_loaded_model(self, mock_llama):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         summarizer._get_llm()
@@ -657,7 +657,7 @@ class TestLlamaCppClose:
     def test_close_is_idempotent(self, mock_llama):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         summarizer._get_llm()
@@ -669,7 +669,7 @@ class TestLlamaCppClose:
     def test_close_without_load_is_noop(self, mock_llama):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         summarizer.close()
@@ -680,7 +680,7 @@ class TestLlamaCppClose:
         mock_llama.close.side_effect = RuntimeError("boom")
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         summarizer = LlamaCppSummarizer(config)
         summarizer._get_llm()
@@ -691,7 +691,7 @@ class TestLlamaCppClose:
     def test_context_manager_closes_model(self, mock_llama):
         config = SummarizationConfig(backend="local", model="phi-4-mini")
 
-        from ownscribe.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
 
         with LlamaCppSummarizer(config) as summarizer:
             assert summarizer._get_llm() is mock_llama
@@ -705,7 +705,7 @@ class TestSummarizerCloseContract:
     def test_ollama_close_is_noop_and_context_manager(self):
         config = SummarizationConfig(host="http://localhost:1", backend="ollama", model="x")
 
-        from ownscribe.summarization.ollama_summarizer import OllamaSummarizer
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
 
         summarizer = OllamaSummarizer(config)
         with summarizer as entered:
@@ -721,7 +721,7 @@ class TestEnsureModel:
             "huggingface_hub.hf_hub_download",
             return_value="/fake/path.gguf",
         ) as mock_dl:
-            from ownscribe.summarization.llama_cpp_summarizer import _ensure_model
+            from clew.summarization.llama_cpp_summarizer import _ensure_model
 
             result = _ensure_model("hf:myorg/myrepo/model.gguf")
 
@@ -729,7 +729,7 @@ class TestEnsureModel:
         assert str(result) == "/fake/path.gguf"
 
     def test_hf_prefix_invalid(self):
-        from ownscribe.summarization.llama_cpp_summarizer import _ensure_model
+        from clew.summarization.llama_cpp_summarizer import _ensure_model
 
         with pytest.raises(ValueError, match="Invalid HuggingFace model spec"):
             _ensure_model("hf:noslash")
@@ -739,7 +739,7 @@ class TestEnsureModel:
             "huggingface_hub.hf_hub_download",
             return_value="/fake/phi.gguf",
         ) as mock_dl:
-            from ownscribe.summarization.llama_cpp_summarizer import _ensure_model
+            from clew.summarization.llama_cpp_summarizer import _ensure_model
 
             result = _ensure_model("phi-4-mini")
 
@@ -753,13 +753,13 @@ class TestEnsureModel:
         model_file = tmp_path / "my_model.gguf"
         model_file.touch()
 
-        from ownscribe.summarization.llama_cpp_summarizer import _ensure_model
+        from clew.summarization.llama_cpp_summarizer import _ensure_model
 
         result = _ensure_model(str(model_file))
         assert result == model_file
 
     def test_unknown_model(self):
-        from ownscribe.summarization.llama_cpp_summarizer import _ensure_model
+        from clew.summarization.llama_cpp_summarizer import _ensure_model
 
         with pytest.raises(FileNotFoundError, match="Unknown model"):
             _ensure_model("nonexistent-model")

@@ -7,8 +7,8 @@ import json
 import numpy as np
 import soundfile as sf
 
-from ownscribe.audio.envelope import generate_envelope_from_file
-from ownscribe.pipeline import _generate_and_save_envelope
+from clew.audio.envelope import generate_envelope_from_file
+from clew.pipeline import _generate_and_save_envelope
 
 
 class TestEnvelopeWriteBehavior:

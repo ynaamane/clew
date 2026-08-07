@@ -5,7 +5,7 @@ from __future__ import annotations
 import signal
 from unittest import mock
 
-from ownscribe.audio.base import AudioRecorder
+from clew.audio.base import AudioRecorder
 
 
 class TestBaseClassMuteDefaults:
@@ -53,9 +53,9 @@ class TestCoreAudioRecorderMute:
     """CoreAudioRecorder sends SIGUSR1 and tracks mute state."""
 
     def _make_recorder(self, mic: bool = True) -> object:
-        from ownscribe.audio.coreaudio import CoreAudioRecorder
+        from clew.audio.coreaudio import CoreAudioRecorder
 
-        with mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=None):
+        with mock.patch("clew.audio.coreaudio._find_binary", return_value=None):
             return CoreAudioRecorder(mic=mic)
 
     def test_toggle_mute_sends_sigusr1(self):

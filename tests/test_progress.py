@@ -6,7 +6,7 @@ import io
 import json
 from unittest import mock
 
-from ownscribe.progress import (
+from clew.progress import (
     _BRAILLE,
     DownloadProgressEvent,
     DownloadProgressWriter,
@@ -68,7 +68,7 @@ class TestDownloadProgressFraction:
         assert download_event_fraction(event) == 0.75
 
     def test_clamps_fraction(self):
-        from ownscribe.progress import DownloadProgressEvent
+        from clew.progress import DownloadProgressEvent
 
         assert download_event_fraction(DownloadProgressEvent(percent=150)) == 1.0
         assert download_event_fraction(DownloadProgressEvent(percent=-5)) == 0.0
@@ -130,7 +130,7 @@ class TestPipelineProgressDetails:
         progress.begin("preparing_models")
         progress.update("preparing_models", 0.1)
 
-        with mock.patch("ownscribe.progress.time.time", return_value=0.0):
+        with mock.patch("clew.progress.time.time", return_value=0.0):
             progress._render_all(final=False)
 
         output = progress._stderr.getvalue()

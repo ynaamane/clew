@@ -8,7 +8,7 @@ from unittest import mock
 
 import pytest
 
-from ownscribe.config import BILINGUAL_INITIAL_PROMPT, Config, OutputConfig, _merge_toml, ensure_config_file
+from clew.config import BILINGUAL_INITIAL_PROMPT, Config, OutputConfig, _merge_toml, ensure_config_file
 
 
 class TestDefaults:
@@ -128,11 +128,11 @@ class TestCpuThreadsValidation:
             _merge_toml(cfg, data_over)
 
     def test_config_toml_contains_cpu_threads_comment(self, tmp_path):
-        config_dir = tmp_path / "ownscribe"
+        config_dir = tmp_path / "clew"
         config_path = config_dir / "config.toml"
         with (
-            mock.patch("ownscribe.config.CONFIG_DIR", config_dir),
-            mock.patch("ownscribe.config.CONFIG_PATH", config_path),
+            mock.patch("clew.config.CONFIG_DIR", config_dir),
+            mock.patch("clew.config.CONFIG_PATH", config_path),
         ):
             result = ensure_config_file()
         written = result.read_text()
@@ -239,7 +239,7 @@ class TestEnvOverrides:
     def test_hf_token_from_env(self):
         with (
             mock.patch.dict(os.environ, {"HF_TOKEN": "hf_test123"}),
-            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
         ):
             mock_path.exists.return_value = False
             cfg = Config.load()
@@ -248,7 +248,7 @@ class TestEnvOverrides:
     def test_ollama_host_from_env(self):
         with (
             mock.patch.dict(os.environ, {"OLLAMA_HOST": "http://remote:11434"}),
-            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
         ):
             mock_path.exists.return_value = False
             cfg = Config.load()
@@ -256,8 +256,28 @@ class TestEnvOverrides:
 
     def test_progress_mode_from_env(self):
         with (
-            mock.patch.dict(os.environ, {"OWNSCRIBE_PROGRESS": "json"}),
-            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+            mock.patch.dict(os.environ, {"CLEW_PROGRESS": "json"}),
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
+        ):
+            mock_path.exists.return_value = False
+            cfg = Config.load()
+        assert cfg.progress_mode == "json"
+
+    def test_progress_mode_from_legacy_env_var(self):
+        """OWNSCRIBE_PROGRESS is the pre-rename name; keep reading it so muscle-memory
+        env vars from the ownscribe era keep working."""
+        with (
+            mock.patch.dict(os.environ, {"OWNSCRIBE_PROGRESS": "json"}, clear=True),
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
+        ):
+            mock_path.exists.return_value = False
+            cfg = Config.load()
+        assert cfg.progress_mode == "json"
+
+    def test_progress_mode_new_env_var_takes_precedence_over_legacy(self):
+        with (
+            mock.patch.dict(os.environ, {"CLEW_PROGRESS": "json", "OWNSCRIBE_PROGRESS": "tui"}),
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
         ):
             mock_path.exists.return_value = False
             cfg = Config.load()
@@ -266,7 +286,7 @@ class TestEnvOverrides:
     def test_progress_mode_default_is_tui_without_env(self):
         with (
             mock.patch.dict(os.environ, {}, clear=True),
-            mock.patch("ownscribe.config.CONFIG_PATH") as mock_path,
+            mock.patch("clew.config.CONFIG_PATH") as mock_path,
         ):
             mock_path.exists.return_value = False
             cfg = Config.load()
@@ -275,11 +295,11 @@ class TestEnvOverrides:
 
 class TestEnsureConfigFile:
     def test_creates_file_when_missing(self, tmp_path):
-        config_dir = tmp_path / "ownscribe"
+        config_dir = tmp_path / "clew"
         config_path = config_dir / "config.toml"
         with (
-            mock.patch("ownscribe.config.CONFIG_DIR", config_dir),
-            mock.patch("ownscribe.config.CONFIG_PATH", config_path),
+            mock.patch("clew.config.CONFIG_DIR", config_dir),
+            mock.patch("clew.config.CONFIG_PATH", config_path),
         ):
             result = ensure_config_file()
         assert result.exists()
@@ -289,13 +309,13 @@ class TestEnsureConfigFile:
         assert "__BILINGUAL_INITIAL_PROMPT__" not in written
 
     def test_does_not_overwrite_existing(self, tmp_path):
-        config_dir = tmp_path / "ownscribe"
+        config_dir = tmp_path / "clew"
         config_dir.mkdir()
         config_path = config_dir / "config.toml"
         config_path.write_text("# custom config\n")
         with (
-            mock.patch("ownscribe.config.CONFIG_DIR", config_dir),
-            mock.patch("ownscribe.config.CONFIG_PATH", config_path),
+            mock.patch("clew.config.CONFIG_DIR", config_dir),
+            mock.patch("clew.config.CONFIG_PATH", config_path),
         ):
             ensure_config_file()
         assert config_path.read_text() == "# custom config\n"
@@ -303,10 +323,10 @@ class TestEnsureConfigFile:
 
 class TestResolvedDir:
     def test_expands_tilde(self):
-        cfg = OutputConfig(dir="~/ownscribe")
+        cfg = OutputConfig(dir="~/clew")
         resolved = cfg.resolved_dir
         assert "~" not in str(resolved)
-        assert str(resolved).endswith("ownscribe")
+        assert str(resolved).endswith("clew")
 
     def test_absolute_path_unchanged(self):
         cfg = OutputConfig(dir="/tmp/notes")

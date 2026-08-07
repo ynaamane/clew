@@ -1,7 +1,7 @@
 """Tests for prompt templates."""
 
-from ownscribe.config import TemplateConfig
-from ownscribe.summarization.prompts import (
+from clew.config import TemplateConfig
+from clew.summarization.prompts import (
     MEETING_SUMMARY_PROMPT,
     MEETING_SUMMARY_SYSTEM,
     TEMPLATES,

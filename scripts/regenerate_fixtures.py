@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run python3
 """Regenerate /tmp/ms-fixture/* from production functions.
 
-Sources the real 27-July meeting from ~/ownscribe/2026-07-27_1536_* (READ-ONLY),
+Sources the real 27-July meeting from ~/clew/2026-07-27_1536_* (READ-ONLY),
 generates anchors + envelope via production functions (generate_envelope_from_file,
 anchor_summary_claims, save_anchors), writes to /tmp/ms-fixture/ for both
 EnvelopeDocumentTests (Swift) and test_anchoring_context_contains_token (Python).
@@ -15,13 +15,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ownscribe.audio.envelope import generate_envelope_from_file
-from ownscribe.summarization.anchoring import anchor_summary_claims
-from ownscribe.summarization.anchors_output import save_anchors
+from clew.audio.envelope import generate_envelope_from_file
+from clew.summarization.anchoring import anchor_summary_claims
+from clew.summarization.anchors_output import save_anchors
 
 
 def main() -> None:
-    source_dir = Path.home() / "ownscribe" / "2026-07-27_1536_project-technical-review-key-points"
+    source_dir = Path.home() / "clew" / "2026-07-27_1536_project-technical-review-key-points"
 
     if not source_dir.exists():
         print(f"Error: source directory not found: {source_dir}", file=sys.stderr)

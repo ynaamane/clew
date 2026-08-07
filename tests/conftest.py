@@ -1,4 +1,4 @@
-"""Shared fixtures for ownscribe tests."""
+"""Shared fixtures for clew tests."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from ownscribe.transcription.models import Segment, TranscriptResult
+from clew.transcription.models import Segment, TranscriptResult
 
 
 @pytest.fixture

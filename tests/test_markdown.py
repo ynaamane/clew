@@ -1,6 +1,6 @@
 """Tests for markdown output formatter."""
 
-from ownscribe.output.markdown import _format_time, format_summary, format_transcript
+from clew.output.markdown import _format_time, format_summary, format_transcript
 
 
 class TestFormatTime:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ownscribe.summarization.anchoring import anchor_summary_claims
+from clew.summarization.anchoring import anchor_summary_claims
 
 
 def test_rare_token_anchoring_on_english_summary_french_transcript():
@@ -194,8 +194,8 @@ We had a long discussion about the roadmap.
 
 
 def test_anchoring_contract_with_the_real_formatter():
-    from ownscribe.output.markdown import format_transcript
-    from ownscribe.transcription.models import Segment, TranscriptResult, Word
+    from clew.output.markdown import format_transcript
+    from clew.transcription.models import Segment, TranscriptResult, Word
 
     segments = [
         Segment(
@@ -371,8 +371,8 @@ def test_pipeline_passes_a_timestamped_transcript_not_flat_text(output_format):
     and a markdown-only test cannot see that."""
     from unittest import mock
 
-    from ownscribe.config import Config
-    from ownscribe.transcription.models import Segment, TranscriptResult
+    from clew.config import Config
+    from clew.transcription.models import Segment, TranscriptResult
 
     result = TranscriptResult(
         segments=[
@@ -388,7 +388,7 @@ def test_pipeline_passes_a_timestamped_transcript_not_flat_text(output_format):
     config.diarization.enabled = False
     config.output.format = output_format
 
-    import ownscribe.pipeline as pipeline
+    import clew.pipeline as pipeline
 
     fake_transcriber = mock.MagicMock()
     fake_transcriber.transcribe.return_value = result

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest import mock
 
-from ownscribe.speakers.base import DEFAULT_MATCH_THRESHOLD, Voiceprint, VoiceprintDB
-from ownscribe.speakers.matching import assign_speaker_names, cosine_similarity, match_speaker
+from clew.speakers.base import DEFAULT_MATCH_THRESHOLD, Voiceprint, VoiceprintDB
+from clew.speakers.matching import assign_speaker_names, cosine_similarity, match_speaker
 
 
 class TestVoiceprintDB:
@@ -59,7 +59,7 @@ class TestVoiceprintDB:
         assert path.exists()
 
     def test_default_path_is_patchable_at_call_time(self, tmp_path):
-        import ownscribe.speakers.base as base_module
+        import clew.speakers.base as base_module
 
         fake_path = tmp_path / "voiceprints.json"
         fake_path.write_text('{"voiceprints": [{"name": "Patched", "embedding": [1.0]}]}')

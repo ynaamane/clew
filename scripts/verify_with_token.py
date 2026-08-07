@@ -50,9 +50,9 @@ def check_community1_real_diarization(hf_token: str, clip: Path | None) -> Check
     if clip is None:
         return _skip(name, "no --clip provided")
     try:
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.progress import PipelineProgress
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.progress import PipelineProgress
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar = DiarizationConfig(enabled=True, hf_token=hf_token)
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=PipelineProgress())
@@ -74,8 +74,8 @@ def check_enrollment_separation(hf_token: str, clip_a: Path | None, clip_b: Path
     if clip_a is None or clip_b is None:
         return _skip(name, "needs both --clip-a and --clip-b (short, single-speaker reference clips)")
     try:
-        from ownscribe.speakers.embedding import SpeakerEmbedder
-        from ownscribe.speakers.matching import cosine_similarity
+        from clew.speakers.embedding import SpeakerEmbedder
+        from clew.speakers.matching import cosine_similarity
 
         embedder = SpeakerEmbedder(hf_token)
         embedding_a1 = embedder.embed_file(clip_a)
@@ -109,11 +109,11 @@ def check_standalone_and_in_meeting_embedding_space(hf_token: str, clip: Path | 
     if clip is None:
         return _skip(name, "needs --clip (a single-speaker clip that also works as a diarization input)")
     try:
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.progress import PipelineProgress
-        from ownscribe.speakers.embedding import SpeakerEmbedder
-        from ownscribe.speakers.matching import cosine_similarity
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.progress import PipelineProgress
+        from clew.speakers.embedding import SpeakerEmbedder
+        from clew.speakers.matching import cosine_similarity
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         embedder = SpeakerEmbedder(hf_token)
         standalone_embedding = embedder.embed_file(clip)
@@ -146,10 +146,10 @@ def check_owner_mic_labeling(clip_system: Path | None, clip_mic: Path | None) ->
     if clip_system is None or clip_mic is None:
         return _skip(name, "needs --clip-system and --clip-mic (a real captured system.wav + mic.wav pair)")
     try:
-        from ownscribe.config import Config
-        from ownscribe.pipeline import _transcribe_dual_track
-        from ownscribe.progress import PipelineProgress
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import Config
+        from clew.pipeline import _transcribe_dual_track
+        from clew.progress import PipelineProgress
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         config = Config()
         transcriber = WhisperXTranscriber(config.transcription, config.diarization, progress=PipelineProgress())
@@ -166,13 +166,13 @@ def check_owner_mic_labeling(clip_system: Path | None, clip_mic: Path | None) ->
 def check_canary_mlx_engine(clip_fr: Path | None) -> CheckResult:
     name = "Canary MLX engine transcribes a real FR clip with source_lang (no involuntary FR->EN)"
     try:
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
     except ImportError:
         return _skip(name, "CanaryMlxTranscriber not built yet (Task#8 is paused pending team-lead direction)")
     if clip_fr is None:
         return _skip(name, "needs --clip-fr")
     try:
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber()
         result = transcriber.transcribe(clip_fr)
@@ -195,9 +195,9 @@ def check_mps_vs_cpu_diarization(hf_token: str, clip: Path | None) -> CheckResul
         if not torch.backends.mps.is_available():
             return _skip(name, "MPS not available on this machine")
 
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.progress import PipelineProgress
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.progress import PipelineProgress
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar_cpu = DiarizationConfig(enabled=True, hf_token=hf_token)
         cpu_result = WhisperXTranscriber(TranscriptionConfig(), diar_cpu, progress=PipelineProgress()).transcribe(clip)
@@ -206,7 +206,7 @@ def check_mps_vs_cpu_diarization(hf_token: str, clip: Path | None) -> CheckResul
         from unittest import mock
 
         with mock.patch(
-            "ownscribe.transcription.whisperx_transcriber.WhisperXTranscriber._load_diarization_pipeline"
+            "clew.transcription.whisperx_transcriber.WhisperXTranscriber._load_diarization_pipeline"
         ) as mock_load:
             from whisperx.diarize import DiarizationPipeline
 

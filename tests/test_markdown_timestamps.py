@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-from ownscribe.output.markdown import format_transcript
-from ownscribe.transcription.models import Segment, TranscriptResult
+from clew.output.markdown import format_transcript
+from clew.transcription.models import Segment, TranscriptResult
 
 TIMESTAMPED_LINE = re.compile(r"^\[\d+:\d{2}\]\s+\S")
 SPEAKER_HEADER = re.compile(r"^\*\*[^*]+\*\*\s+\[\d+:\d{2}\]$")

@@ -6,13 +6,14 @@ from unittest import mock
 
 from click.testing import CliRunner
 
-from ownscribe.cli import cli
-from ownscribe.config import Config
+import clew.cli as cli_module
+from clew.cli import cli
+from clew.config import Config
 
 
 def _mock_config(config: Config | None = None):
     """Return a mock that makes Config.load() return a default Config."""
-    return mock.patch("ownscribe.cli.Config.load", return_value=config or Config())
+    return mock.patch("clew.cli.Config.load", return_value=config or Config())
 
 
 class TestMainCommand:
@@ -24,7 +25,7 @@ class TestMainCommand:
 
     def test_no_summarize_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--no-summarize"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -32,7 +33,7 @@ class TestMainCommand:
 
     def test_mic_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--mic"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -40,7 +41,7 @@ class TestMainCommand:
 
     def test_device_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--device", "USB Mic"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -49,7 +50,7 @@ class TestMainCommand:
 
     def test_model_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--model", "large-v3"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -57,7 +58,7 @@ class TestMainCommand:
 
     def test_language_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--language", "de"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -65,7 +66,7 @@ class TestMainCommand:
 
     def test_silence_timeout_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--silence-timeout", "60"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -73,7 +74,7 @@ class TestMainCommand:
 
     def test_silence_timeout_disable(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--silence-timeout", "0"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -133,13 +134,13 @@ class TestSubcommandHelp:
         runner = CliRunner()
         result = runner.invoke(cli, ["cleanup", "--help"])
         assert result.exit_code == 0
-        assert "Remove ownscribe data from disk" in result.output
+        assert "Remove clew data from disk" in result.output
 
 
 class TestKeepRecordingFlag:
     def test_keep_recording_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--no-keep-recording"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -147,7 +148,7 @@ class TestKeepRecordingFlag:
 
     def test_keep_recording_default_is_true(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, [])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -157,7 +158,7 @@ class TestKeepRecordingFlag:
 class TestProgressFlag:
     def test_progress_json_flag_sets_config(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, ["--progress", "json"])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -165,7 +166,7 @@ class TestProgressFlag:
 
     def test_progress_default_is_tui(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_pipeline") as mock_run:
+        with _mock_config(), mock.patch("clew.pipeline.run_pipeline") as mock_run:
             result = runner.invoke(cli, [])
             assert result.exit_code == 0
             config = mock_run.call_args[0][0]
@@ -182,7 +183,7 @@ class TestProgressFlag:
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
 
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_transcribe") as mock_transcribe:
+        with _mock_config(), mock.patch("clew.pipeline.run_transcribe") as mock_transcribe:
             result = runner.invoke(cli, ["--progress", "json", "transcribe", str(audio_path)])
             assert result.exit_code == 0
             config = mock_transcribe.call_args[0][0]
@@ -192,7 +193,7 @@ class TestProgressFlag:
 class TestWarmupCommand:
     def test_warmup_invokes_pipeline_with_overrides(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_warmup") as mock_warmup:
+        with _mock_config(), mock.patch("clew.pipeline.run_warmup") as mock_warmup:
             result = runner.invoke(cli, ["warmup", "--model", "large-v3", "--language", "de", "--with-diarization"])
 
         assert result.exit_code == 0
@@ -205,7 +206,7 @@ class TestWarmupCommand:
 class TestResumeCommand:
     def test_resume_invokes_pipeline_with_overrides(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+        with _mock_config(), mock.patch("clew.pipeline.run_resume") as mock_resume:
             result = runner.invoke(
                 cli,
                 ["resume", str(tmp_path), "--model", "large-v3", "--language", "fr", "--template", "brief"],
@@ -220,7 +221,7 @@ class TestResumeCommand:
 
     def test_resume_diarize_flag_enables_diarization(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+        with _mock_config(), mock.patch("clew.pipeline.run_resume") as mock_resume:
             result = runner.invoke(cli, ["resume", str(tmp_path), "--diarize"])
 
         assert result.exit_code == 0
@@ -229,7 +230,7 @@ class TestResumeCommand:
 
     def test_resume_without_diarize_flag_does_not_enable_diarization(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_resume") as mock_resume:
+        with _mock_config(), mock.patch("clew.pipeline.run_resume") as mock_resume:
             result = runner.invoke(cli, ["resume", str(tmp_path)])
 
         assert result.exit_code == 0
@@ -246,7 +247,7 @@ class TestResumeCommand:
 class TestReprocessCommand:
     def test_reprocess_invokes_pipeline_with_overrides(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+        with _mock_config(), mock.patch("clew.pipeline.run_reprocess") as mock_reprocess:
             result = runner.invoke(
                 cli,
                 ["reprocess", str(tmp_path), "--model", "large-v3", "--language", "fr", "--template", "brief"],
@@ -261,7 +262,7 @@ class TestReprocessCommand:
 
     def test_reprocess_diarize_flag_enables_diarization(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+        with _mock_config(), mock.patch("clew.pipeline.run_reprocess") as mock_reprocess:
             result = runner.invoke(cli, ["reprocess", str(tmp_path), "--diarize"])
 
         assert result.exit_code == 0
@@ -270,7 +271,7 @@ class TestReprocessCommand:
 
     def test_reprocess_without_diarize_flag_does_not_enable_diarization(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_reprocess") as mock_reprocess:
+        with _mock_config(), mock.patch("clew.pipeline.run_reprocess") as mock_reprocess:
             result = runner.invoke(cli, ["reprocess", str(tmp_path)])
 
         assert result.exit_code == 0
@@ -287,7 +288,7 @@ class TestReprocessCommand:
 class TestPurgeCommand:
     def test_purge_default_forwards_none_and_false(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+        with _mock_config(), mock.patch("clew.pipeline.run_purge") as mock_purge:
             result = runner.invoke(cli, ["purge"])
 
         assert result.exit_code == 0
@@ -299,7 +300,7 @@ class TestPurgeCommand:
 
     def test_purge_older_than_and_dry_run_flags(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+        with _mock_config(), mock.patch("clew.pipeline.run_purge") as mock_purge:
             result = runner.invoke(cli, ["purge", "--older-than", "14", "--dry-run"])
 
         assert result.exit_code == 0
@@ -310,7 +311,7 @@ class TestPurgeCommand:
 
     def test_purge_all_flag(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_purge") as mock_purge:
+        with _mock_config(), mock.patch("clew.pipeline.run_purge") as mock_purge:
             result = runner.invoke(cli, ["purge", "--all"])
 
         assert result.exit_code == 0
@@ -328,7 +329,7 @@ class TestBackfillCommand:
 
     def test_backfill_with_directory_forwards_it(self, tmp_path):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_backfill") as mock_backfill:
+        with _mock_config(), mock.patch("clew.pipeline.run_backfill") as mock_backfill:
             result = runner.invoke(cli, ["backfill", str(tmp_path)])
 
         assert result.exit_code == 0
@@ -338,7 +339,7 @@ class TestBackfillCommand:
 
     def test_backfill_without_directory_forwards_none(self):
         runner = CliRunner()
-        with _mock_config(), mock.patch("ownscribe.pipeline.run_backfill") as mock_backfill:
+        with _mock_config(), mock.patch("clew.pipeline.run_backfill") as mock_backfill:
             result = runner.invoke(cli, ["backfill"])
 
         assert result.exit_code == 0
@@ -369,9 +370,9 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
-            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -400,9 +401,9 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
-            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -425,8 +426,8 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._CACHE_DIR", str(cache_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--config", "--yes"])
 
@@ -460,9 +461,9 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(tmp_path / "no-config")),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(tmp_path / "no-cache")),
-            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(tmp_path / "no-voiceprints")),
+            mock.patch("clew.cli._CONFIG_DIR", str(tmp_path / "no-config")),
+            mock.patch("clew.cli._CACHE_DIR", str(tmp_path / "no-cache")),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(tmp_path / "no-voiceprints")),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -471,7 +472,7 @@ class TestCleanup:
 
     def test_all_yes_removes_voiceprints_dir(self, tmp_path):
         """cleanup --all claims to remove everything; voiceprints are biometric
-        data and must not survive it (config.py targets ~/.config/ownscribe,
+        data and must not survive it (config.py targets ~/.config/clew,
         but voiceprints live in ~/.config/meeting-scribe/voiceprints -
         speakers/base.py)."""
         config_dir = tmp_path / "config"
@@ -488,9 +489,9 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
-            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir), create=True),
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(voiceprint_dir), create=True),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -516,9 +517,9 @@ class TestCleanup:
         runner = CliRunner()
         with (
             _mock_config(cfg),
-            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
-            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
-            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--yes"])
 
@@ -527,11 +528,288 @@ class TestCleanup:
         assert "Removed Voiceprints" in result.output
 
 
+class TestCliNeverMigrates:
+    """The `cli` Click group must never run the legacy-path migration itself --
+    only `main()` does, deliberately, so CliRunner-driven tests (this whole file)
+    can never trigger a real filesystem move. This is the regression guard for
+    that design; see main()'s docstring in clew/cli.py."""
+
+    def test_invoking_cli_never_calls_migrate_legacy_paths(self):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("clew.cli.migrate_legacy_paths") as mock_migrate:
+            runner.invoke(cli, ["--help"])
+            runner.invoke(cli, ["apps"])
+            runner.invoke(cli, ["cleanup", "--help"])
+        mock_migrate.assert_not_called()
+
+
+class TestMigrateDir:
+    """Unit tests for the low-level move-once-if-safe helper. Always uses tmp_path
+    on both sides -- never a real HOME path -- per this repo's rule that a test
+    must never touch real user data."""
+
+    def test_moves_old_to_new_when_new_absent(self, tmp_path):
+        old = tmp_path / "old"
+        old.mkdir()
+        (old / "file.txt").write_text("data")
+        new = tmp_path / "new"
+
+        cli_module._migrate_dir(str(old), str(new), "thing")
+
+        assert not old.exists()
+        assert new.exists()
+        assert (new / "file.txt").read_text() == "data"
+
+    def test_does_nothing_when_new_already_exists(self, tmp_path):
+        old = tmp_path / "old"
+        old.mkdir()
+        (old / "file.txt").write_text("old-data")
+        new = tmp_path / "new"
+        new.mkdir()
+        (new / "file.txt").write_text("new-data")
+
+        cli_module._migrate_dir(str(old), str(new), "thing")
+
+        assert old.exists(), "must never delete the old dir when it doesn't move it"
+        assert (old / "file.txt").read_text() == "old-data"
+        assert (new / "file.txt").read_text() == "new-data", "must never overwrite the new dir"
+
+    def test_does_nothing_when_old_absent(self, tmp_path):
+        new = tmp_path / "new"
+
+        cli_module._migrate_dir(str(tmp_path / "no-such-old"), str(new), "thing")
+
+        assert not new.exists()
+
+    def test_creates_new_parent_directory(self, tmp_path):
+        old = tmp_path / "old"
+        old.mkdir()
+        new = tmp_path / "nested" / "new"
+
+        cli_module._migrate_dir(str(old), str(new), "thing")
+
+        assert new.exists()
+
+
+class TestMigrateLegacyPaths:
+    """migrate_legacy_paths() orchestrates the config-dir and voiceprint-dir moves
+    via the module's patchable string constants -- same pattern TestCleanup already
+    uses for _CONFIG_DIR/_CACHE_DIR/_VOICEPRINT_DIR."""
+
+    def test_migrates_config_and_voiceprint_dirs(self, tmp_path):
+        legacy_config = tmp_path / "legacy-config"
+        legacy_config.mkdir()
+        (legacy_config / "config.toml").write_text("[output]\n")
+        new_config = tmp_path / "new-config"
+
+        legacy_voiceprints = tmp_path / "legacy-voiceprints"
+        legacy_voiceprints.mkdir()
+        (legacy_voiceprints / "voiceprints.json").write_text("{}")
+        new_voiceprints = tmp_path / "new-voiceprints"
+
+        with (
+            mock.patch("clew.cli._LEGACY_CONFIG_DIR", str(legacy_config)),
+            mock.patch("clew.cli._CONFIG_DIR", str(new_config)),
+            mock.patch("clew.cli._LEGACY_VOICEPRINT_DIR", str(legacy_voiceprints)),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(new_voiceprints)),
+        ):
+            cli_module.migrate_legacy_paths(None)
+
+        assert not legacy_config.exists()
+        assert (new_config / "config.toml").exists()
+        assert not legacy_voiceprints.exists()
+        assert (new_voiceprints / "voiceprints.json").exists()
+
+    def test_none_cfg_skips_output_dir_migration(self, tmp_path):
+        with (
+            mock.patch("clew.cli._LEGACY_CONFIG_DIR", str(tmp_path / "no-legacy-config")),
+            mock.patch("clew.cli._CONFIG_DIR", str(tmp_path / "no-new-config")),
+            mock.patch("clew.cli._LEGACY_VOICEPRINT_DIR", str(tmp_path / "no-legacy-vp")),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(tmp_path / "no-new-vp")),
+            mock.patch("clew.cli._migrate_output_dir") as mock_output_migrate,
+        ):
+            cli_module.migrate_legacy_paths(None)
+
+        mock_output_migrate.assert_not_called()
+
+    def test_cfg_provided_runs_output_dir_migration(self, tmp_path):
+        with (
+            mock.patch("clew.cli._LEGACY_CONFIG_DIR", str(tmp_path / "no-legacy-config")),
+            mock.patch("clew.cli._CONFIG_DIR", str(tmp_path / "no-new-config")),
+            mock.patch("clew.cli._LEGACY_VOICEPRINT_DIR", str(tmp_path / "no-legacy-vp")),
+            mock.patch("clew.cli._VOICEPRINT_DIR", str(tmp_path / "no-new-vp")),
+            mock.patch("clew.cli._migrate_output_dir") as mock_output_migrate,
+        ):
+            cfg = Config()
+            cli_module.migrate_legacy_paths(cfg)
+
+        mock_output_migrate.assert_called_once_with(cfg)
+
+
+class TestMigrateOutputDir:
+    """_migrate_output_dir() only ever moves the shipped default (old literal or new
+    literal), and only when the user never pointed `output.dir` somewhere else."""
+
+    def test_migrates_when_dir_is_the_legacy_default(self, tmp_path):
+        old = tmp_path / "ownscribe"  # matches the fake expanduser() below
+        old.mkdir()
+        (old / "meeting").mkdir()
+        new = tmp_path / "clew"
+
+        cfg = Config()
+        cfg.output.dir = "~/ownscribe"
+
+        with (
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+            mock.patch("pathlib.Path.expanduser", lambda self: tmp_path / str(self).removeprefix("~/")),
+            mock.patch("clew.cli._rewrite_legacy_output_default_in_config_file") as mock_rewrite,
+        ):
+            cli_module._migrate_output_dir(cfg)
+
+        assert not old.exists()
+        assert new.exists()
+        assert (new / "meeting").exists()
+        assert cfg.output.dir == "~/clew"
+        mock_rewrite.assert_called_once()
+
+    def test_migrates_when_dir_is_already_the_new_default_but_data_is_at_old_location(self, tmp_path):
+        """No config.toml (or one written after the rename): the dataclass default
+        already reads "~/clew", but the user's real data may still physically sit
+        at the pre-rename path. Move it, but don't touch cfg.output.dir (already
+        correct) or rewrite a config file (nothing to rewrite)."""
+        old = tmp_path / "ownscribe"  # matches the fake expanduser() below
+        old.mkdir()
+        new = tmp_path / "clew"
+
+        cfg = Config()
+        assert cfg.output.dir == "~/clew"
+
+        with (
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+            mock.patch("pathlib.Path.expanduser", lambda self: tmp_path / str(self).removeprefix("~/")),
+            mock.patch("clew.cli._rewrite_legacy_output_default_in_config_file") as mock_rewrite,
+        ):
+            cli_module._migrate_output_dir(cfg)
+
+        assert not old.exists()
+        assert new.exists()
+        mock_rewrite.assert_not_called()
+
+    def test_never_touches_a_custom_output_dir(self, tmp_path):
+        custom = tmp_path / "my-custom-notes"
+        custom.mkdir()
+
+        cfg = Config()
+        cfg.output.dir = str(custom)
+
+        with (
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+        ):
+            cli_module._migrate_output_dir(cfg)
+
+        assert custom.exists()
+        assert cfg.output.dir == str(custom)
+
+    def test_does_nothing_when_neither_default_dir_exists(self, tmp_path):
+        cfg = Config()
+        cfg.output.dir = "~/ownscribe"
+
+        with (
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+            mock.patch("pathlib.Path.expanduser", lambda self: tmp_path / str(self).removeprefix("~/")),
+        ):
+            cli_module._migrate_output_dir(cfg)
+
+        assert cfg.output.dir == "~/ownscribe", "nothing to migrate, so nothing should change"
+
+
+class TestRewriteLegacyOutputDefaultInConfigFile:
+    def test_rewrites_the_literal_legacy_default_line(self, tmp_path):
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_path = config_dir / "config.toml"
+        config_path.write_text('[output]\ndir = "~/ownscribe"       # base output directory\nformat = "markdown"\n')
+
+        with (
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+        ):
+            cli_module._rewrite_legacy_output_default_in_config_file()
+
+        written = config_path.read_text()
+        assert 'dir = "~/clew"       # base output directory' in written
+        assert '"~/ownscribe"' not in written
+
+    def test_leaves_a_customized_dir_line_untouched(self, tmp_path):
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_path = config_dir / "config.toml"
+        original = '[output]\ndir = "/Users/someone/my-notes"\n'
+        config_path.write_text(original)
+
+        with (
+            mock.patch("clew.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+        ):
+            cli_module._rewrite_legacy_output_default_in_config_file()
+
+        assert config_path.read_text() == original
+
+    def test_no_op_when_config_file_missing(self, tmp_path):
+        with (
+            mock.patch("clew.cli._CONFIG_DIR", str(tmp_path / "no-config-dir")),
+            mock.patch("clew.cli._LEGACY_OUTPUT_DEFAULT", "~/ownscribe"),
+            mock.patch("clew.cli._NEW_OUTPUT_DEFAULT", "~/clew"),
+        ):
+            cli_module._rewrite_legacy_output_default_in_config_file()  # must not raise
+
+
+class TestMainEntryPoint:
+    """main() is the real console-script entry point (clew/ownscribe both point at
+    it). It must migrate before dispatching to cli(), and it must never let a
+    Config.load() failure prevent the CLI from running (cli() re-loads and reports
+    the real error itself)."""
+
+    def test_migrates_then_loads_config_then_dispatches_to_cli(self):
+        manager = mock.Mock()
+        manager.load.return_value = Config()
+        with (
+            mock.patch("clew.cli.migrate_legacy_paths", manager.migrate),
+            mock.patch("clew.cli.Config.load", manager.load),
+            mock.patch("clew.cli.cli", manager.cli),
+        ):
+            cli_module.main()
+
+        assert manager.mock_calls == [
+            mock.call.migrate(None),
+            mock.call.load(),
+            mock.call.migrate(mock.ANY),
+            mock.call.cli(),
+        ]
+
+    def test_config_load_failure_still_dispatches_to_cli(self):
+        with (
+            mock.patch("clew.cli.migrate_legacy_paths") as mock_migrate,
+            mock.patch("clew.cli.Config.load", side_effect=ValueError("bad config")),
+            mock.patch("clew.cli.cli") as mock_cli,
+        ):
+            cli_module.main()
+
+        mock_cli.assert_called_once()
+        mock_migrate.assert_called_once_with(None)
+
+
 class TestInvalidConfigReporting:
     def test_invalid_config_reports_the_problem_without_a_traceback(self):
         runner = CliRunner()
         with mock.patch(
-            "ownscribe.cli.Config.load",
+            "clew.cli.Config.load",
             side_effect=ValueError("cpu_threads must be a positive integer, got 'not_a_number'"),
         ):
             result = runner.invoke(cli, ["apps"])
@@ -543,7 +821,7 @@ class TestInvalidConfigReporting:
 
     def test_invalid_config_does_not_leak_the_exception_type(self):
         runner = CliRunner()
-        with mock.patch("ownscribe.cli.Config.load", side_effect=ValueError("bad value")):
+        with mock.patch("clew.cli.Config.load", side_effect=ValueError("bad value")):
             result = runner.invoke(cli, ["apps"])
 
         assert "ValueError" not in result.output

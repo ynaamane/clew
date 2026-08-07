@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ownscribe.summarization.grounding import find_ungrounded_names
+from clew.summarization.grounding import find_ungrounded_names
 
 
 class TestFindUngroundedNames:

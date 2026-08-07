@@ -7,12 +7,12 @@ from unittest import mock
 
 import pytest
 
-from ownscribe.config import CanaryConfig, Config, TranscriptionConfig
+from clew.config import CanaryConfig, Config, TranscriptionConfig
 
 
 class TestIsAvailable:
     def test_true_when_uv_on_path_and_runs_clean(self):
-        from ownscribe.transcription.canary_mlx_transcriber import is_available
+        from clew.transcription.canary_mlx_transcriber import is_available
 
         fake_result = mock.MagicMock(returncode=0)
         with mock.patch("subprocess.run", return_value=fake_result) as mock_run:
@@ -20,13 +20,13 @@ class TestIsAvailable:
         mock_run.assert_called_once_with(["uv", "--version"], capture_output=True)
 
     def test_false_when_uv_missing_from_path(self):
-        from ownscribe.transcription.canary_mlx_transcriber import is_available
+        from clew.transcription.canary_mlx_transcriber import is_available
 
         with mock.patch("subprocess.run", side_effect=FileNotFoundError):
             assert is_available() is False
 
     def test_false_when_uv_exits_nonzero(self):
-        from ownscribe.transcription.canary_mlx_transcriber import is_available
+        from clew.transcription.canary_mlx_transcriber import is_available
 
         fake_result = mock.MagicMock(returncode=1)
         with mock.patch("subprocess.run", return_value=fake_result):
@@ -35,26 +35,26 @@ class TestIsAvailable:
 
 class TestCanaryMlxTranscriberInit:
     def test_uses_configured_language(self):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language="en"), CanaryConfig())
         assert transcriber._language == "en"
 
     def test_falls_back_to_french_when_language_unset(self):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language=""), CanaryConfig())
         assert transcriber._language == "fr"
 
     def test_prepare_models_overrides_language(self):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language="fr"), CanaryConfig())
         transcriber.prepare_models(language="en")
         assert transcriber._language == "en"
 
     def test_last_speaker_embeddings_always_empty(self):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(), CanaryConfig())
         assert transcriber.last_speaker_embeddings == {}
@@ -69,7 +69,7 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
         return mock.MagicMock(returncode=returncode, stdout=stdout, stderr=stderr)
 
     def test_builds_the_uv_run_with_command_correctly(self, tmp_path, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language="fr"), CanaryConfig())
         ok_response = json.dumps({"ok": True, "result": {"segments": [], "duration": 0.5, "language": "fr"}})
@@ -80,10 +80,10 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
         called_args = mock_run.call_args[0][0]
         assert called_args[:3] == ["uv", "run", "--with"]
         assert "mlx-audio" in called_args[3]
-        assert called_args[-1] == "ownscribe.transcription.canary_mlx_worker"
+        assert called_args[-1] == "clew.transcription.canary_mlx_worker"
 
     def test_passes_config_fields_in_the_request_payload(self, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         canary_config = CanaryConfig(repo="some/repo", max_segment_seconds=20.0, max_tokens_per_segment=99)
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language="en"), canary_config)
@@ -100,7 +100,7 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
         assert sent_request["audio_path"] == str(synthetic_wav)
 
     def test_parses_segments_from_a_successful_response(self, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         ok_response = json.dumps(
             {
@@ -126,7 +126,7 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
         assert result.segments[0].words == []
 
     def test_raises_when_worker_process_exits_nonzero(self, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(), CanaryConfig())
         with (
@@ -136,7 +136,7 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
             transcriber.transcribe(synthetic_wav)
 
     def test_raises_when_worker_reports_ok_false(self, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         error_response = json.dumps({"ok": False, "error": "ValueError: bad checkpoint"})
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(), CanaryConfig())
@@ -147,7 +147,7 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
             transcriber.transcribe(synthetic_wav)
 
     def test_raises_when_stdout_is_not_valid_json(self, synthetic_wav):
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(), CanaryConfig())
         with (
@@ -159,32 +159,32 @@ class TestCanaryMlxTranscriberSubprocessOrchestration:
 
 class TestCreateTranscriberEngineSelection:
     def test_default_engine_creates_whisperx_transcriber(self):
-        from ownscribe.pipeline import _create_transcriber
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.pipeline import _create_transcriber
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = _create_transcriber(Config())
         assert isinstance(transcriber, WhisperXTranscriber)
 
     def test_canary_mlx_engine_creates_canary_transcriber_when_uv_available(self):
-        from ownscribe.pipeline import _create_transcriber
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.pipeline import _create_transcriber
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         config = Config()
         config.transcription.engine = "canary_mlx"
 
-        with mock.patch("ownscribe.transcription.canary_mlx_transcriber.is_available", return_value=True):
+        with mock.patch("clew.transcription.canary_mlx_transcriber.is_available", return_value=True):
             transcriber = _create_transcriber(config)
 
         assert isinstance(transcriber, CanaryMlxTranscriber)
 
     def test_canary_mlx_engine_fails_loud_when_uv_unavailable(self):
-        from ownscribe.pipeline import _create_transcriber
+        from clew.pipeline import _create_transcriber
 
         config = Config()
         config.transcription.engine = "canary_mlx"
 
         with (
-            mock.patch("ownscribe.transcription.canary_mlx_transcriber.is_available", return_value=False),
+            mock.patch("clew.transcription.canary_mlx_transcriber.is_available", return_value=False),
             pytest.raises(SystemExit),
         ):
             _create_transcriber(config)
@@ -227,7 +227,7 @@ class TestCanaryMlxWorker:
         return fake_load, fake_model
 
     def test_run_skips_empty_spans_and_empty_text(self, monkeypatch):
-        from ownscribe.transcription.canary_mlx_worker import _run
+        from clew.transcription.canary_mlx_worker import _run
 
         fake_result_text = mock.MagicMock(text="  Bonjour  ")
         fake_result_empty = mock.MagicMock(text="   ")
@@ -255,7 +255,7 @@ class TestCanaryMlxWorker:
         assert result["language"] == "fr"
 
     def test_run_passes_source_and_target_lang_from_the_single_language_field(self, monkeypatch):
-        from ownscribe.transcription.canary_mlx_worker import _run
+        from clew.transcription.canary_mlx_worker import _run
 
         fake_result = mock.MagicMock(text="Hello")
         _, fake_model = self._install_fake_modules(
@@ -273,7 +273,7 @@ class TestCanaryMlxWorker:
         assert call_kwargs["max_tokens"] == 200
 
     def test_main_writes_ok_true_json_to_stdout_on_success(self, monkeypatch, capsys):
-        from ownscribe.transcription import canary_mlx_worker
+        from clew.transcription import canary_mlx_worker
 
         fake_request = {
             "audio_path": "fake.wav",
@@ -296,7 +296,7 @@ class TestCanaryMlxWorker:
         assert captured["result"]["language"] == "fr"
 
     def test_main_writes_ok_false_json_on_exception_never_raises(self, monkeypatch, capsys):
-        from ownscribe.transcription import canary_mlx_worker
+        from clew.transcription import canary_mlx_worker
 
         fake_request = {
             "audio_path": "fake.wav",
@@ -331,7 +331,7 @@ class TestCanaryMlxRealIntegration:
 
     def test_transcribes_a_real_short_clip(self, tmp_path):
 
-        from ownscribe.transcription.canary_mlx_transcriber import is_available
+        from clew.transcription.canary_mlx_transcriber import is_available
 
         if not is_available():
             pytest.skip("uv not on PATH")
@@ -345,8 +345,8 @@ class TestCanaryMlxRealIntegration:
         wav_path = tmp_path / "tone.wav"
         sf.write(str(wav_path), tone, sample_rate)
 
-        from ownscribe.config import CanaryConfig, TranscriptionConfig
-        from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+        from clew.config import CanaryConfig, TranscriptionConfig
+        from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
         transcriber = CanaryMlxTranscriber(TranscriptionConfig(language="fr"), CanaryConfig())
         try:

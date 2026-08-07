@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest import mock
 
-from ownscribe.correction import _is_acceptable_correction, correct_segment_text, correct_transcript
-from ownscribe.transcription.models import Segment, TranscriptResult, Word
+from clew.correction import _is_acceptable_correction, correct_segment_text, correct_transcript
+from clew.transcription.models import Segment, TranscriptResult, Word
 
 
 class TestIsAcceptableCorrection:

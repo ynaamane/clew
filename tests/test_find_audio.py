@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ownscribe.pipeline import _find_audio
+from clew.pipeline import _find_audio
 
 
 def _touch(directory, *names):

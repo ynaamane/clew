@@ -1,6 +1,6 @@
 """A/B pilot driver: Whisper-large-v3 (whisperx) vs Canary-1B-v2 (canary_mlx).
 
-Deterministic, detached compute -- not part of ownscribe's own pipeline.
+Deterministic, detached compute -- not part of clew's own pipeline.
 Fetches (or accepts) a code-switched FR/EN clip + reference transcript,
 transcribes it with both engines, computes WER by reference language span
 (overall / fra / eng / switch), and optionally runs the continuous-run
@@ -69,8 +69,8 @@ def _audio_duration_s(audio_path: Path) -> float:
 
 
 def _transcribe_whisperx(audio_path: Path, language: str) -> tuple[list[HypothesisSegment], float]:
-    from ownscribe.config import TranscriptionConfig
-    from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+    from clew.config import TranscriptionConfig
+    from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
     transcriber = WhisperXTranscriber(TranscriptionConfig(language=language), None)
     t0 = time.time()
@@ -81,8 +81,8 @@ def _transcribe_whisperx(audio_path: Path, language: str) -> tuple[list[Hypothes
 
 
 def _transcribe_canary(audio_path: Path, language: str) -> tuple[list[HypothesisSegment], float]:
-    from ownscribe.config import CanaryConfig, TranscriptionConfig
-    from ownscribe.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
+    from clew.config import CanaryConfig, TranscriptionConfig
+    from clew.transcription.canary_mlx_transcriber import CanaryMlxTranscriber
 
     transcriber = CanaryMlxTranscriber(TranscriptionConfig(language=language), CanaryConfig())
     t0 = time.time()

@@ -9,8 +9,8 @@ from unittest import mock
 
 import pytest
 
-from ownscribe.config import Config
-from ownscribe.transcription.models import Segment, TranscriptResult, Word
+from clew.config import Config
+from clew.transcription.models import Segment, TranscriptResult, Word
 
 
 def _write_wav(path, samples, sample_rate=16000):
@@ -57,7 +57,7 @@ def _write_wav_at_exact_rms(path, target_rms, total_seconds, sample_rate=16000, 
 
 class TestGateSilentMicSegments:
     def test_loud_segment_is_kept(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         _write_segmented_wav(mic_path, loud_spans=[(0.0, 2.0)], total_seconds=2.0)
@@ -68,7 +68,7 @@ class TestGateSilentMicSegments:
         assert [seg.text for seg in gated.segments] == ["hello"]
 
     def test_silent_segment_is_dropped(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         _write_segmented_wav(mic_path, loud_spans=[], total_seconds=2.0)
@@ -79,7 +79,7 @@ class TestGateSilentMicSegments:
         assert gated.segments == []
 
     def test_mixed_segments_only_silent_ones_dropped(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         _write_segmented_wav(mic_path, loud_spans=[(0.0, 1.0), (2.0, 3.0)], total_seconds=3.0)
@@ -96,7 +96,7 @@ class TestGateSilentMicSegments:
         assert [seg.text for seg in gated.segments] == ["real speech", "more real speech"]
 
     def test_missing_mic_file_returns_result_unchanged(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         result = TranscriptResult(segments=[Segment(text="untouched", start=0.0, end=1.0)])
         gated = gate_silent_mic_segments(result, tmp_path / "does-not-exist.wav")
@@ -104,7 +104,7 @@ class TestGateSilentMicSegments:
         assert [seg.text for seg in gated.segments] == ["untouched"]
 
     def test_does_not_mutate_original_result(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         _write_segmented_wav(mic_path, loud_spans=[], total_seconds=1.0)
@@ -115,7 +115,7 @@ class TestGateSilentMicSegments:
         assert len(original.segments) == 1
 
     def test_custom_threshold_is_respected(self, tmp_path):
-        from ownscribe.pipeline import gate_silent_mic_segments
+        from clew.pipeline import gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         _write_segmented_wav(mic_path, loud_spans=[(0.0, 1.0)], total_seconds=1.0)
@@ -126,7 +126,7 @@ class TestGateSilentMicSegments:
         assert gated.segments == []
 
     def test_segment_ten_percent_above_threshold_is_kept(self, tmp_path):
-        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
+        from clew.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         just_above = _MIC_SEGMENT_SILENCE_THRESHOLD * 1.1
@@ -138,7 +138,7 @@ class TestGateSilentMicSegments:
         assert [seg.text for seg in gated.segments] == ["quiet real speech"]
 
     def test_segment_ten_percent_below_threshold_is_dropped(self, tmp_path):
-        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
+        from clew.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD, gate_silent_mic_segments
 
         mic_path = tmp_path / "mic.wav"
         just_below = _MIC_SEGMENT_SILENCE_THRESHOLD * 0.9
@@ -150,7 +150,7 @@ class TestGateSilentMicSegments:
         assert gated.segments == []
 
     def test_default_threshold_stays_two_orders_of_magnitude_below_real_world_repro_owner_segment_rms(self):
-        from ownscribe.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD
+        from clew.pipeline import _MIC_SEGMENT_SILENCE_THRESHOLD
 
         real_world_repro_owner_segment_rms = 0.016304502
         assert real_world_repro_owner_segment_rms / _MIC_SEGMENT_SILENCE_THRESHOLD > 100
@@ -158,7 +158,7 @@ class TestGateSilentMicSegments:
 
 class TestTrackRms:
     def test_silent_track_has_near_zero_rms(self, tmp_path):
-        from ownscribe.pipeline import _track_rms
+        from clew.pipeline import _track_rms
 
         path = tmp_path / "silent.wav"
         _write_wav(path, _silent_samples())
@@ -166,7 +166,7 @@ class TestTrackRms:
         assert _track_rms(path) == 0.0
 
     def test_loud_track_has_nonzero_rms(self, tmp_path):
-        from ownscribe.pipeline import _track_rms
+        from clew.pipeline import _track_rms
 
         path = tmp_path / "loud.wav"
         _write_wav(path, _loud_samples())
@@ -176,14 +176,14 @@ class TestTrackRms:
         assert rms > 1e-3
 
     def test_missing_file_returns_none(self, tmp_path):
-        from ownscribe.pipeline import _track_rms
+        from clew.pipeline import _track_rms
 
         assert _track_rms(tmp_path / "does-not-exist.wav") is None
 
 
 class TestCheckDualTrackSilence:
     def test_both_loud_no_warning(self, tmp_path, capsys):
-        from ownscribe.pipeline import _check_dual_track_silence
+        from clew.pipeline import _check_dual_track_silence
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -196,7 +196,7 @@ class TestCheckDualTrackSilence:
         assert "Warning" not in captured.err
 
     def test_system_silent_mic_loud_warns_system_specifically(self, tmp_path, capsys):
-        from ownscribe.pipeline import _check_dual_track_silence
+        from clew.pipeline import _check_dual_track_silence
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -210,7 +210,7 @@ class TestCheckDualTrackSilence:
         assert "Microphone track is silent" not in captured.err
 
     def test_mic_silent_system_loud_warns_mic_specifically(self, tmp_path, capsys):
-        from ownscribe.pipeline import _check_dual_track_silence
+        from clew.pipeline import _check_dual_track_silence
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -224,7 +224,7 @@ class TestCheckDualTrackSilence:
         assert "System audio track is silent" not in captured.err
 
     def test_both_silent_warns_both(self, tmp_path, capsys):
-        from ownscribe.pipeline import _check_dual_track_silence
+        from clew.pipeline import _check_dual_track_silence
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -237,7 +237,7 @@ class TestCheckDualTrackSilence:
         assert "Both system audio and microphone" in captured.err
 
     def test_never_raises_systemexit(self, tmp_path):
-        from ownscribe.pipeline import _check_dual_track_silence
+        from clew.pipeline import _check_dual_track_silence
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -249,52 +249,52 @@ class TestCheckDualTrackSilence:
 
 class TestCreateRecorder:
     def test_coreaudio_when_available(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             recorder = _create_recorder(config)
             assert recorder == mock_cls.return_value
 
     def test_fallback_to_sounddevice(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
 
         with (
-            mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_ca,
-            mock.patch("ownscribe.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd,
+            mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_ca,
+            mock.patch("clew.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd,
         ):
             mock_ca.return_value.is_available.return_value = False
             recorder = _create_recorder(config)
             assert recorder == mock_sd.return_value
 
     def test_sounddevice_when_device_set(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = "USB Mic"
 
-        with mock.patch("ownscribe.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd:
+        with mock.patch("clew.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd:
             recorder = _create_recorder(config)
             assert recorder == mock_sd.return_value
 
     def test_silence_timeout_passed_to_coreaudio(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
         config.audio.silence_timeout = 120
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
@@ -307,13 +307,13 @@ class TestCreateRecorder:
             )
 
     def test_capture_mode_defaults_to_all(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
@@ -326,14 +326,14 @@ class TestCreateRecorder:
             )
 
     def test_capture_mode_picker_override_passed_to_coreaudio(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
         config.audio.capture_mode = "picker"
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             mock_cls.assert_called_once_with(
@@ -346,71 +346,71 @@ class TestCreateRecorder:
             )
 
     def test_capture_backend_defaults_to_coreaudio_tap(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             assert mock_cls.call_args.kwargs["capture_backend"] == "coreaudio"
 
     def test_capture_backend_screencapturekit_override_passed_through(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
         config.audio.capture_backend = "screencapturekit"
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             assert mock_cls.call_args.kwargs["capture_backend"] == "screencapturekit"
 
     def test_echo_cancellation_defaults_to_off(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             assert mock_cls.call_args.kwargs["echo_cancellation"] == "off"
 
     def test_echo_cancellation_override_passed_through(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "coreaudio"
         config.audio.device = ""
         config.audio.echo_cancellation = "auto"
 
-        with mock.patch("ownscribe.audio.coreaudio.CoreAudioRecorder") as mock_cls:
+        with mock.patch("clew.audio.coreaudio.CoreAudioRecorder") as mock_cls:
             mock_cls.return_value.is_available.return_value = True
             _create_recorder(config)
             assert mock_cls.call_args.kwargs["echo_cancellation"] == "auto"
 
     def test_silence_timeout_passed_to_sounddevice(self):
-        from ownscribe.pipeline import _create_recorder
+        from clew.pipeline import _create_recorder
 
         config = Config()
         config.audio.backend = "sounddevice"
         config.audio.device = "USB Mic"
         config.audio.silence_timeout = 60
 
-        with mock.patch("ownscribe.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd:
+        with mock.patch("clew.audio.sounddevice_recorder.SoundDeviceRecorder") as mock_sd:
             _create_recorder(config)
             mock_sd.assert_called_once_with(device="USB Mic", silence_timeout=60)
 
 
 class TestFormatOutput:
     def test_markdown_format(self, sample_transcript):
-        from ownscribe.pipeline import _format_output
+        from clew.pipeline import _format_output
 
         config = Config()
         config.output.format = "markdown"
@@ -420,7 +420,7 @@ class TestFormatOutput:
         assert summary_str is None
 
     def test_markdown_with_summary(self, sample_transcript):
-        from ownscribe.pipeline import _format_output
+        from clew.pipeline import _format_output
 
         config = Config()
         config.output.format = "markdown"
@@ -431,7 +431,7 @@ class TestFormatOutput:
         assert "A great meeting." in summary_str
 
     def test_json_format(self, sample_transcript):
-        from ownscribe.pipeline import _format_output
+        from clew.pipeline import _format_output
 
         config = Config()
         config.output.format = "json"
@@ -443,23 +443,23 @@ class TestFormatOutput:
 
 class TestProgressClass:
     def test_defaults_to_pipeline_progress(self):
-        from ownscribe.pipeline import _progress_class
-        from ownscribe.progress import PipelineProgress
+        from clew.pipeline import _progress_class
+        from clew.progress import PipelineProgress
 
         config = Config()
         assert _progress_class(config) is PipelineProgress
 
     def test_json_mode_selects_json_progress(self):
-        from ownscribe.pipeline import _progress_class
-        from ownscribe.progress import JsonProgress
+        from clew.pipeline import _progress_class
+        from clew.progress import JsonProgress
 
         config = Config()
         config.progress_mode = "json"
         assert _progress_class(config) is JsonProgress
 
     def test_unknown_mode_falls_back_to_pipeline_progress(self):
-        from ownscribe.pipeline import _progress_class
-        from ownscribe.progress import PipelineProgress
+        from clew.pipeline import _progress_class
+        from clew.progress import PipelineProgress
 
         config = Config()
         config.progress_mode = "something-else"
@@ -468,33 +468,33 @@ class TestProgressClass:
 
 class TestSlugify:
     def test_basic(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         assert _slugify("Q3 Budget Planning Review") == "q3-budget-planning-review"
 
     def test_strips_special_chars(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         assert _slugify("Hello, World! @#$") == "hello-world"
 
     def test_truncates_to_max_length(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         result = _slugify("a " * 100, max_length=10)
         assert len(result) <= 10
 
     def test_empty_input(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         assert _slugify("") == ""
 
     def test_colons_removed(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         assert _slugify("Meeting: Budget Review") == "meeting-budget-review"
 
     def test_underscores_never_survive(self):
-        from ownscribe.pipeline import _slugify
+        from clew.pipeline import _slugify
 
         assert "_" not in _slugify("Sprint_2 review"), (
             "_rename_output_dir's strip pattern assumes _slugify never produces underscores. "
@@ -532,7 +532,7 @@ class TestIsLlmRefusal:
         ],
     )
     def test_catches_refusal(self, title):
-        from ownscribe.pipeline import _is_llm_refusal
+        from clew.pipeline import _is_llm_refusal
 
         assert _is_llm_refusal(title) is True, f"Should catch refusal: {title!r}"
 
@@ -552,14 +552,14 @@ class TestIsLlmRefusal:
         ],
     )
     def test_keeps_legitimate_title(self, title):
-        from ownscribe.pipeline import _is_llm_refusal
+        from clew.pipeline import _is_llm_refusal
 
         assert _is_llm_refusal(title) is False, f"Should keep legitimate title: {title!r}"
 
 
 class TestGenerateTitleSlug:
     def test_returns_slug(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         mock_summarizer = mock.MagicMock()
         mock_summarizer.generate_title.return_value = "Budget Review"
@@ -567,7 +567,7 @@ class TestGenerateTitleSlug:
         assert _generate_title_slug("summary text", mock_summarizer) == "budget-review"
 
     def test_returns_empty_on_empty_slug(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         mock_summarizer = mock.MagicMock()
         mock_summarizer.generate_title.return_value = "!!!"  # slugifies to empty
@@ -575,7 +575,7 @@ class TestGenerateTitleSlug:
         assert _generate_title_slug("summary", mock_summarizer) == ""
 
     def test_returns_empty_on_llm_failure(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         mock_summarizer = mock.MagicMock()
         mock_summarizer.generate_title.side_effect = Exception("LLM down")
@@ -583,7 +583,7 @@ class TestGenerateTitleSlug:
         assert _generate_title_slug("summary", mock_summarizer) == ""
 
     def test_rejects_llm_refusal_as_title(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         mock_summarizer = mock.MagicMock()
         mock_summarizer.generate_title.return_value = "I'm sorry, but I need the transcript of the meeting"
@@ -593,7 +593,7 @@ class TestGenerateTitleSlug:
         assert result == "", "LLM refusal must not become a slug"
 
     def test_rejects_llm_apology_variations(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         refusals = [
             "Sorry, please provide the transcript",
@@ -610,7 +610,7 @@ class TestGenerateTitleSlug:
             assert result == "", f"Refusal '{refusal}' must not become a slug, got '{result}'"
 
     def test_keeps_legitimate_title_containing_trigger_words(self):
-        from ownscribe.pipeline import _generate_title_slug
+        from clew.pipeline import _generate_title_slug
 
         mock_summarizer = mock.MagicMock()
         mock_summarizer.generate_title.return_value = "Transcript Review Workshop"
@@ -620,7 +620,7 @@ class TestGenerateTitleSlug:
 
 class TestRenameOutputDir:
     def test_renames_when_target_does_not_exist(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -634,7 +634,7 @@ class TestRenameOutputDir:
         assert not source.exists()
 
     def test_renames_to_empty_target_when_it_exists(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -650,7 +650,7 @@ class TestRenameOutputDir:
         assert not source.exists()
 
     def test_appends_suffix_when_target_exists_with_content(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -669,7 +669,7 @@ class TestRenameOutputDir:
         assert (first_target / "audio.wav").read_text() == "first meeting audio"
 
     def test_appends_higher_suffix_when_multiple_collisions(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -687,7 +687,7 @@ class TestRenameOutputDir:
         assert (expected / "transcript.md").read_text() == "third meeting"
 
     def test_strips_swift_collision_marker_before_appending_slug(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200_2"
         source.mkdir()
@@ -702,7 +702,7 @@ class TestRenameOutputDir:
         assert not source.exists()
 
     def test_preserves_directory_name_without_trailing_digits(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -719,7 +719,7 @@ class TestRenameOutputDir:
         )
 
     def test_strips_two_digit_suffix(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200_10"
         source.mkdir()
@@ -732,7 +732,7 @@ class TestRenameOutputDir:
         assert (expected / "transcript.md").read_text() == "tenth collision"
 
     def test_all_digit_slug_strips_like_collision_marker(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200_2024"
         source.mkdir()
@@ -747,7 +747,7 @@ class TestRenameOutputDir:
         )
 
     def test_two_swift_collisions_normalize_to_same_slug(self, tmp_path):
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         first_source = tmp_path / "2026-01-01_1200_2"
         first_source.mkdir()
@@ -770,7 +770,7 @@ class TestRenameOutputDir:
     def test_returns_original_on_unexpected_os_error(self, tmp_path):
         from pathlib import Path
 
-        from ownscribe.pipeline import _rename_output_dir
+        from clew.pipeline import _rename_output_dir
 
         source = tmp_path / "2026-01-01_1200"
         source.mkdir()
@@ -793,7 +793,7 @@ class TestDoTranscribeAndSummarize:
         )
 
     def test_transcribe_only(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -803,14 +803,14 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert (tmp_path / "transcript.md").exists()
         assert not (tmp_path / "summary.md").exists()
 
     def test_transcribe_and_summarize(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -826,9 +826,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.summarize.return_value = "## Summary\nGood meeting."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -837,7 +837,7 @@ class TestDoTranscribeAndSummarize:
         assert "Summary" in (tmp_path / "summary.md").read_text()
 
     def test_summary_with_invented_name_triggers_grounding_warning(self, tmp_path, capsys):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -853,9 +853,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.summarize.return_value = "## Action Items\n- Zephyr to follow up.\n"
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -864,7 +864,7 @@ class TestDoTranscribeAndSummarize:
         assert "not found in the transcript" in captured.err
 
     def test_summary_fully_grounded_in_transcript_has_no_warning(self, tmp_path, capsys):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -880,9 +880,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.summarize.return_value = "## Summary\nHello world was discussed."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -890,7 +890,7 @@ class TestDoTranscribeAndSummarize:
         assert "not found in the transcript" not in captured.err
 
     def test_json_progress_mode_emits_ndjson_events_on_stderr(self, tmp_path, capsys):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -907,9 +907,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.summarize.return_value = "## Summary\nHello world was discussed."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -921,7 +921,7 @@ class TestDoTranscribeAndSummarize:
         assert any(e == {"event": "complete", "step": "summarizing"} for e in events)
 
     def test_summarizer_unavailable_skips_gracefully(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -936,8 +936,8 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.is_available.return_value = False
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -945,7 +945,7 @@ class TestDoTranscribeAndSummarize:
         assert not (tmp_path / "summary.md").exists()
 
     def test_json_output_format(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "json"
@@ -955,14 +955,14 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert (tmp_path / "transcript.json").exists()
         assert not (tmp_path / "transcript.md").exists()
 
     def test_keep_recording_false_deletes_wav(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -973,14 +973,14 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert (tmp_path / "transcript.md").exists()
         assert not audio_path.exists()
 
     def test_keep_recording_false_also_deletes_dual_tracks_and_sidecar(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -997,7 +997,7 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert not audio_path.exists()
@@ -1006,7 +1006,7 @@ class TestDoTranscribeAndSummarize:
         assert not sidecar_path.exists()
 
     def test_keep_recording_true_keeps_dual_tracks_too(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1021,7 +1021,7 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert audio_path.exists()
@@ -1029,7 +1029,7 @@ class TestDoTranscribeAndSummarize:
         assert mic_path.exists()
 
     def test_keep_recording_true_keeps_wav(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1040,14 +1040,14 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert (tmp_path / "transcript.md").exists()
         assert audio_path.exists()
 
     def test_summarization_failure_preserves_transcript(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1063,9 +1063,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.summarize.side_effect = Exception("GPU OOM")
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -1074,7 +1074,7 @@ class TestDoTranscribeAndSummarize:
         assert not (tmp_path / "summary.md").exists()
 
     def test_separate_audio_dir_renamed_alongside_out_dir(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1098,9 +1098,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.generate_title.return_value = "Budget Review"
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=True)
 
@@ -1113,7 +1113,7 @@ class TestDoTranscribeAndSummarize:
         assert not audio_dir.exists()
 
     def test_keep_recording_false_deletes_from_separate_audio_dir(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1131,7 +1131,7 @@ class TestDoTranscribeAndSummarize:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=False)
 
         assert (out_dir / "transcript.md").exists()
@@ -1142,7 +1142,7 @@ class TestDoTranscribeAndSummarize:
         """Resuming a directory that holds its own recording (made before
         audio_dir was configured) must follow out_dir's rename, not try to
         rename the audio's directory a second time."""
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1165,9 +1165,9 @@ class TestDoTranscribeAndSummarize:
         mock_summarizer.generate_title.return_value = "Budget Review"
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=True)
 
@@ -1187,7 +1187,7 @@ class TestCorrectionIntegration:
         )
 
     def test_correction_disabled_leaves_transcript_untouched(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = False
@@ -1197,14 +1197,14 @@ class TestCorrectionIntegration:
         mock_transcriber = mock.MagicMock()
         mock_transcriber.transcribe.return_value = self._make_transcript()
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         transcript_text = (tmp_path / "transcript.md").read_text()
         assert "Bonjur tout le monde." in transcript_text
 
     def test_correction_enabled_applies_fix(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1219,8 +1219,8 @@ class TestCorrectionIntegration:
         mock_summarizer.chat.return_value = "Bonjour tout le monde."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
@@ -1229,7 +1229,7 @@ class TestCorrectionIntegration:
         assert "Bonjur" not in transcript_text
 
     def test_correction_enabled_creates_summarizer_even_without_summarize(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1245,8 +1245,8 @@ class TestCorrectionIntegration:
         mock_summarizer.chat.return_value = "Bonjour tout le monde."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
@@ -1255,7 +1255,7 @@ class TestCorrectionIntegration:
         assert not (tmp_path / "summary.md").exists()
 
     def test_correction_and_summarization_share_one_summarizer_instance(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1272,16 +1272,16 @@ class TestCorrectionIntegration:
         mock_summarizer.summarize.return_value = "A greeting."
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer) as mock_create,
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
 
         mock_create.assert_called_once()
 
     def test_correction_backend_unavailable_skips_gracefully(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1295,8 +1295,8 @@ class TestCorrectionIntegration:
         mock_summarizer.is_available.return_value = False
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
@@ -1304,7 +1304,7 @@ class TestCorrectionIntegration:
         assert "Bonjur tout le monde." in transcript_text
 
     def test_correction_exception_falls_back_to_uncorrected_transcript(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1319,8 +1319,8 @@ class TestCorrectionIntegration:
         mock_summarizer.chat.side_effect = RuntimeError("boom")
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
@@ -1328,7 +1328,7 @@ class TestCorrectionIntegration:
         assert "Bonjur tout le monde." in transcript_text
 
     def test_hallucinated_correction_rejected_transcript_unchanged(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.correction.enabled = True
@@ -1345,8 +1345,8 @@ class TestCorrectionIntegration:
         )
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
         ):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
@@ -1356,7 +1356,7 @@ class TestCorrectionIntegration:
 
 class TestFindDualTracks:
     def test_returns_none_when_neither_track_exists(self, tmp_path):
-        from ownscribe.pipeline import _find_dual_tracks
+        from clew.pipeline import _find_dual_tracks
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -1364,7 +1364,7 @@ class TestFindDualTracks:
         assert _find_dual_tracks(audio_path) is None
 
     def test_returns_none_when_only_system_exists(self, tmp_path):
-        from ownscribe.pipeline import _find_dual_tracks
+        from clew.pipeline import _find_dual_tracks
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -1373,7 +1373,7 @@ class TestFindDualTracks:
         assert _find_dual_tracks(audio_path) is None
 
     def test_returns_none_when_only_mic_exists(self, tmp_path):
-        from ownscribe.pipeline import _find_dual_tracks
+        from clew.pipeline import _find_dual_tracks
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -1382,7 +1382,7 @@ class TestFindDualTracks:
         assert _find_dual_tracks(audio_path) is None
 
     def test_returns_both_paths_when_both_exist(self, tmp_path):
-        from ownscribe.pipeline import _find_dual_tracks
+        from clew.pipeline import _find_dual_tracks
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -1398,7 +1398,7 @@ class TestFindDualTracks:
 
 class TestReadMicStartOffset:
     def test_reads_positive_offset_from_sidecar(self, tmp_path):
-        from ownscribe.pipeline import _read_mic_start_offset
+        from clew.pipeline import _read_mic_start_offset
 
         audio_path = tmp_path / "recording.wav"
         (tmp_path / "track_alignment.json").write_text('{"mic_start_offset_seconds": 0.3}')
@@ -1406,7 +1406,7 @@ class TestReadMicStartOffset:
         assert _read_mic_start_offset(audio_path) == 0.3
 
     def test_reads_negative_offset_from_sidecar(self, tmp_path):
-        from ownscribe.pipeline import _read_mic_start_offset
+        from clew.pipeline import _read_mic_start_offset
 
         audio_path = tmp_path / "recording.wav"
         (tmp_path / "track_alignment.json").write_text('{"mic_start_offset_seconds": -0.3}')
@@ -1414,14 +1414,14 @@ class TestReadMicStartOffset:
         assert _read_mic_start_offset(audio_path) == -0.3
 
     def test_returns_zero_when_sidecar_missing(self, tmp_path):
-        from ownscribe.pipeline import _read_mic_start_offset
+        from clew.pipeline import _read_mic_start_offset
 
         audio_path = tmp_path / "recording.wav"
 
         assert _read_mic_start_offset(audio_path) == 0.0
 
     def test_returns_zero_when_sidecar_malformed(self, tmp_path):
-        from ownscribe.pipeline import _read_mic_start_offset
+        from clew.pipeline import _read_mic_start_offset
 
         audio_path = tmp_path / "recording.wav"
         (tmp_path / "track_alignment.json").write_text("not json at all")
@@ -1429,7 +1429,7 @@ class TestReadMicStartOffset:
         assert _read_mic_start_offset(audio_path) == 0.0
 
     def test_returns_zero_when_key_missing(self, tmp_path):
-        from ownscribe.pipeline import _read_mic_start_offset
+        from clew.pipeline import _read_mic_start_offset
 
         audio_path = tmp_path / "recording.wav"
         (tmp_path / "track_alignment.json").write_text("{}")
@@ -1439,7 +1439,7 @@ class TestReadMicStartOffset:
 
 class TestShiftResult:
     def test_shifts_segment_and_word_timestamps(self):
-        from ownscribe.pipeline import _shift_result
+        from clew.pipeline import _shift_result
 
         result = TranscriptResult(
             segments=[
@@ -1462,7 +1462,7 @@ class TestShiftResult:
         assert shifted.segments[0].words[0].end == 2.5
 
     def test_negative_offset_shifts_backward(self):
-        from ownscribe.pipeline import _shift_result
+        from clew.pipeline import _shift_result
 
         result = TranscriptResult(segments=[Segment(text="hi", start=2.0, end=3.0)])
 
@@ -1472,7 +1472,7 @@ class TestShiftResult:
         assert shifted.segments[0].end == 2.5
 
     def test_does_not_mutate_original(self):
-        from ownscribe.pipeline import _shift_result
+        from clew.pipeline import _shift_result
 
         original = TranscriptResult(segments=[Segment(text="hi", start=1.0, end=2.0)])
 
@@ -1483,7 +1483,7 @@ class TestShiftResult:
 
 class TestTagSpeaker:
     def test_sets_speaker_on_every_segment(self):
-        from ownscribe.pipeline import _tag_speaker
+        from clew.pipeline import _tag_speaker
 
         result = TranscriptResult(
             segments=[
@@ -1499,7 +1499,7 @@ class TestTagSpeaker:
 
 class TestMergeDualTrackResults:
     def test_interleaves_segments_by_start_time(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(
             segments=[
@@ -1521,7 +1521,7 @@ class TestMergeDualTrackResults:
         assert texts_in_order == ["remote says hi", "owner replies", "remote continues"]
 
     def test_mic_segments_tagged_owner_and_shifted(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(segments=[], language="en", duration=5.0)
         mic_result = TranscriptResult(
@@ -1538,7 +1538,7 @@ class TestMergeDualTrackResults:
         assert merged.segments[0].end == 1.3
 
     def test_system_segments_speaker_labels_untouched(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(
             segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")],
@@ -1552,7 +1552,7 @@ class TestMergeDualTrackResults:
         assert merged.segments[0].speaker == "SPEAKER_00"
 
     def test_duration_is_max_of_both_tracks_accounting_for_offset(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(segments=[], language="en", duration=5.0)
         mic_result = TranscriptResult(segments=[], language="en", duration=10.0)
@@ -1565,7 +1565,7 @@ class TestMergeDualTrackResults:
         """mic_offset < 0 means mic started BEFORE system (BUG3: shifting mic backward by
         a negative amount pushed its early segments to negative timestamps, which
         _format_time then rendered as a bogus HH:MM like [59:51])."""
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(
             segments=[Segment(text="remote", start=0.0, end=1.0, speaker="SPEAKER_00")],
@@ -1587,7 +1587,7 @@ class TestMergeDualTrackResults:
         assert system_seg.start == 0.3
 
     def test_negative_offset_preserves_chronological_order(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(
             segments=[Segment(text="remote later", start=0.0, end=1.0, speaker="SPEAKER_00")],
@@ -1605,7 +1605,7 @@ class TestMergeDualTrackResults:
         assert [seg.text for seg in merged.segments] == ["owner earlier", "remote later"]
 
     def test_negative_offset_duration_accounts_for_shifted_system(self):
-        from ownscribe.pipeline import _merge_dual_track_results
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(segments=[], language="en", duration=5.0)
         mic_result = TranscriptResult(segments=[], language="en", duration=10.0)
@@ -1616,8 +1616,8 @@ class TestMergeDualTrackResults:
 
     def test_real_world_repro_offset_produces_chronological_non_negative_timeline(self):
         """Pins the exact BUG3 repro values (mic started ~28.28s before system;
-        ~/ownscribe/2026-07-24_1756_emerging-internet-force-impact/track_alignment.json)."""
-        from ownscribe.pipeline import _merge_dual_track_results
+        ~/clew/2026-07-24_1756_emerging-internet-force-impact/track_alignment.json)."""
+        from clew.pipeline import _merge_dual_track_results
 
         system_result = TranscriptResult(
             segments=[
@@ -1640,7 +1640,7 @@ class TestMergeDualTrackResults:
 
 class TestTranscribeDualTrack:
     def test_diarizes_system_never_diarizes_mic(self, tmp_path):
-        from ownscribe.pipeline import _transcribe_dual_track
+        from clew.pipeline import _transcribe_dual_track
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -1660,7 +1660,7 @@ class TestTranscribeDualTrack:
         assert calls[1].kwargs == {"diarize": False}
 
     def test_merges_both_transcripts_into_one_result(self, tmp_path):
-        from ownscribe.pipeline import _transcribe_dual_track
+        from clew.pipeline import _transcribe_dual_track
 
         system_path = tmp_path / "system.wav"
         mic_path = tmp_path / "mic.wav"
@@ -1679,8 +1679,8 @@ class TestTranscribeDualTrack:
 
 class TestRelabelSpeakersWithVoiceprints:
     def test_relabels_matching_cluster(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
@@ -1689,14 +1689,14 @@ class TestRelabelSpeakersWithVoiceprints:
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker == "Alice"
 
     def test_unmatched_cluster_gets_unknown_label(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
@@ -1705,13 +1705,13 @@ class TestRelabelSpeakersWithVoiceprints:
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.0, 0.0, 1.0]})
 
         assert relabeled.segments[0].speaker == "Unknown-1"
 
     def test_no_embeddings_returns_result_unchanged(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
@@ -1720,19 +1720,19 @@ class TestRelabelSpeakersWithVoiceprints:
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_no_enrolled_voiceprints_returns_result_unchanged(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints
 
         db_path = tmp_path / "voiceprints.json"
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_non_dict_embeddings_returns_result_unchanged(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
@@ -1741,8 +1741,8 @@ class TestRelabelSpeakersWithVoiceprints:
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_segments_without_speaker_are_untouched(self, tmp_path):
-        from ownscribe.pipeline import _relabel_speakers_with_voiceprints
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
@@ -1751,7 +1751,7 @@ class TestRelabelSpeakersWithVoiceprints:
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker=None)])
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
 
         assert relabeled.segments[0].speaker is None
@@ -1759,8 +1759,8 @@ class TestRelabelSpeakersWithVoiceprints:
 
 class TestTranscribeAndIdentify:
     def test_relabels_using_transcriber_captured_embeddings(self, tmp_path):
-        from ownscribe.pipeline import _transcribe_and_identify
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import _transcribe_and_identify
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
@@ -1775,14 +1775,14 @@ class TestTranscribeAndIdentify:
         )
         mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.99, 0.01, 0.0]}
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             result = _transcribe_and_identify(mock_transcriber, audio_path)
 
         mock_transcriber.transcribe.assert_called_once_with(audio_path)
         assert result.segments[0].speaker == "Alice"
 
     def test_no_enrollment_db_leaves_diarized_labels_as_is(self, tmp_path):
-        from ownscribe.pipeline import _transcribe_and_identify
+        from clew.pipeline import _transcribe_and_identify
 
         audio_path = tmp_path / "system.wav"
 
@@ -1793,7 +1793,7 @@ class TestTranscribeAndIdentify:
         mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.99, 0.01, 0.0]}
 
         db_path = tmp_path / "voiceprints.json"
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             result = _transcribe_and_identify(mock_transcriber, audio_path)
 
         assert result.segments[0].speaker == "SPEAKER_00"
@@ -1801,7 +1801,7 @@ class TestTranscribeAndIdentify:
 
 class TestDoTranscribeAndSummarizeDualTrack:
     def test_uses_dual_track_when_both_tracks_present(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1817,7 +1817,7 @@ class TestDoTranscribeAndSummarizeDualTrack:
             TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
         ]
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         assert mock_transcriber.transcribe.call_count == 2
@@ -1825,7 +1825,7 @@ class TestDoTranscribeAndSummarizeDualTrack:
         assert "Owner" in transcript_text
 
     def test_falls_back_to_single_track_when_tracks_absent(self, tmp_path):
-        from ownscribe.pipeline import _do_transcribe_and_summarize
+        from clew.pipeline import _do_transcribe_and_summarize
 
         config = Config()
         config.output.format = "markdown"
@@ -1839,7 +1839,7 @@ class TestDoTranscribeAndSummarizeDualTrack:
             duration=1.5,
         )
 
-        with mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber):
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
 
         mock_transcriber.transcribe.assert_called_once_with(audio_path)
@@ -1854,18 +1854,18 @@ class TestRunWatch:
         return process
 
     def test_errors_when_binary_not_found(self):
-        from ownscribe.pipeline import run_watch
+        from clew.pipeline import run_watch
 
         config = Config()
 
         with (
-            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=None),
+            mock.patch("clew.audio.coreaudio._find_binary", return_value=None),
             pytest.raises(SystemExit),
         ):
             run_watch(config, sustained_seconds=3.0)
 
     def test_starts_recording_on_detection(self, tmp_path):
-        from ownscribe.pipeline import run_watch
+        from clew.pipeline import run_watch
 
         config = Config()
         binary_path = tmp_path / "ownscribe-audio"
@@ -1874,16 +1874,16 @@ class TestRunWatch:
         fake_process = self._make_fake_process(["[MEETING_DETECTED]\n"])
 
         with (
-            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("clew.audio.coreaudio._find_binary", return_value=binary_path),
             mock.patch("subprocess.Popen", return_value=fake_process),
-            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+            mock.patch("clew.pipeline.run_pipeline") as mock_run_pipeline,
         ):
             run_watch(config, sustained_seconds=3.0)
 
         mock_run_pipeline.assert_called_once_with(config)
 
     def test_passes_sustained_seconds_to_subprocess(self, tmp_path):
-        from ownscribe.pipeline import run_watch
+        from clew.pipeline import run_watch
 
         config = Config()
         binary_path = tmp_path / "ownscribe-audio"
@@ -1892,9 +1892,9 @@ class TestRunWatch:
         fake_process = self._make_fake_process(["[MEETING_DETECTED]\n"])
 
         with (
-            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("clew.audio.coreaudio._find_binary", return_value=binary_path),
             mock.patch("subprocess.Popen", return_value=fake_process) as mock_popen,
-            mock.patch("ownscribe.pipeline.run_pipeline"),
+            mock.patch("clew.pipeline.run_pipeline"),
         ):
             run_watch(config, sustained_seconds=5.0)
 
@@ -1905,7 +1905,7 @@ class TestRunWatch:
         assert "5.0" in called_args
 
     def test_process_exit_without_detection_does_not_start_recording(self, tmp_path):
-        from ownscribe.pipeline import run_watch
+        from clew.pipeline import run_watch
 
         config = Config()
         binary_path = tmp_path / "ownscribe-audio"
@@ -1914,9 +1914,9 @@ class TestRunWatch:
         fake_process = self._make_fake_process([])
 
         with (
-            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("clew.audio.coreaudio._find_binary", return_value=binary_path),
             mock.patch("subprocess.Popen", return_value=fake_process),
-            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+            mock.patch("clew.pipeline.run_pipeline") as mock_run_pipeline,
             pytest.raises(SystemExit),
         ):
             run_watch(config, sustained_seconds=3.0)
@@ -1924,7 +1924,7 @@ class TestRunWatch:
         mock_run_pipeline.assert_not_called()
 
     def test_ignores_unrelated_stdout_lines_before_detection(self, tmp_path):
-        from ownscribe.pipeline import run_watch
+        from clew.pipeline import run_watch
 
         config = Config()
         binary_path = tmp_path / "ownscribe-audio"
@@ -1933,9 +1933,9 @@ class TestRunWatch:
         fake_process = self._make_fake_process(["some noise\n", "\n", "[MEETING_DETECTED]\n"])
 
         with (
-            mock.patch("ownscribe.audio.coreaudio._find_binary", return_value=binary_path),
+            mock.patch("clew.audio.coreaudio._find_binary", return_value=binary_path),
             mock.patch("subprocess.Popen", return_value=fake_process),
-            mock.patch("ownscribe.pipeline.run_pipeline") as mock_run_pipeline,
+            mock.patch("clew.pipeline.run_pipeline") as mock_run_pipeline,
         ):
             run_watch(config, sustained_seconds=3.0)
 
@@ -1944,7 +1944,7 @@ class TestRunWatch:
 
 class TestRunWarmup:
     def test_run_warmup_calls_prepare_models(self):
-        from ownscribe.pipeline import run_warmup
+        from clew.pipeline import run_warmup
 
         config = Config()
         config.transcription.language = "en"
@@ -1952,24 +1952,24 @@ class TestRunWarmup:
         mock_transcriber = mock.MagicMock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_warmup(config)
 
         mock_transcriber.prepare_models.assert_called_once_with(language="en")
 
     def test_run_warmup_enables_prepare_step_in_progress(self):
-        from ownscribe.pipeline import run_warmup
+        from clew.pipeline import run_warmup
 
         config = Config()
         mock_transcriber = mock.MagicMock()
         fake_progress = mock.MagicMock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline.PipelineProgress") as mock_progress_cls,
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.PipelineProgress") as mock_progress_cls,
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             mock_progress_cls.return_value.__enter__.return_value = fake_progress
             run_warmup(config)
@@ -1980,7 +1980,7 @@ class TestRunWarmup:
         assert kwargs["download_summarizer"] is True
 
     def test_run_warmup_downloads_summarizer_with_progress(self):
-        from ownscribe.pipeline import run_warmup
+        from clew.pipeline import run_warmup
 
         config = Config()
         config.summarization.enabled = True
@@ -1990,8 +1990,8 @@ class TestRunWarmup:
         mock_transcriber = mock.MagicMock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model") as mock_ensure,
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model") as mock_ensure,
         ):
             run_warmup(config)
 
@@ -2000,7 +2000,7 @@ class TestRunWarmup:
         assert kwargs.get("on_progress") is not None
 
     def test_run_warmup_skips_summarizer_download_when_not_local(self):
-        from ownscribe.pipeline import run_warmup
+        from clew.pipeline import run_warmup
 
         config = Config()
         config.summarization.enabled = True
@@ -2009,8 +2009,8 @@ class TestRunWarmup:
         mock_transcriber = mock.MagicMock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model") as mock_ensure,
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model") as mock_ensure,
         ):
             run_warmup(config)
 
@@ -2035,7 +2035,7 @@ class TestRunPipelineAudioLocation:
         return recorder
 
     def test_audio_recorded_into_separate_audio_dir(self, tmp_path):
-        from ownscribe.pipeline import run_pipeline
+        from clew.pipeline import run_pipeline
 
         config = Config()
         config.output.dir = str(tmp_path / "notes")
@@ -2044,8 +2044,8 @@ class TestRunPipelineAudioLocation:
         mock_recorder = self._make_recorder_mock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_recorder", return_value=mock_recorder),
-            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts,
+            mock.patch("clew.pipeline._create_recorder", return_value=mock_recorder),
+            mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts,
         ):
             run_pipeline(config)
 
@@ -2062,7 +2062,7 @@ class TestRunPipelineAudioLocation:
         assert called_out_dir.name == audio_path.parent.name
 
     def test_audio_recorded_into_dir_when_audio_dir_unset(self, tmp_path):
-        from ownscribe.pipeline import run_pipeline
+        from clew.pipeline import run_pipeline
 
         config = Config()
         config.output.dir = str(tmp_path / "notes")
@@ -2071,8 +2071,8 @@ class TestRunPipelineAudioLocation:
         mock_recorder = self._make_recorder_mock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_recorder", return_value=mock_recorder),
-            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"),
+            mock.patch("clew.pipeline._create_recorder", return_value=mock_recorder),
+            mock.patch("clew.pipeline._do_transcribe_and_summarize"),
         ):
             run_pipeline(config)
 
@@ -2081,7 +2081,7 @@ class TestRunPipelineAudioLocation:
         assert audio_path.parent.parent == tmp_path / "notes"
 
     def test_dual_track_silence_check_runs_when_tracks_present(self, tmp_path, capsys):
-        from ownscribe.pipeline import run_pipeline
+        from clew.pipeline import run_pipeline
 
         config = Config()
         config.output.dir = str(tmp_path / "notes")
@@ -2100,8 +2100,8 @@ class TestRunPipelineAudioLocation:
         recorder.start.side_effect = _start
 
         with (
-            mock.patch("ownscribe.pipeline._create_recorder", return_value=recorder),
-            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"),
+            mock.patch("clew.pipeline._create_recorder", return_value=recorder),
+            mock.patch("clew.pipeline._do_transcribe_and_summarize"),
         ):
             run_pipeline(config)
 
@@ -2109,7 +2109,7 @@ class TestRunPipelineAudioLocation:
         assert "System audio track is silent" in captured.err
 
     def test_single_track_silence_check_runs_when_no_dual_tracks(self, tmp_path):
-        from ownscribe.pipeline import run_pipeline
+        from clew.pipeline import run_pipeline
 
         config = Config()
         config.output.dir = str(tmp_path / "notes")
@@ -2117,9 +2117,9 @@ class TestRunPipelineAudioLocation:
         mock_recorder = self._make_recorder_mock()
 
         with (
-            mock.patch("ownscribe.pipeline._create_recorder", return_value=mock_recorder),
-            mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"),
-            mock.patch("ownscribe.pipeline._check_audio_silence") as mock_check,
+            mock.patch("clew.pipeline._create_recorder", return_value=mock_recorder),
+            mock.patch("clew.pipeline._do_transcribe_and_summarize"),
+            mock.patch("clew.pipeline._check_audio_silence") as mock_check,
         ):
             run_pipeline(config)
 
@@ -2130,7 +2130,7 @@ class TestRunTranscribeColocation:
     """Test that run_transcribe saves output alongside the input file."""
 
     def test_transcript_saved_next_to_audio(self, tmp_path):
-        from ownscribe.pipeline import run_transcribe
+        from clew.pipeline import run_transcribe
 
         audio_dir = tmp_path / "meetings" / "2026-01-01_1200"
         audio_dir.mkdir(parents=True)
@@ -2148,8 +2148,8 @@ class TestRunTranscribeColocation:
         )
 
         with (
-            mock.patch("ownscribe.pipeline._create_transcriber", return_value=mock_transcriber),
-            mock.patch("ownscribe.pipeline._check_audio_silence"),
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline._check_audio_silence"),
         ):
             run_transcribe(config, str(audio_path))
 
@@ -2160,7 +2160,7 @@ class TestRunSummarizeColocation:
     """Test that run_summarize saves output alongside the input file."""
 
     def test_summary_saved_next_to_transcript(self, tmp_path):
-        from ownscribe.pipeline import run_summarize
+        from clew.pipeline import run_summarize
 
         tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
         tx_dir.mkdir(parents=True)
@@ -2176,8 +2176,8 @@ class TestRunSummarizeColocation:
         mock_summarizer.generate_title.return_value = "test-title"
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_summarize(config, str(tx_path))
 
@@ -2185,7 +2185,7 @@ class TestRunSummarizeColocation:
         assert (renamed_dir / "summary.md").exists()
 
     def test_summary_with_invented_name_triggers_grounding_warning(self, tmp_path, capsys):
-        from ownscribe.pipeline import run_summarize
+        from clew.pipeline import run_summarize
 
         tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
         tx_dir.mkdir(parents=True)
@@ -2201,8 +2201,8 @@ class TestRunSummarizeColocation:
         mock_summarizer.generate_title.return_value = "test-title"
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_summarize(config, str(tx_path))
 
@@ -2211,7 +2211,7 @@ class TestRunSummarizeColocation:
         assert "not found in the transcript" in captured.err
 
     def test_renames_matching_audio_dir_inside_output_tree(self, tmp_path):
-        from ownscribe.pipeline import run_summarize
+        from clew.pipeline import run_summarize
 
         tx_dir = tmp_path / "notes" / "2026-01-01_1200"
         tx_dir.mkdir(parents=True)
@@ -2233,8 +2233,8 @@ class TestRunSummarizeColocation:
         mock_summarizer.generate_title.return_value = "test-title"
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_summarize(config, str(tx_path))
 
@@ -2245,7 +2245,7 @@ class TestRunSummarizeColocation:
     def test_leaves_audio_dir_alone_for_transcript_outside_output_tree(self, tmp_path):
         """A same-named directory under audio_dir must not be renamed when the
         summarized transcript does not belong to the output tree."""
-        from ownscribe.pipeline import run_summarize
+        from clew.pipeline import run_summarize
 
         tx_dir = tmp_path / "elsewhere" / "2026-01-01_1200"
         tx_dir.mkdir(parents=True)
@@ -2266,8 +2266,8 @@ class TestRunSummarizeColocation:
         mock_summarizer.generate_title.return_value = "test-title"
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_summarize(config, str(tx_path))
 
@@ -2281,7 +2281,7 @@ class TestResume:
     """Test run_resume artifact detection and dispatch."""
 
     def test_nothing_to_resume(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         (tmp_path / "transcript.md").write_text("hello")
         (tmp_path / "summary.md").write_text("summary")
@@ -2291,50 +2291,50 @@ class TestResume:
         # Should exit cleanly without error
 
     def test_error_no_audio_no_transcript(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         config = Config()
         with mock.patch("sys.exit", side_effect=SystemExit(1)), contextlib.suppress(SystemExit):
             run_resume(config, str(tmp_path))
 
     def test_resumes_summarize_only(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         (tmp_path / "transcript.md").write_text("# Transcript\nHello.")
 
         config = Config()
         config.summarization.enabled = True
 
-        with mock.patch("ownscribe.pipeline.run_summarize") as mock_sum:
+        with mock.patch("clew.pipeline.run_summarize") as mock_sum:
             run_resume(config, str(tmp_path))
             mock_sum.assert_called_once_with(config, str(tmp_path / "transcript.md"))
 
     def test_resumes_transcribe_and_summarize(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_resume(config, str(tmp_path))
             mock_ts.assert_called_once_with(config, audio_path, tmp_path)
 
     def test_finds_non_wav_audio(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         audio_path = tmp_path / "meeting.mp3"
         audio_path.touch()
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_resume(config, str(tmp_path))
             mock_ts.assert_called_once_with(config, audio_path, tmp_path)
 
     def test_finds_audio_in_separate_audio_dir(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         text_dir = tmp_path / "notes" / "2026-01-01_1200"
         text_dir.mkdir(parents=True)
@@ -2347,18 +2347,18 @@ class TestResume:
         config.output.dir = str(tmp_path / "notes")
         config.output.audio_dir = str(tmp_path / "audio-cache")
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_resume(config, str(text_dir))
             mock_ts.assert_called_once_with(config, audio_path, text_dir)
 
     def test_finds_json_transcript(self, tmp_path):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         (tmp_path / "transcript.json").write_text('{"segments": []}')
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline.run_summarize") as mock_sum:
+        with mock.patch("clew.pipeline.run_summarize") as mock_sum:
             run_resume(config, str(tmp_path))
             mock_sum.assert_called_once_with(config, str(tmp_path / "transcript.json"))
 
@@ -2367,7 +2367,7 @@ class TestReprocess:
     """Test run_reprocess forced re-transcription from retained audio."""
 
     def test_errors_when_directory_does_not_exist(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         config = Config()
         missing = tmp_path / "does-not-exist"
@@ -2376,7 +2376,7 @@ class TestReprocess:
             run_reprocess(config, str(missing))
 
     def test_errors_when_no_audio_retained(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         (tmp_path / "transcript.md").write_text("# Transcript\nHello.")
         (tmp_path / "summary.md").write_text("# Summary")
@@ -2387,7 +2387,7 @@ class TestReprocess:
             run_reprocess(config, str(tmp_path))
 
     def test_forces_reprocess_even_when_transcript_and_summary_exist(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -2396,12 +2396,12 @@ class TestReprocess:
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_reprocess(config, str(tmp_path))
             mock_ts.assert_called_once_with(config, audio_path, tmp_path)
 
     def test_deletes_stale_transcript_and_summary_before_reprocessing(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         audio_path = tmp_path / "recording.wav"
         audio_path.touch()
@@ -2412,14 +2412,14 @@ class TestReprocess:
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize"):
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize"):
             run_reprocess(config, str(tmp_path))
 
         assert not transcript_path.exists()
         assert not summary_path.exists()
 
     def test_finds_dual_track_audio_in_separate_audio_dir(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         text_dir = tmp_path / "notes" / "2026-01-01_1200"
         text_dir.mkdir(parents=True)
@@ -2434,19 +2434,19 @@ class TestReprocess:
         config.output.dir = str(tmp_path / "notes")
         config.output.audio_dir = str(tmp_path / "audio-cache")
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_reprocess(config, str(text_dir))
             mock_ts.assert_called_once_with(config, audio_path, text_dir)
 
     def test_finds_non_wav_audio(self, tmp_path):
-        from ownscribe.pipeline import run_reprocess
+        from clew.pipeline import run_reprocess
 
         audio_path = tmp_path / "meeting.mp3"
         audio_path.touch()
 
         config = Config()
 
-        with mock.patch("ownscribe.pipeline._do_transcribe_and_summarize") as mock_ts:
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize") as mock_ts:
             run_reprocess(config, str(tmp_path))
             mock_ts.assert_called_once_with(config, audio_path, tmp_path)
 
@@ -2462,7 +2462,7 @@ class TestRunPurge:
         os.utime(path, (past, past))
 
     def test_keep_forever_default_without_all_is_a_noop(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         meeting_dir = tmp_path / "2026-01-01_1200"
         meeting_dir.mkdir()
@@ -2478,7 +2478,7 @@ class TestRunPurge:
         assert audio_path.exists()
 
     def test_all_purges_regardless_of_age(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         meeting_dir = tmp_path / "2026-01-01_1200"
         meeting_dir.mkdir()
@@ -2493,7 +2493,7 @@ class TestRunPurge:
         assert not audio_path.exists()
 
     def test_all_also_deletes_dual_tracks(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         meeting_dir = tmp_path / "2026-01-01_1200"
         meeting_dir.mkdir()
@@ -2514,7 +2514,7 @@ class TestRunPurge:
         assert not mic_path.exists()
 
     def test_older_than_days_only_purges_aged_recordings(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         old_dir = tmp_path / "2020-01-01_1200"
         old_dir.mkdir()
@@ -2536,7 +2536,7 @@ class TestRunPurge:
         assert recent_audio.exists()
 
     def test_older_than_flag_overrides_config_retention_days(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         meeting_dir = tmp_path / "2026-01-01_1200"
         meeting_dir.mkdir()
@@ -2553,7 +2553,7 @@ class TestRunPurge:
         assert not audio_path.exists()
 
     def test_dry_run_does_not_delete(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         meeting_dir = tmp_path / "2026-01-01_1200"
         meeting_dir.mkdir()
@@ -2568,7 +2568,7 @@ class TestRunPurge:
         assert audio_path.exists()
 
     def test_directories_without_audio_are_skipped_not_errored(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         empty_dir = tmp_path / "2026-01-01_1200"
         empty_dir.mkdir()
@@ -2580,7 +2580,7 @@ class TestRunPurge:
         run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
 
     def test_missing_output_base_dir_is_a_noop(self, tmp_path):
-        from ownscribe.pipeline import run_purge
+        from clew.pipeline import run_purge
 
         config = Config()
         config.output.dir = str(tmp_path / "does-not-exist")
@@ -2590,7 +2590,7 @@ class TestRunPurge:
 
 class TestRunEnroll:
     def test_errors_without_hf_token(self, tmp_path):
-        from ownscribe.pipeline import run_enroll
+        from clew.pipeline import run_enroll
 
         config = Config()
         config.diarization.hf_token = ""
@@ -2601,8 +2601,8 @@ class TestRunEnroll:
             run_enroll(config, "Alice", str(clip))
 
     def test_saves_embedding_to_db(self, tmp_path):
-        from ownscribe.pipeline import run_enroll
-        from ownscribe.speakers.base import Voiceprint, VoiceprintDB
+        from clew.pipeline import run_enroll
+        from clew.speakers.base import Voiceprint, VoiceprintDB
 
         config = Config()
         config.diarization.hf_token = "hf_test_token"
@@ -2614,8 +2614,8 @@ class TestRunEnroll:
         mock_embedder.embed_file.return_value = [0.1, 0.2, 0.3]
 
         with (
-            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
-            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
         ):
             run_enroll(config, "Alice", str(clip))
 
@@ -2623,7 +2623,7 @@ class TestRunEnroll:
         assert db.voiceprints == [Voiceprint(name="Alice", embedding=[0.1, 0.2, 0.3])]
 
     def test_embedding_failure_exits_with_error(self, tmp_path):
-        from ownscribe.pipeline import run_enroll
+        from clew.pipeline import run_enroll
 
         config = Config()
         config.diarization.hf_token = "hf_test_token"
@@ -2634,14 +2634,14 @@ class TestRunEnroll:
         mock_embedder.embed_file.side_effect = RuntimeError("boom")
 
         with (
-            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
             pytest.raises(SystemExit),
         ):
             run_enroll(config, "Alice", str(clip))
 
     def test_reenrolling_same_name_overwrites(self, tmp_path):
-        from ownscribe.pipeline import run_enroll
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import run_enroll
+        from clew.speakers.base import VoiceprintDB
 
         config = Config()
         config.diarization.hf_token = "hf_test_token"
@@ -2653,15 +2653,15 @@ class TestRunEnroll:
         mock_embedder.embed_file.return_value = [1.0, 0.0]
 
         with (
-            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
-            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
         ):
             run_enroll(config, "Alice", str(clip))
 
         mock_embedder.embed_file.return_value = [0.0, 1.0]
         with (
-            mock.patch("ownscribe.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
-            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
         ):
             run_enroll(config, "Alice", str(clip))
 
@@ -2672,27 +2672,27 @@ class TestRunEnroll:
 
 class TestRunUnenroll:
     def test_removes_existing_speaker(self, tmp_path):
-        from ownscribe.pipeline import run_unenroll
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import run_unenroll
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
         db.upsert("Alice", [1.0, 0.0])
         db.save(db_path)
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             run_unenroll("Alice")
 
         reloaded = VoiceprintDB.load(db_path)
         assert reloaded.voiceprints == []
 
     def test_missing_speaker_exits_with_error(self, tmp_path):
-        from ownscribe.pipeline import run_unenroll
+        from clew.pipeline import run_unenroll
 
         db_path = tmp_path / "voiceprints.json"
 
         with (
-            mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
             pytest.raises(SystemExit),
         ):
             run_unenroll("Nobody")
@@ -2700,8 +2700,8 @@ class TestRunUnenroll:
 
 class TestRunListEnrolled:
     def test_lists_all_enrolled_names(self, tmp_path, capsys):
-        from ownscribe.pipeline import run_list_enrolled
-        from ownscribe.speakers.base import VoiceprintDB
+        from clew.pipeline import run_list_enrolled
+        from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
         db = VoiceprintDB()
@@ -2709,7 +2709,7 @@ class TestRunListEnrolled:
         db.upsert("Bob", [0.0, 1.0])
         db.save(db_path)
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             run_list_enrolled()
 
         captured = capsys.readouterr()
@@ -2717,11 +2717,11 @@ class TestRunListEnrolled:
         assert "Bob" in captured.out
 
     def test_empty_db_reports_none_enrolled(self, tmp_path, capsys):
-        from ownscribe.pipeline import run_list_enrolled
+        from clew.pipeline import run_list_enrolled
 
         db_path = tmp_path / "voiceprints.json"
 
-        with mock.patch("ownscribe.speakers.base.VOICEPRINT_DB_PATH", db_path):
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
             run_list_enrolled()
 
         captured = capsys.readouterr()
@@ -2735,7 +2735,7 @@ class TestResumeWritesTheEvidenceFiles:
     lived exclusively inside `_do_transcribe_and_summarize`, and `run_resume` routes a
     transcript-present/summary-absent directory to `run_summarize` — which is exactly what
     `AppState.runPipeline` invokes and exactly what the pipeline's own failure message
-    advertises ("Resume with: ownscribe resume <dir>").
+    advertises ("Resume with: clew resume <dir>").
     """
 
     TRANSCRIPT = (
@@ -2754,7 +2754,7 @@ class TestResumeWritesTheEvidenceFiles:
     )
 
     def _run_resume(self, tmp_path, output_format="markdown"):
-        from ownscribe.pipeline import run_resume
+        from clew.pipeline import run_resume
 
         config = Config()
         config.output.format = output_format
@@ -2769,8 +2769,8 @@ class TestResumeWritesTheEvidenceFiles:
         mock_summarizer.summarize.return_value = self.SUMMARY
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", return_value=mock_summarizer),
-            mock.patch("ownscribe.summarization.llama_cpp_summarizer._ensure_model"),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
         ):
             run_resume(config, str(tmp_path))
         return tmp_path
@@ -2826,7 +2826,7 @@ class TestResumeWritesTheEvidenceFiles:
         )
 
     def test_resume_does_not_read_an_absent_audio_path(self, tmp_path):
-        from ownscribe import pipeline
+        from clew import pipeline
 
         seen: list[str] = []
         real_generate = pipeline._generate_and_save_envelope
@@ -2878,7 +2878,7 @@ class TestBackfillDerivedArtifacts:
         return d
 
     def test_skips_directory_without_transcript_or_summary(self, tmp_path):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         config = Config()
@@ -2889,7 +2889,7 @@ class TestBackfillDerivedArtifacts:
         assert not (d / "envelope.json").exists()
 
     def test_adds_anchors_from_existing_transcript_and_summary(self, tmp_path):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         (d / "transcript.md").write_text(self.TRANSCRIPT)
@@ -2908,7 +2908,7 @@ class TestBackfillDerivedArtifacts:
         assert not (d / "envelope.json").exists(), "no retained audio -- absence must stay absence"
 
     def test_adds_envelope_from_retained_audio(self, tmp_path, synthetic_wav):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         shutil.copy(synthetic_wav, d / "recording.wav")
@@ -2924,7 +2924,7 @@ class TestBackfillDerivedArtifacts:
         assert len(buckets) == 500
 
     def test_idempotent_does_not_touch_existing_derived_files(self, tmp_path, synthetic_wav):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         shutil.copy(synthetic_wav, d / "recording.wav")
@@ -2946,7 +2946,7 @@ class TestBackfillDerivedArtifacts:
         state the top-level 'both already exist' check does NOT shield -- it must fall through
         to the per-file guards, and those must still leave the existing anchors.json alone.
         """
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         shutil.copy(synthetic_wav, d / "recording.wav")
@@ -2964,7 +2964,7 @@ class TestBackfillDerivedArtifacts:
         assert (d / "envelope.json").exists(), "envelope.json was genuinely missing and must be added"
 
     def test_does_not_overwrite_existing_envelope_when_only_anchors_is_missing(self, tmp_path, synthetic_wav):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         shutil.copy(synthetic_wav, d / "recording.wav")
@@ -2982,7 +2982,7 @@ class TestBackfillDerivedArtifacts:
         assert (d / "anchors.json").exists(), "anchors.json was genuinely missing and must be added"
 
     def test_never_modifies_transcript_or_summary(self, tmp_path):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         (d / "transcript.md").write_text(self.TRANSCRIPT)
@@ -2995,7 +2995,7 @@ class TestBackfillDerivedArtifacts:
         assert (d / "summary.md").read_text() == self.SUMMARY
 
     def test_never_calls_the_summarizer_or_transcriber(self, tmp_path):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         (d / "transcript.md").write_text(self.TRANSCRIPT)
@@ -3003,16 +3003,16 @@ class TestBackfillDerivedArtifacts:
         config = Config()
 
         with (
-            mock.patch("ownscribe.pipeline.create_summarizer", side_effect=AssertionError("must not run the LLM")),
-            mock.patch("ownscribe.pipeline._create_transcriber", side_effect=AssertionError("must not run ASR")),
+            mock.patch("clew.pipeline.create_summarizer", side_effect=AssertionError("must not run the LLM")),
+            mock.patch("clew.pipeline._create_transcriber", side_effect=AssertionError("must not run ASR")),
         ):
             run_backfill(config, str(d))
 
         assert (d / "anchors.json").exists()
 
     def test_parity_between_markdown_and_json_output_format(self, tmp_path):
-        from ownscribe.output.json_output import format_transcript_json
-        from ownscribe.pipeline import run_backfill
+        from clew.output.json_output import format_transcript_json
+        from clew.pipeline import run_backfill
 
         md_dir = self._meeting_dir(tmp_path, "2026-01-01_1200")
         (md_dir / "transcript.md").write_text(self.TRANSCRIPT)
@@ -3058,8 +3058,8 @@ class TestBackfillDerivedArtifacts:
         straight into anchor_summary_claims, 'Summary' would be picked up as a spurious rare
         token whenever the transcript happens to contain the word 'summary' anywhere.
         """
-        from ownscribe.output.markdown import format_summary
-        from ownscribe.pipeline import run_backfill
+        from clew.output.markdown import format_summary
+        from clew.pipeline import run_backfill
 
         d = self._meeting_dir(tmp_path)
         (d / "transcript.md").write_text(self.TRANSCRIPT + "[00:30] In summary, Gary is happy with the rollout.\n")
@@ -3072,7 +3072,7 @@ class TestBackfillDerivedArtifacts:
         assert "Summary" not in anchors, "the file header must not leak into the anchored claims"
 
     def test_scans_every_meeting_directory_when_none_given(self, tmp_path, capsys):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         base = tmp_path / "notes"
         base.mkdir()
@@ -3102,7 +3102,7 @@ class TestBackfillDerivedArtifacts:
         assert (needs_backfill / "anchors.json").exists()
 
     def test_errors_when_given_directory_does_not_exist(self, tmp_path):
-        from ownscribe.pipeline import run_backfill
+        from clew.pipeline import run_backfill
 
         config = Config()
         missing = tmp_path / "does-not-exist"

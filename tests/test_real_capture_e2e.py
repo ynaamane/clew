@@ -30,7 +30,7 @@ def _production_binary() -> Path:
     happened with BUG5: bin/ held a binary three days older than the fix and
     still halved playback speed.
     """
-    from ownscribe.audio.coreaudio import _BINARY_CANDIDATES
+    from clew.audio.coreaudio import _BINARY_CANDIDATES
 
     for candidate in _BINARY_CANDIDATES:
         if candidate.is_file():
@@ -179,7 +179,7 @@ class TestDualTrackMergeOnRealAudio:
 @pytest.mark.hardware
 class TestEnvelopeOnRealAudio:
     def test_the_envelope_reader_survives_a_real_capture(self, tmp_path):
-        from ownscribe.audio.envelope import generate_envelope_from_file
+        from clew.audio.envelope import generate_envelope_from_file
 
         output = tmp_path / "recording.wav"
         _run_capture(output, 3.0)
@@ -196,7 +196,7 @@ class TestEnvelopeOnRealAudio:
         assert not any(value != value for value in envelope), "NaN in the envelope would break the strip"
 
     def test_the_envelope_file_the_pipeline_writes_is_valid_json(self, tmp_path):
-        from ownscribe.audio.envelope import generate_envelope_from_file
+        from clew.audio.envelope import generate_envelope_from_file
 
         output = tmp_path / "recording.wav"
         _run_capture(output, 2.0)

@@ -1,5 +1,5 @@
 [project]
-name = "ownscribe"
+name = "clew"
 version = "0.13.1"
 description = "Fully local meeting transcription and summarization CLI"
 readme = "README.md"
@@ -41,12 +41,13 @@ openai = ["openai>=1.0"]
 all = ["ollama>=0.4", "openai>=1.0"]
 
 [project.urls]
-Homepage = "https://github.com/ynaamane/meeting-scribe"
-Repository = "https://github.com/ynaamane/meeting-scribe"
-Issues = "https://github.com/ynaamane/meeting-scribe/issues"
+Homepage = "https://github.com/ynaamane/clew"
+Repository = "https://github.com/ynaamane/clew"
+Issues = "https://github.com/ynaamane/clew/issues"
 
 [project.scripts]
-ownscribe = "ownscribe.cli:cli"
+clew = "clew.cli:main"
+ownscribe = "clew.cli:main"
 
 [dependency-groups]
 dev = [

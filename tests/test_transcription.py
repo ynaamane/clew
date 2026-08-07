@@ -10,8 +10,8 @@ import pytest
 
 class TestFfmpegCheck:
     def test_missing_ffmpeg_exits(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
 
@@ -49,8 +49,8 @@ class _FakeProgress:
 
 class TestPrepareModels:
     def test_prepare_models_emits_preparing_models_lifecycle(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(language="en"), None, progress=progress)
@@ -72,8 +72,8 @@ class TestPrepareModels:
         assert mock_capture.call_count >= 1
 
     def test_prepare_models_skips_diarization_without_token(self):
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         progress = _FakeProgress()
         diar = DiarizationConfig(enabled=True, hf_token="")
@@ -95,8 +95,8 @@ class TestPrepareModels:
         assert mock_capture.call_count >= 1
 
     def test_prepare_models_reuses_loaded_whisper_model(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(language="en"), None, progress=progress)
@@ -123,9 +123,9 @@ class TestPrepareModels:
 
 class TestDownloadProgressHooks:
     def test_on_download_progress_updates_detail_and_bar(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.progress import DownloadProgressEvent
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.progress import DownloadProgressEvent
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None, progress=progress)
@@ -142,8 +142,8 @@ class TestDownloadProgressHooks:
         assert "25%" not in progress.details["preparing_models"]
 
     def test_capture_download_output_resets_bar_to_zero(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         progress = _FakeProgress()
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None, progress=progress)
@@ -158,8 +158,8 @@ class TestDownloadProgressHooks:
         assert all(frac > 0 for _, frac in progress.updates)
 
     def test_transcribe_inner_does_not_use_preparing_models_step(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         class _Audio:
             shape = (16000,)
@@ -195,8 +195,8 @@ class TestDownloadProgressHooks:
 
 class TestDiarizeOverride:
     def test_diarize_false_override_skips_diarization_even_when_configured(self):
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         class _Audio:
             shape = (16000,)
@@ -222,8 +222,8 @@ class TestDiarizeOverride:
         mock_diarize.assert_not_called()
 
     def test_diarize_none_falls_back_to_config_enabled(self):
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         class _Audio:
             shape = (16000,)
@@ -249,8 +249,8 @@ class TestDiarizeOverride:
         mock_diarize.assert_called_once()
 
     def test_diarize_enabled_without_token_skips_diarize_and_warns(self):
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         class _Audio:
             shape = (16000,)
@@ -270,7 +270,7 @@ class TestDiarizeOverride:
             mock.patch.dict("sys.modules", {"whisperx": fake_whisperx}),
             mock.patch.object(transcriber, "_load_align_model", return_value=(object(), object())),
             mock.patch.object(transcriber, "_diarize") as mock_diarize,
-            mock.patch("ownscribe.transcription.whisperx_transcriber.click.echo") as mock_echo,
+            mock.patch("clew.transcription.whisperx_transcriber.click.echo") as mock_echo,
         ):
             transcriber.transcribe(mock.MagicMock())
 
@@ -282,8 +282,8 @@ class TestDiarizeOverride:
 class TestDiarizationApiCompat:
     def test_load_diarization_pipeline_passes_token_kwarg(self):
         # pyannote.audio 4.0 renamed `use_auth_token` -> `token`.
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
@@ -307,8 +307,8 @@ class TestDiarizationApiCompat:
         assert "use_auth_token" not in kwargs
 
     def test_load_diarization_pipeline_always_forces_cpu(self):
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
@@ -334,8 +334,8 @@ class TestDiarizationApiCompat:
         import numpy as np
         import torch  # noqa: F401
 
-        from ownscribe.config import DiarizationConfig, TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
@@ -423,8 +423,8 @@ class TestExtractClusterEmbeddings:
     def test_extracts_embeddings_keyed_by_speaker_label(self):
         import numpy as np
 
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
 
@@ -440,8 +440,8 @@ class TestExtractClusterEmbeddings:
         assert result == {"SPEAKER_00": [0.1, 0.2], "SPEAKER_01": [0.3, 0.4]}
 
     def test_returns_empty_dict_when_embeddings_attribute_missing(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
 
@@ -452,8 +452,8 @@ class TestExtractClusterEmbeddings:
         assert result == {}
 
     def test_returns_empty_dict_when_embeddings_is_none(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
 
@@ -469,8 +469,8 @@ class TestExtractClusterEmbeddings:
 
 class TestLastSpeakerEmbeddings:
     def test_defaults_to_empty_dict(self):
-        from ownscribe.config import TranscriptionConfig
-        from ownscribe.transcription.whisperx_transcriber import WhisperXTranscriber
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
 

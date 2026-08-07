@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ownscribe.audio.envelope import compute_rms_envelope, generate_envelope_from_file
+from clew.audio.envelope import compute_rms_envelope, generate_envelope_from_file
 
 
 class TestComputeRMSEnvelope:
@@ -86,9 +86,7 @@ class TestComputeRMSEnvelope:
         """Validate against the real recording reference measurement."""
         from pathlib import Path
 
-        audio_path = Path(
-            "/Users/yanisnaamane/ownscribe/2026-07-27_1536_project-technical-review-key-points/recording.wav"
-        )
+        audio_path = Path("/Users/yanisnaamane/clew/2026-07-27_1536_project-technical-review-key-points/recording.wav")
 
         if not audio_path.exists():
             pytest.skip("Reference recording not available on this machine")
