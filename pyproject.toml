@@ -3,9 +3,12 @@ name = "ownscribe"
 version = "0.13.1"
 description = "Fully local meeting transcription and summarization CLI"
 readme = "README.md"
-license = "MIT"
+license = { text = "PolyForm-Noncommercial-1.0.0 AND MIT" }
 authors = [
     { name = "Pascal Berrang", email = "git@p4l.dev" }
+]
+maintainers = [
+    { name = "Yanis Naamane", email = "yanis@nymedia.io" }
 ]
 requires-python = ">=3.12,<3.14"
 keywords = ["meeting", "transcription", "summarization", "whisper", "local", "privacy"]
@@ -13,7 +16,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
