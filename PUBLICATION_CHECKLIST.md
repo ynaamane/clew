@@ -69,22 +69,66 @@ is trustworthy until it is captured after the rewrite (if the rewrite happens).
   an open item (`TODO.md:34`); it states single-clip enrollment instead, matching what the code
   actually does.
 
+- [x] **Cleanup command purges voiceprints too (queue task 9)**
+  Done this session. `cleanup` targeted `~/.config/ownscribe` only (`config.py:10`) and silently
+  left voiceprint biometric data behind at `~/.config/meeting-scribe/voiceprints`
+  (`speakers/base.py:9`) whenever `cleanup --all` ran, despite claiming to remove everything.
+  TDD fix: failing test written first, confirmed red against the unmodified command, then green,
+  mutation-checked. Independent review (`reviewer` subagent) caught a real gap the first pass
+  missed: 3 pre-existing tests would have deleted a real developer's actual voiceprint store the
+  moment `--all` genuinely started removing it, since they never mocked the new path; patched all
+  three and added coverage for the previously-untested flagless interactive path too. Verified
+  with a fake-HOME sentinel file that now survives the full `TestCleanup` suite. 48/48
+  `test_cli.py`, 678 passed project-wide, `scripts/check.sh` 10/10 (`EXIT=0`). Commit `b210cc1`.
+
+- [x] **Legal and privacy notice inserted (queue task 3, disclaimer)**
+  Done this session. `README.md`, new `## Legal and privacy notice` section placed just before
+  Acknowledgments (consent law by jurisdiction, local-only processing, voiceprints as GDPR
+  special-category biometric data, "not legal advice"), plus a cross-reference line added to
+  `## Speaker Diarization`. Inserted from
+  `/Users/yanisnaamane/taff/pipeline/research/legal-privacy-notice.md` verbatim, WITHOUT the
+  "cleanup does not currently touch this file" sentence the dossier's own note flagged for
+  removal once the cleanup bug above is fixed, which it now is.
+
 - [x] **MIT license intact**
   Verified this session. `/Users/yanisnaamane/meeting-scribe/LICENSE` exists, standard MIT text,
   upstream copyright notice preserved verbatim: `Copyright (c) 2026 Pascal Berrang`. No
   modification needed, MIT requires the notice survive, not the git history (also confirmed in
   the A3 tradeoff doc as the legal basis for the fresh-start option being license-safe).
 
+- [ ] **License structure decision (PolyForm-NC vs MIT vs AGPL)**
+  PENDING, Yanis decision, explicitly out of scope for this session. Full tradeoff doc:
+  `/Users/yanisnaamane/taff/pipeline/research/license-structure.md` (queue item
+  `license-choice`). Distinct from "MIT license intact" above: that item confirms today's
+  upstream notice survives untouched; this one is whether the published repo stays plain MIT or
+  re-licenses Yanis's own additions under PolyForm Noncommercial 1.0.0 (blocks commercial use,
+  reads as source-available not open source on GitHub's own badge) or AGPL-3.0-only (OSI green
+  badge, does not actually block commercial use). Common blockers regardless of choice, from the
+  same doc: `pyproject.toml`'s `license`/`authors`/classifier/`name` fields still say upstream's
+  MIT/Pascal Berrang/`ownscribe` (deliberately left untouched this session, only the
+  `[project.urls]` Homepage/Repository/Issues were fixed to `ynaamane/meeting-scribe`, see below);
+  the README MIT badge; a "Contribution licensing" section in `CONTRIBUTING.md` (still zero
+  "licen" occurrences there). None of this is actioned until Yanis picks a variant.
+
+- [x] **`pyproject.toml` URLs fixed**
+  Done this session. `[project.urls]` Homepage/Repository/Issues now point to
+  `https://github.com/ynaamane/meeting-scribe` instead of upstream's `paberr/ownscribe`.
+  `license`, `authors`, `classifiers` and `name` deliberately NOT touched, they depend on the
+  license structure decision above. Verified the file still parses (`tomllib.load`) and that the
+  four untouched fields are byte-identical to before.
+
 - [ ] **CONTRIBUTING.md up to date**
-  Read in full this session. Currently accurate about today's state (`scripts/check.sh` as the
-  CI replacement, the 10-gate description, the measurement traps, the render-and-look rule) but
-  its "Running tests" section (`CONTRIBUTING.md:27-33`) still states **"There is no CI. GitHub
-  Actions never ran on this repo, 29 consecutive `startup_failure`s with zero jobs created"**.
-  Given A6's status (workflow written and pushed, but blocked at the GitHub account level, not
-  yet merged to `main`), this paragraph is still technically accurate today, but needs a
-  follow-up edit the moment A6 actually resolves (either a working CI landing on `main`, or a
-  documented account-level blocker replacing the "never ran" framing). Not done by this
-  checklist. Marked PENDING pending that edit.
+  Partially done this session. Clone URL fixed (`git clone
+  https://github.com/ynaamane/meeting-scribe.git` / `cd meeting-scribe`, was still
+  `paberr/ownscribe`). The "Running tests" section's **"There is no CI"** paragraph
+  (`CONTRIBUTING.md:27` before this session) is rewritten: CI exists on branch `ci-resurrection`
+  (`.github/workflows/ci.yml`, matches A6's evidence above) and will start running once the repo
+  goes public and the workflow merges to `main`; the macOS job stays manual (`workflow_dispatch`)
+  since a hosted macOS runner is not something to burn on every push. The matching "there is no
+  CI" line in the "Code style" section was updated too, for internal consistency. Still NOT fully
+  up to date: the license-structure doc's own finding stands, `CONTRIBUTING.md` has zero "licen"
+  occurrences (no Contribution licensing section), which depends on the license decision above.
+  Marked PENDING pending that decision.
 
 ## Final gate
 
