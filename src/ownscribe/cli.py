@@ -9,10 +9,12 @@ import subprocess
 import click
 
 from ownscribe.config import CONFIG_DIR, Config, ensure_config_file
+from ownscribe.speakers.base import VOICEPRINT_DIR
 
 # Canonical paths for cleanup
 _CACHE_DIR = os.path.expanduser("~/.local/share/ownscribe")
 _CONFIG_DIR = str(CONFIG_DIR)
+_VOICEPRINT_DIR = str(VOICEPRINT_DIR)
 
 
 def _dir_size(path: str) -> str:
@@ -394,7 +396,7 @@ def config_cmd() -> None:
 
 @cli.command()
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts.")
-@click.option("--all", "all_", is_flag=True, help="Remove everything (config + cache + output).")
+@click.option("--all", "all_", is_flag=True, help="Remove everything (config + cache + output + voiceprints).")
 @click.option("--config", "config_", is_flag=True, help="Remove config directory (~/.config/ownscribe/).")
 @click.option("--cache", is_flag=True, help="Remove cached binary (~/.local/share/ownscribe/).")
 @click.option("--output", is_flag=True, help="Remove output directory with recordings/transcripts.")
@@ -419,6 +421,7 @@ def cleanup(
             ("Config", _CONFIG_DIR),
             ("Cache", _CACHE_DIR),
             ("Output", output_dir),
+            ("Voiceprints", _VOICEPRINT_DIR),
         ]
         if audio_dir != output_dir:
             targets.append(("Audio", audio_dir))
@@ -436,6 +439,7 @@ def cleanup(
             ("Config", _CONFIG_DIR),
             ("Cache", _CACHE_DIR),
             ("Output", output_dir),
+            ("Voiceprints", _VOICEPRINT_DIR),
         ]
         if audio_dir != output_dir:
             candidates.append(("Audio", audio_dir))

@@ -358,7 +358,8 @@ class TestCleanup:
         config_dir = tmp_path / "config"
         cache_dir = tmp_path / "cache"
         output_dir = tmp_path / "output"
-        for d in (config_dir, cache_dir, output_dir):
+        voiceprint_dir = tmp_path / "voiceprints"
+        for d in (config_dir, cache_dir, output_dir, voiceprint_dir):
             d.mkdir()
             (d / "file.txt").write_text("data")
 
@@ -370,6 +371,7 @@ class TestCleanup:
             _mock_config(cfg),
             mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
             mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -386,7 +388,8 @@ class TestCleanup:
         cache_dir = tmp_path / "cache"
         output_dir = tmp_path / "output"
         audio_dir = tmp_path / "audio-cache"
-        for d in (config_dir, cache_dir, output_dir, audio_dir):
+        voiceprint_dir = tmp_path / "voiceprints"
+        for d in (config_dir, cache_dir, output_dir, audio_dir, voiceprint_dir):
             d.mkdir()
             (d / "file.txt").write_text("data")
 
@@ -399,6 +402,7 @@ class TestCleanup:
             _mock_config(cfg),
             mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
             mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
@@ -458,11 +462,69 @@ class TestCleanup:
             _mock_config(cfg),
             mock.patch("ownscribe.cli._CONFIG_DIR", str(tmp_path / "no-config")),
             mock.patch("ownscribe.cli._CACHE_DIR", str(tmp_path / "no-cache")),
+            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(tmp_path / "no-voiceprints")),
         ):
             result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
 
         assert result.exit_code == 0
         assert "not found, skipping" in result.output
+
+    def test_all_yes_removes_voiceprints_dir(self, tmp_path):
+        """cleanup --all claims to remove everything; voiceprints are biometric
+        data and must not survive it (config.py targets ~/.config/ownscribe,
+        but voiceprints live in ~/.config/meeting-scribe/voiceprints -
+        speakers/base.py)."""
+        config_dir = tmp_path / "config"
+        cache_dir = tmp_path / "cache"
+        output_dir = tmp_path / "output"
+        voiceprint_dir = tmp_path / "voiceprints"
+        for d in (config_dir, cache_dir, output_dir, voiceprint_dir):
+            d.mkdir()
+            (d / "file.txt").write_text("data")
+
+        cfg = Config()
+        cfg.output.dir = str(output_dir)
+
+        runner = CliRunner()
+        with (
+            _mock_config(cfg),
+            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir), create=True),
+        ):
+            result = runner.invoke(cli, ["cleanup", "--all", "--yes"])
+
+        assert result.exit_code == 0
+        assert not voiceprint_dir.exists(), "cleanup --all left the voiceprint store on disk"
+        assert "Removed Voiceprints" in result.output
+
+    def test_interactive_yes_removes_voiceprints_dir(self, tmp_path):
+        """The flagless interactive path (`cleanup --yes`, no --all/--config/--cache/
+        --output) builds its own candidate list; it must offer Voiceprints too, not
+        just the --all branch."""
+        config_dir = tmp_path / "config"
+        cache_dir = tmp_path / "cache"
+        output_dir = tmp_path / "output"
+        voiceprint_dir = tmp_path / "voiceprints"
+        for d in (config_dir, cache_dir, output_dir, voiceprint_dir):
+            d.mkdir()
+            (d / "file.txt").write_text("data")
+
+        cfg = Config()
+        cfg.output.dir = str(output_dir)
+
+        runner = CliRunner()
+        with (
+            _mock_config(cfg),
+            mock.patch("ownscribe.cli._CONFIG_DIR", str(config_dir)),
+            mock.patch("ownscribe.cli._CACHE_DIR", str(cache_dir)),
+            mock.patch("ownscribe.cli._VOICEPRINT_DIR", str(voiceprint_dir)),
+        ):
+            result = runner.invoke(cli, ["cleanup", "--yes"])
+
+        assert result.exit_code == 0
+        assert not voiceprint_dir.exists(), "interactive cleanup left the voiceprint store on disk"
+        assert "Removed Voiceprints" in result.output
 
 
 class TestInvalidConfigReporting:
