@@ -25,7 +25,7 @@ final class SpeakerAvatarInitialsTests: XCTestCase {
     }
 
     func testAnEnrolledNameBecomesItsInitials() {
-        XCTAssertEqual(SpeakerAvatarStyle.displayLabel(for: "Sam"), "N")
+        XCTAssertEqual(SpeakerAvatarStyle.displayLabel(for: "Sam"), "S")
         XCTAssertEqual(
             SpeakerAvatarStyle.displayLabel(for: "Marie_Claire"), "MC",
             "an underscore separates given and family name in an enrolled label, so both initials survive")
@@ -40,12 +40,12 @@ final class SpeakerAvatarInitialsTests: XCTestCase {
     }
 
     func testTwoDifferentSpeakersDoNotCollapseOntoTheSameInitial() {
-        let Sam = SpeakerAvatarStyle.displayLabel(for: "Sam")
-        let nathalie = SpeakerAvatarStyle.displayLabel(for: "Nathalie")
+        let sam = SpeakerAvatarStyle.displayLabel(for: "Sam")
+        let sofia = SpeakerAvatarStyle.displayLabel(for: "Sofia")
 
-        XCTAssertEqual(Sam, nathalie, "two names sharing an initial DO share a glyph — that is expected")
+        XCTAssertEqual(sam, sofia, "two names sharing an initial DO share a glyph, that is expected")
         XCTAssertNotEqual(
-            SpeakerAvatarStyle.color(for: "Sam"), SpeakerAvatarStyle.color(for: "Nathalie"),
+            SpeakerAvatarStyle.color(for: "Sam"), SpeakerAvatarStyle.color(for: "Sofia"),
             "which is why the COLOUR has to separate them. An initial alone is not an identity, and the avatar's whole job is telling two speakers apart at a glance.")
     }
 

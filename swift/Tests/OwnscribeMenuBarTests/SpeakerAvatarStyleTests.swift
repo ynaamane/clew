@@ -59,7 +59,7 @@ import SwiftUI
         #expect(SpeakerAvatarStyle.displayLabel(for: "Léa_B") == "LB")
         #expect(SpeakerAvatarStyle.displayLabel(for: "Marc_B") == "MB")
         #expect(SpeakerAvatarStyle.displayLabel(for: "Marie_Claire") == "MC")
-        #expect(SpeakerAvatarStyle.displayLabel(for: "Sam") == "N")
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Sam") == "S")
     }
 
     @Test func colorDistinguishesSPEAKERPattern() {
@@ -69,42 +69,54 @@ import SwiftUI
     }
 
     @Test func enrolledNamesGetConsistentColors() {
-        let nicolas1 = SpeakerAvatarStyle.color(for: "Sam")
-        let nicolas2 = SpeakerAvatarStyle.color(for: "Sam")
-        #expect(nicolas1 == nicolas2, "Same name must get same color")
+        let sam1 = SpeakerAvatarStyle.color(for: "Sam")
+        let sam2 = SpeakerAvatarStyle.color(for: "Sam")
+        #expect(sam1 == sam2, "Same name must get same color")
 
-        let Idris = SpeakerAvatarStyle.color(for: "Idris")
-        #expect(Idris == SpeakerAvatarStyle.color(for: "Idris"), "Same name must get same color")
+        let idris = SpeakerAvatarStyle.color(for: "Idris")
+        #expect(idris == SpeakerAvatarStyle.color(for: "Idris"), "Same name must get same color")
 
         let lea = SpeakerAvatarStyle.color(for: "Léa_B")
         #expect(lea == SpeakerAvatarStyle.color(for: "Léa_B"), "Same name must get same color")
     }
 
     @Test func enrolledNamesDoNotCollapseToOnePurple() {
-        let Sam = SpeakerAvatarStyle.color(for: "Sam")
-        let Idris = SpeakerAvatarStyle.color(for: "Idris")
+        let sam = SpeakerAvatarStyle.color(for: "Sam")
+        let idris = SpeakerAvatarStyle.color(for: "Idris")
         let marc = SpeakerAvatarStyle.color(for: "Marc_B")
 
         let speaker01Purple = Color.purple
 
-        let allPurple = (Sam == speaker01Purple && Idris == speaker01Purple && marc == speaker01Purple)
+        let allPurple = (sam == speaker01Purple && idris == speaker01Purple && marc == speaker01Purple)
         #expect(!allPurple, "F9: Enrolled names must not all collapse to purple (the old behavior)")
     }
 
     @Test func deterministicColorMapping() {
-        #expect(SpeakerAvatarStyle.color(for: "Sam") == .purple)
-        #expect(SpeakerAvatarStyle.color(for: "Idris") == .pink)
+        #expect(SpeakerAvatarStyle.color(for: "Sam") == .teal)
+        #expect(SpeakerAvatarStyle.color(for: "Idris") == .teal)
         #expect(SpeakerAvatarStyle.color(for: "Léa_B") == .indigo)
         #expect(SpeakerAvatarStyle.color(for: "Marc_B") == .cyan)
     }
 
     @Test func enrolledNamesGetDistinctColors() {
-        let Sam = SpeakerAvatarStyle.color(for: "Sam")
-        let Idris = SpeakerAvatarStyle.color(for: "Idris")
+        let sam = SpeakerAvatarStyle.color(for: "Sam")
         let lea = SpeakerAvatarStyle.color(for: "Léa_B")
+        let marc = SpeakerAvatarStyle.color(for: "Marc_B")
 
-        #expect(Sam != Idris, "Sam and Idris must have different colors")
-        #expect(Sam != lea, "Sam and Léa_B must have different colors")
-        #expect(Idris != lea, "Idris and Léa_B must have different colors")
+        #expect(sam != lea, "Sam and Léa_B must have different colors")
+        #expect(sam != marc, "Sam and Marc_B must have different colors")
+        #expect(lea != marc, "Léa_B and Marc_B must have different colors")
+    }
+
+    @Test func twoEnrolledNamesCanShareAColourAndTheInitialIsWhatSeparatesThem() {
+        // FNV-1a modulo a 7-colour palette cannot promise distinct colours for
+        // arbitrary names, and "Sam" and "Idris" are a real collision (both teal,
+        // pinned above). The pair is kept here on purpose: the previous version of
+        // this suite asserted pairwise distinctness on the two sample names it
+        // happened to hold, which read as a guarantee the palette does not make.
+        // What actually separates them at a glance is the initial.
+        #expect(SpeakerAvatarStyle.color(for: "Sam") == SpeakerAvatarStyle.color(for: "Idris"))
+        #expect(SpeakerAvatarStyle.displayLabel(for: "Sam")
+                != SpeakerAvatarStyle.displayLabel(for: "Idris"))
     }
 }
