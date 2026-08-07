@@ -14,7 +14,72 @@ that rewrite and is provisional: it will need to be re-captured against the post
 before the actual visibility flip. The plan's own ordering rule: no proof citing a SHA or run URL
 is trustworthy until it is captured after the rewrite (if the rewrite happens).
 
+**On the two patterns referenced below.** The *narrow purge pattern* (A1) and the *widened NDA
+pattern* (A2 and the final sweep) are both recorded verbatim in the Track A plan linked above,
+and are referred to here by name rather than inlined. Naming them instead of quoting them keeps
+this file from reproducing the very tokens the sweep exists to remove, which is also why the
+employer name and the client project codename appear below as descriptions rather than literals.
+
 ## Checklist
+
+- [x] **A1: Purge of the 3 identified docs (screenshot-incident narrative)**
+  Done. Evidence: commit `3978b62` ("docs: genericize the screenshot-incident narrative across
+  all docs (A1+A2)"), touching `HANDOFF.md`, `LESSONS_LEARNED.md`, `TODO.md` (plus `APP_TEST.md`,
+  `CLAUDE.md`, `design/mockup.html`, folded in under A2 below). Done criterion from the plan: the
+  narrow purge pattern returns zero matches across those three docs. Re-verified fresh this
+  session (2026-08-06) against current HEAD
+  (`e96ba37`): still zero matches, and the technical lesson (never `screencapture` the full
+  screen, target the window via `-l <windowid>` or `-R`) reads intact in all three docs.
+
+- [x] **A2: Widened-pattern NDA sweep at HEAD**
+  Done at HEAD `e96ba37` (same content as `3978b62`, no NDA-relevant edits since, other than the
+  two items below closing). Pattern: the widened NDA pattern described at the top of this file,
+  all tracked files, `.git` excluded. Full occurrence table with a verdict per line is in
+  `/Users/yanisnaamane/taff/docs/handoffs/reports/2026-08-04-meeting-scribe.md`. Re-run that
+  session: 28 occurrences (excluding the `MeetingsLack`/`ClaimsLacking` substring false
+  positives, consistent with the report's count), all in the ACCEPTABLE class per the plan's
+  criteria (generic colleague-voice examples, internal project-ticket references with no
+  employer identified, the employer name used alone as a nameable career fact per the project's
+  own NDA read). Zero occurrences of the codename. Two items the report flagged as needing a
+  human decision: **both RESOLVED**, commit `44b9f2c` ("docs: reframe pilot as global-recorder,
+  not client-fed (pre-publication)"), landed the same day, before either reached Yanis as an
+  open question. Stale citation refreshed this session (2026-08-07), re-checked directly rather
+  than trusted:
+  - `NOTES.md:629`, `pilot/run_pilot.py`, `pilot/fetch_fallback_clip.py` used to name the
+    employer in the phrase describing the fallback clip; reworded to generic terms ("without any
+    user-provided audio", "a real, Yanis-provided meeting clip"). Re-verified this session: a
+    grep for the employer name across `NOTES.md`, `pilot/run_pilot.py` and
+    `pilot/fetch_fallback_clip.py` returns zero matches (this checklist
+    previously cited that old wording as still current, which by the time it was written was
+    already a session behind).
+  - `.claude/skills/ownscribe-pipeline-traps/SKILL.md:56` used to claim "the repo is private
+    because it holds biometric voiceprints"; reworded to the accurate claim. Re-read this
+    session: the line now says "Voiceprint embeddings are biometric data (GDPR Art. 9, cleared
+    for this use) and live outside the tracked tree, under `~/.config` and `~/ownscribe`: never
+    commit them into the repo", no false claim about repo contents.
+  Also DONE (same anonymization pass, commit `a35d03c`, plus this session's `6760942`): the
+  remaining 3 of the 5 tracked micro-validations from the morning-review queue (colleague first
+  names anonymized project-wide across `TODO.md`, `rec.sh`,
+  `HANDOFF.md`, `LESSONS_LEARNED.md`; the forced-purple-selection question decided in place, kept
+  the macOS system selection color). All 5 micro-validations from `pending-decisions.jsonl` are
+  DONE.
+  **Final re-run of this sweep, post-A3 history rewrite (if any), is still PENDING**, see the
+  note below; this refresh checks current HEAD content only, not history.
+
+- [ ] **A3: Git history treatment**
+  PENDING, Yanis decision. Tradeoff document with a real trial run already done:
+  `/Users/yanisnaamane/taff/docs/handoffs/2026-08-04-a3-history-tradeoff.md`. The trial (on a
+  separate mirror clone, real repo untouched) found: paragraph-excision by `git filter-repo`
+  callback produces a genuinely clean history covering both blobs and commit messages (a
+  token-only `--replace-text` pass would NOT: 19 blobs tell the whole leak narrative without
+  containing the employer name or the codename as tokens); the hash churn is unavoidable in any
+  rewrite (comes
+  from GPG-signature stripping, not from the excision itself); 42 of 43 commit-hash citations
+  across the docs go stale under a rewrite. Three options are on the table (surgical excision,
+  HEAD-only purge with documented residual risk, fresh-start public history), see the tradeoff
+  doc for the full comparison. **The real deadline for this decision is the public flip (target
+  September 1, 2026), not any earlier internal date**, per the plan's own note in the tradeoff
+  doc.
 
 - [ ] **A4: `scripts/check.sh` green + real visual verification**
   Partially done. `check.sh` evidence: `CHECK_EXIT=0` read from a captured variable (not off a
@@ -129,6 +194,15 @@ is trustworthy until it is captured after the rewrite (if the rewrite happens).
   up to date: the license-structure doc's own finding stands, `CONTRIBUTING.md` has zero "licen"
   occurrences (no Contribution licensing section), which depends on the license decision above.
   Marked PENDING pending that decision.
+
+- [ ] **Final NDA sweep (widened pattern, blobs AND commit messages)**
+  PENDING, to run after the A3 decision is executed (if a rewrite happens) or explicitly
+  confirmed as HEAD-only (if not). Must cover both surfaces per the report's Decouverte 4: a
+  blob-only sweep already missed a commit message once (`178b05d`'s message quoted the old
+  CLAUDE.md leak narrative verbatim, found only by `git log --all -p`, not by an
+  enumerate-blobs approach). Command for the re-run: pipe `git log --all -p` through a
+  case-insensitive grep for the widened NDA pattern described at the top of this file, against
+  whatever history state is live at flip time, plus a human read of every remaining occurrence.
 
 ## Final gate
 
