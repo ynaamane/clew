@@ -116,7 +116,7 @@ installed copy (`open /Applications/Clew.app`), never the inner binary.
 
 ## Architecture
 
-**clew** (formerly ownscribe; the console script is still also installed as `ownscribe` for muscle memory) is a CLI tool for local meeting recording, transcription, and summarization. The main pipeline is: Record → Transcribe → Summarize → Output.
+**clew** (formerly ownscribe; the `ownscribe` console-script alias was removed, only `clew` is installed now) is a CLI tool for local meeting recording, transcription, and summarization. The main pipeline is: Record → Transcribe → Summarize → Output.
 
 ### Plugin systems with abstract base classes
 

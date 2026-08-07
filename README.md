@@ -149,9 +149,6 @@ then call `clew` directly. The examples in [Usage](#usage) use the bare
 `clew` form, which works after activation, after `uv tool install`, or via
 `uvx --from git+https://github.com/ynaamane/clew clew`.
 
-An `ownscribe` command is also installed alongside `clew` (same entry point,
-kept for muscle memory from before the rename).
-
 ## Usage
 
 ### Record, transcribe, and summarize a meeting

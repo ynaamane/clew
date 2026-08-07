@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 if [[ -z "${HF_TOKEN:-}" ]]; then
   TOKEN_CHECK_OUTPUT=$(.venv/bin/python -c "
-from ownscribe.config import Config
+from clew.config import Config
 import sys
 try:
     cfg = Config.load()
@@ -20,7 +20,7 @@ except Exception as e:
     exit 1
   elif [[ $TOKEN_EXIT -ne 0 ]]; then
     echo "⚠️  No HuggingFace token found."
-    echo "   Put it in $HOME/.config/ownscribe/config.toml under [diarization] as hf_token = \"hf_...\" (chmod 600),"
+    echo "   Put it in $HOME/.config/clew/config.toml under [diarization] as hf_token = \"hf_...\" (chmod 600),"
     echo "   or export HF_TOKEN=hf_xxxxx for a one-off run."
     echo "   Get one at https://huggingface.co/settings/tokens after accepting"
     echo "   https://huggingface.co/pyannote/speaker-diarization-community-1"
@@ -32,26 +32,26 @@ MODE="${1:-call}"
 
 case "$MODE" in
   call)
-    echo "🎙️  Recording English call — Ctrl+C to stop. Output in ~/ownscribe/"
-    exec .venv/bin/ownscribe --mic --diarize --language en
+    echo "🎙️  Recording English call — Ctrl+C to stop. Output in ~/clew/"
+    exec .venv/bin/clew --mic --diarize --language en
     ;;
   fr)
     echo "🎙️  Recording French call — Ctrl+C to stop."
-    exec .venv/bin/ownscribe --mic --diarize --language fr
+    exec .venv/bin/clew --mic --diarize --language fr
     ;;
   auto)
     echo "🎙️  Recording, auto language — Ctrl+C to stop."
-    exec .venv/bin/ownscribe --mic --diarize
+    exec .venv/bin/clew --mic --diarize
     ;;
   redo)
     DIR="${2:?usage: ./rec.sh redo <meeting-dir>}"
     echo "♻️  Re-processing $DIR from retained audio"
-    exec .venv/bin/ownscribe resume "$DIR" --diarize --language en --model large-v3
+    exec .venv/bin/clew resume "$DIR" --diarize --language en --model large-v3
     ;;
   enroll)
     NAME="${2:?usage: ./rec.sh enroll \"Name\" clip.wav}"
     CLIP="${3:?usage: ./rec.sh enroll \"Name\" clip.wav}"
-    exec .venv/bin/ownscribe enroll --name "$NAME" "$CLIP"
+    exec .venv/bin/clew enroll --name "$NAME" "$CLIP"
     ;;
   *)
     echo "usage:"

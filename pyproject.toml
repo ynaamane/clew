@@ -47,7 +47,6 @@ Issues = "https://github.com/ynaamane/clew/issues"
 
 [project.scripts]
 clew = "clew.cli:main"
-ownscribe = "clew.cli:main"
 
 [dependency-groups]
 dev = [
