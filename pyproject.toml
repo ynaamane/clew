@@ -1,6 +1,6 @@
 [project]
 name = "clew"
-version = "0.13.1"
+version = "0.13.2"
 description = "Fully local meeting transcription and summarization CLI"
 readme = "README.md"
 license = { text = "PolyForm-Noncommercial-1.0.0 AND MIT" }
