@@ -207,6 +207,15 @@ employer name and the client project codename appear below as descriptions rathe
   is still PENDING below. Applied now anyway, on explicit instruction, on `main` of the still
   PRIVATE repo (verified via `gh repo view`), so this does not touch the public-visibility gate;
   flagging the sequencing conflict for the record rather than silently overriding it.
+  **SUPERSEDED (single-file merge)**: the two-file layout described above (`LICENSE-MIT` +
+  `LICENSE.md`) is gone. `LICENSE-MIT`'s content is now merged verbatim into `LICENSE.md` under
+  a new `## Inherited work (MIT)` section (the 21-line MIT block, scope paragraph and the Pascal
+  Berrang copyright line all byte-preserved), with the PolyForm terms under
+  `## Work added in this fork (PolyForm Noncommercial 1.0.0)`; `LICENSE-MIT` was `git rm`'d and
+  every reference to it in `README.md` and `CONTRIBUTING.md` now points at the corresponding
+  `LICENSE.md` section anchor. The `LICENSE-MIT` mentions in this entry and the ones above
+  describe the file layout that was true at the time and are left as historical record, not
+  live pointers.
 
 - [x] **`pyproject.toml` URLs fixed**
   Done. `[project.urls]` Homepage/Repository/Issues point to

@@ -599,7 +599,7 @@ This repository uses two licenses.
 
 Code inherited from upstream, everything present at the fork point (commit
 `fc8198e`, 2026-07-20), stays under the MIT License, unmodified and
-permanent. See [LICENSE-MIT](LICENSE-MIT).
+permanent. See [LICENSE.md § Inherited work (MIT)](LICENSE.md#inherited-work-mit).
 
 Everything added or changed in this fork after that commit, Copyright (c)
 2026 Yanis Naamane, is licensed under [PolyForm Noncommercial

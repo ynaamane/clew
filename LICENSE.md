@@ -1,14 +1,42 @@
 # License
 
-This repository uses two licenses side by side.
+This repository contains two bodies of work under two different licenses.
 
-**Inherited code.** Everything present at commit
-`fc8198ea18abe63b8fe450b128d244fcd57f0abb` (2026-07-20), the fork point from
-[paberr/ownscribe](https://github.com/paberr/ownscribe), stays under the MIT
-License, permanently and irrevocably, no matter what license applies to this
-fork's own later work. Full text and scope: [LICENSE-MIT](LICENSE-MIT).
+## Inherited work (MIT)
 
-**Additions.** Everything written for this fork after that commit, Copyright
+Scope: this section covers the code inherited from the upstream project
+(paberr/ownscribe), specifically every file and every line present at commit
+fc8198ea18abe63b8fe450b128d244fcd57f0abb (2026-07-20), the fork point for
+this repository. That inherited code stays under the MIT terms below,
+permanently and irrevocably, regardless of any license applied to this
+fork's own later additions. See [Work added in this fork](#work-added-in-this-fork-polyform-noncommercial-100)
+below for the terms covering everything added or changed after that commit.
+
+MIT License
+
+Copyright (c) 2026 Pascal Berrang and the ownscribe contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Work added in this fork (PolyForm Noncommercial 1.0.0)
+
+Everything written for this fork after that commit, Copyright
 (c) 2026 Yanis Naamane, is licensed under the PolyForm Noncommercial License
 1.0.0, reproduced in full below. A file changed after the fork point is a
 joint work: the portions carried over from upstream stay MIT, the portions
