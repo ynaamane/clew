@@ -156,6 +156,19 @@ Add support for more summarization backends beyond the built-in local model, Oll
 
 The current diarization works well for 2-3 speakers but can struggle with larger meetings. Investigate better models or post-processing to improve accuracy for many-participant calls.
 
+## Contribution licensing
+
+This fork's own additions are licensed under the PolyForm Noncommercial
+License 1.0.0 (see [LICENSE.md](LICENSE.md)); the code inherited from
+upstream stays MIT (see [LICENSE-MIT](LICENSE-MIT)).
+
+By submitting a contribution, you agree that it is licensed to the project
+under the MIT license, the text in [LICENSE-MIT](LICENSE-MIT), regardless of
+the PolyForm Noncommercial terms that apply to the project's own code. This
+keeps every contribution as reusable as the upstream project it builds on,
+and lets the project relicense the combined work later without needing to
+track down every contributor individually.
+
 ## Submitting changes
 
 1. Fork the repo and create a feature branch

@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/ownscribe)](https://pypi.org/project/ownscribe/)
 [![CI](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ynaamane/meeting-scribe/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange.svg)](LICENSE.md)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 Local-first meeting transcription and summarization CLI.
@@ -575,4 +575,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, tests, and open co
 
 ## License
 
-MIT
+This repository uses two licenses.
+
+Code inherited from upstream, everything present at the fork point (commit
+`fc8198e`, 2026-07-20), stays under the MIT License, unmodified and
+permanent. See [LICENSE-MIT](LICENSE-MIT).
+
+Everything added or changed in this fork after that commit, Copyright (c)
+2026 Yanis Naamane, is licensed under [PolyForm Noncommercial
+1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0): free for
+personal use, research, and any other noncommercial purpose, not free for
+commercial use. Full text and the delimitation between the two licenses:
+[LICENSE.md](LICENSE.md).
+
+For commercial licensing of the PolyForm-covered portions, contact
+yanis@nymedia.io.
