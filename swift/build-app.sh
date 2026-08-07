@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CERT_NAME="MeetingScribeDev"
+CERT_NAME="MeetingScribeDev"  # unchanged on purpose: this is the on-disk code-signing
+                               # identity TCC permission grants are anchored to; renaming
+                               # it would reset every Screen/System Audio Recording and
+                               # Microphone grant. See scripts/setup-codesign-identity.sh.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_NAME="MeetingScribe.app"
+APP_NAME="Clew.app"
 APP_DIR="$REPO_ROOT/dist/$APP_NAME"
 
 if ! security find-identity -v -p codesigning | grep -q "\"$CERT_NAME\""; then

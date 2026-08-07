@@ -22,12 +22,12 @@ public final class RecordingController {
         public var description: String {
             switch self {
             case .systemAudioPermissionDenied:
-                return "System Audio Recording is off for MeetingScribe. Open System Settings → "
-                    + "Privacy & Security → Screen & System Audio Recording, enable MeetingScribe, "
+                return "System Audio Recording is off for Clew. Open System Settings → "
+                    + "Privacy & Security → Screen & System Audio Recording, enable Clew, "
                     + "then quit and reopen the app."
             case .microphonePermissionDenied:
-                return "Microphone access is off for MeetingScribe. Open System Settings → "
-                    + "Privacy & Security → Microphone and enable MeetingScribe. The call will still "
+                return "Microphone access is off for Clew. Open System Settings → "
+                    + "Privacy & Security → Microphone and enable Clew. The call will still "
                     + "be recorded without it, but your own voice will be missing."
             case .permissionDenied: return "System Audio Recording or Microphone permission is not granted."
             case .unsupportedOSVersion: return "CoreAudio process-tap capture requires macOS 14.2 or later."

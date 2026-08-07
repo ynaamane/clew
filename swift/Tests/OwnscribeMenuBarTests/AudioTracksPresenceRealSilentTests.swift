@@ -5,7 +5,7 @@ import Foundation
 @Suite struct AudioTracksPresenceRealSilentTests {
     @Test func silentRecordingDoesNotRenderAsCheckmark() throws {
         let silentDir = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("ownscribe/2026-07-27_1352")
+            .appendingPathComponent("clew/2026-07-27_1352")
 
         guard FileManager.default.fileExists(atPath: silentDir.path) else {
             Issue.record("Test directory not found: \(silentDir.path)")

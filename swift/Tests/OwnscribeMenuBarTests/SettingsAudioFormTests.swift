@@ -151,7 +151,7 @@ final class SettingsAudioFormTests: XCTestCase {
 
         XCTAssertEqual(
             url.path,
-            "/tmp/ownscribe-fake-home/.config/ownscribe/config.toml",
+            "/tmp/ownscribe-fake-home/.config/clew/config.toml",
             "The pane must resolve its config path from an injectable home directory so a test can never be pointed at the real one")
     }
 

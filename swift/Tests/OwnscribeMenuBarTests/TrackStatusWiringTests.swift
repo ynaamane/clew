@@ -4,8 +4,8 @@ import XCTest
 final class TrackStatusWiringTests: XCTestCase {
     func testSilentAndSpeechTracksRenderDifferently() throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let silentDir = home.appendingPathComponent("ownscribe/2026-07-27_1352")
-        let speechDir = home.appendingPathComponent("ownscribe/2026-07-27_1536_project-technical-review-key-points")
+        let silentDir = home.appendingPathComponent("clew/2026-07-27_1352")
+        let speechDir = home.appendingPathComponent("clew/2026-07-27_1536_project-technical-review-key-points")
 
         let silent = AudioTracksPresence.checkTracks(in: silentDir)
             .first { $0.filename == "recording.wav" }

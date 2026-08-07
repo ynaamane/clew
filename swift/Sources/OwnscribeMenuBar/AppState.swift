@@ -69,7 +69,7 @@ public final class AppState {
     }
 
     private func applyConfigSettings() {
-        let configPath = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        let configPath = homeDir.appendingPathComponent(".config/clew/config.toml")
         let configText = try? String(contentsOf: configPath, encoding: .utf8)
         let audioSettings = OwnscribeConfigReader.parseAudioSettings(fromTOML: configText)
         recordingController.enableMic = audioSettings.mic
@@ -165,7 +165,7 @@ public final class AppState {
     }
 
     public var outputDir: URL {
-        let configPath = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        let configPath = homeDir.appendingPathComponent(".config/clew/config.toml")
         let configText = try? String(contentsOf: configPath, encoding: .utf8)
         return OwnscribeConfigReader.resolvedOutputDir(configText: configText, homeDir: homeDir)
     }

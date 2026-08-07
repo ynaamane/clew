@@ -15,8 +15,8 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>14.2</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>ownscribe captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
+	<string>Clew captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ownscribe records your microphone so it can transcribe your side of the meeting.</string>
+	<string>Clew records your microphone so it can transcribe your side of the meeting.</string>
 </dict>
 </plist>

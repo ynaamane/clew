@@ -42,7 +42,7 @@ public struct BannerState: Equatable {
 
         if !isCliAvailable {
             return BannerState(
-                message: "L'audio sera enregistré mais pas transcrit — le CLI ownscribe est absent. Restaurez-le, puis lancez ./rec.sh redo <répertoire> pour transcrire cette réunion depuis son audio conservé.",
+                message: "L'audio sera enregistré mais pas transcrit : le CLI clew est absent. Restaurez-le, puis lancez ./rec.sh redo <répertoire> pour transcrire cette réunion depuis son audio conservé.",
                 headline: "CLI absent : audio enregistré seulement",
                 severity: .warning,
                 isDismissible: false

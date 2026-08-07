@@ -1,7 +1,7 @@
 import Foundation
 
 public struct WindowOpenRoute {
-    public static let scheme = "ownscribe"
+    public static let scheme = "clew"
 
     public static func scene(for url: URL) -> String? {
         guard url.scheme?.lowercased() == scheme else { return nil }

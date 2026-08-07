@@ -9,7 +9,7 @@ public struct EnrolledSpeakerStore {
     }
 
     public static func names(in homeDir: URL) -> [String] {
-        let path = homeDir.appendingPathComponent(".config/meeting-scribe/voiceprints/voiceprints.json")
+        let path = homeDir.appendingPathComponent(".config/clew/voiceprints/voiceprints.json")
         guard let data = try? Data(contentsOf: path),
               let database = try? JSONDecoder().decode(Database.self, from: data)
         else {

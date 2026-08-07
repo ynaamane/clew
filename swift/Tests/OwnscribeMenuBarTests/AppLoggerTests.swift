@@ -35,7 +35,7 @@ final class AppLoggerTests: XCTestCase {
     }
 
     func testPhaseLogDescriptionDone() {
-        let url = URL(fileURLWithPath: "/Users/user/ownscribe/2026-07-28_1430_meeting")
+        let url = URL(fileURLWithPath: "/Users/user/clew/2026-07-28_1430_meeting")
         let phase = AppState.Phase.done(directory: url)
         XCTAssertEqual(phase.logDescription(), "done(directory: 2026-07-28_1430_meeting)")
     }

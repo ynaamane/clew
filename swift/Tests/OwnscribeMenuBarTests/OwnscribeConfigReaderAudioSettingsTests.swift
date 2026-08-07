@@ -62,7 +62,7 @@ final class OwnscribeConfigReaderAudioSettingsTests: XCTestCase {
     func testDefaultsWhenAudioSectionAbsent() {
         let toml = """
         [output]
-        dir = "~/ownscribe"
+        dir = "~/clew"
         """
 
         let result = OwnscribeConfigReader.parseAudioSettings(fromTOML: toml)

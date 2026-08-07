@@ -4,7 +4,7 @@ import XCTest
 final class EnrolledSpeakerStoreTests: XCTestCase {
     private func makeHome(_ json: String?) throws -> URL {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("voices-\(UUID().uuidString)")
-        let dir = home.appendingPathComponent(".config/meeting-scribe/voiceprints")
+        let dir = home.appendingPathComponent(".config/clew/voiceprints")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         if let json {
             try json.write(to: dir.appendingPathComponent("voiceprints.json"), atomically: true, encoding: .utf8)

@@ -20,9 +20,9 @@ public final class PipelineRunner: PipelineRunning {
         public var description: String {
             switch self {
             case .binaryNotFound:
-                return "Could not find the ownscribe CLI in the repo venv (.venv/bin/ownscribe)."
+                return "Could not find the clew CLI in the repo venv (.venv/bin/clew)."
             case .processExitedNonZero(let code):
-                return "ownscribe exited with status \(code)."
+                return "clew exited with status \(code)."
             }
         }
     }

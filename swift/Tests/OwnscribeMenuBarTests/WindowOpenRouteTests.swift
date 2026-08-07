@@ -3,7 +3,7 @@ import XCTest
 
 final class WindowOpenRouteTests: XCTestCase {
     func testTheLibraryURLOpensTheLibraryScene() {
-        let route = WindowOpenRoute.scene(for: URL(string: "ownscribe://library")!)
+        let route = WindowOpenRoute.scene(for: URL(string: "clew://library")!)
 
         XCTAssertEqual(
             route, LibraryWindow.sceneID,
@@ -13,13 +13,13 @@ final class WindowOpenRouteTests: XCTestCase {
     }
 
     func testTheHostIsMatchedCaseInsensitivelyBecauseURLsGetTyped() {
-        XCTAssertEqual(WindowOpenRoute.scene(for: URL(string: "ownscribe://Library")!), LibraryWindow.sceneID)
-        XCTAssertEqual(WindowOpenRoute.scene(for: URL(string: "OWNSCRIBE://LIBRARY")!), LibraryWindow.sceneID)
+        XCTAssertEqual(WindowOpenRoute.scene(for: URL(string: "clew://Library")!), LibraryWindow.sceneID)
+        XCTAssertEqual(WindowOpenRoute.scene(for: URL(string: "CLEW://LIBRARY")!), LibraryWindow.sceneID)
     }
 
     func testAPathFormIsAcceptedToo() {
         XCTAssertEqual(
-            WindowOpenRoute.scene(for: URL(string: "ownscribe:///library")!), LibraryWindow.sceneID,
+            WindowOpenRoute.scene(for: URL(string: "clew:///library")!), LibraryWindow.sceneID,
             "a triple slash puts 'library' in the path rather than the host; both spellings are "
                 + "things a person actually types")
     }
@@ -33,9 +33,9 @@ final class WindowOpenRouteTests: XCTestCase {
 
     func testAnUnknownDestinationIsRefusedRatherThanFallingBackToTheLibrary() {
         XCTAssertNil(
-            WindowOpenRoute.scene(for: URL(string: "ownscribe://record")!),
+            WindowOpenRoute.scene(for: URL(string: "clew://record")!),
             "silently opening the library for any unknown URL would make a typo look like it worked, "
                 + "and would open a window on a URL that might one day mean something else")
-        XCTAssertNil(WindowOpenRoute.scene(for: URL(string: "ownscribe://")!))
+        XCTAssertNil(WindowOpenRoute.scene(for: URL(string: "clew://")!))
     }
 }

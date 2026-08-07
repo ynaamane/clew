@@ -12,7 +12,7 @@ final class UrlOpenHandlerTests: XCTestCase {
         var opened: [String] = []
         UrlOpenHandler.shared.openScene = { opened.append($0) }
 
-        UrlOpenHandler.shared.handle(URL(string: "ownscribe://library")!)
+        UrlOpenHandler.shared.handle(URL(string: "clew://library")!)
 
         XCTAssertEqual(
             opened, [LibraryWindow.sceneID],
@@ -24,7 +24,7 @@ final class UrlOpenHandlerTests: XCTestCase {
         var opened: [String] = []
         UrlOpenHandler.shared.openScene = { opened.append($0) }
 
-        UrlOpenHandler.shared.handle(URL(string: "ownscribe://nope")!)
+        UrlOpenHandler.shared.handle(URL(string: "clew://nope")!)
         UrlOpenHandler.shared.handle(URL(string: "http://library")!)
 
         XCTAssertTrue(
@@ -47,7 +47,7 @@ final class UrlOpenHandlerTests: XCTestCase {
 
         XCTAssertTrue(
             schemes.contains(WindowOpenRoute.scheme),
-            "the handler is inert without the declaration: macOS routes ownscribe:// only to a bundle "
+            "the handler is inert without the declaration: macOS routes clew:// only to a bundle "
                 + "that claims the scheme, so shipping the code alone changes nothing")
     }
 }

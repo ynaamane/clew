@@ -12,7 +12,7 @@ public struct OwnscribeConfigWriter {
     public static func defaultConfigURL(
         homeDir: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> URL {
-        homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        homeDir.appendingPathComponent(".config/clew/config.toml")
     }
 
     public static func applyingAudioSettings(_ settings: AudioSettings, to configText: String) -> String {

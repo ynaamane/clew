@@ -72,7 +72,7 @@ struct SettingsView: View {
                 Button("Apply") {
                     do {
                         try audioForm.save(to: configURL)
-                        audioMessage = "Saved. Restart ownscribe to apply to the next recording."
+                        audioMessage = "Saved. Restart Clew to apply to the next recording."
                     } catch {
                         audioMessage = String(describing: error)
                     }

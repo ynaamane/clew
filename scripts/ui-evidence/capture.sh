@@ -3,7 +3,7 @@
 # Never captures the screen: resolves the window id by OWNER first, then -l.
 set -euo pipefail
 
-OWNER="${1:-MeetingScribe}"
+OWNER="${1:-Clew}"
 OUT="${2:-/tmp/ui-evidence}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -14,7 +14,7 @@ fi
 mkdir -p "$OUT"
 INFO="$("$HERE/ui-evidence" "$OWNER" "$OUT")" || {
   printf 'No on-screen window owned by %s.\n' "$OWNER" >&2
-  printf 'MeetingScribe is a menu-bar app: open its window with Cmd-0 first.\n' >&2
+  printf 'Clew is a menu-bar app: open its window with Cmd-0 first.\n' >&2
   exit 2
 }
 printf '%s\n' "$INFO"

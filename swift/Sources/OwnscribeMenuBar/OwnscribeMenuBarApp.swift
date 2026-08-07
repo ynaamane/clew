@@ -20,12 +20,12 @@ struct OwnscribeMenuBarApp: App {
         .defaultSize(width: 1080, height: 660)
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Ouvrir MeetingScribe") { showLibrary() }
+                Button("Ouvrir Clew") { showLibrary() }
                     .keyboardShortcut("0", modifiers: .command)
             }
         }
 
-        MenuBarExtra("ownscribe", systemImage: appState.muteIndicator.symbolName) {
+        MenuBarExtra("Clew", systemImage: appState.muteIndicator.symbolName) {
             MenuBarContentView()
                 .environment(appState)
                 .task { UrlOpenHandler.shared.openScene = { _ in showLibrary() } }

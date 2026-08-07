@@ -92,7 +92,7 @@ final class CancelProcessingTests: XCTestCase {
 
         XCTAssertEqual(
             runner.cancelCount, 1,
-            "Cancelled from INSIDE the running pipeline, through the real toggleRecording path. Setting phase back to .idle without calling cancel() would leave the ownscribe child transcribing for minutes, burning CPU with nothing to show it — the button would LOOK like it worked. This is the assertion that distinguishes cancelling from hiding.")
+            "Cancelled from INSIDE the running pipeline, through the real toggleRecording path. Setting phase back to .idle without calling cancel() would leave the clew child transcribing for minutes, burning CPU with nothing to show it: the button would LOOK like it worked. This is the assertion that distinguishes cancelling from hiding.")
         XCTAssertEqual(
             state.phase, .idle,
             "and the pipeline's own completion must not resurrect a terminal phase after the user cancelled")

@@ -118,7 +118,7 @@ final class OwnscribeConfigWriterTests: XCTestCase {
 
     func testPreservesLeadingCommentsAndUnknownSections() {
         let existing = """
-        # ownscribe configuration
+        # clew configuration
         # edited by hand
 
         [summarization]
@@ -134,7 +134,7 @@ final class OwnscribeConfigWriterTests: XCTestCase {
             to: existing)
 
         for preserved in [
-            "# ownscribe configuration",
+            "# clew configuration",
             "# edited by hand",
             "[summarization]",
             "provider = \"llamacpp\"",

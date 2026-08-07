@@ -4,15 +4,15 @@ import XCTest
 final class OwnscribeConfigReaderTests: XCTestCase {
     private let homeDir = URL(fileURLWithPath: "/Users/testuser")
 
-    func testDefaultsToTildeOwnscribeWhenConfigTextIsNil() {
+    func testDefaultsToTildeClewWhenConfigTextIsNil() {
         let dir = OwnscribeConfigReader.resolvedOutputDir(configText: nil, homeDir: homeDir)
-        XCTAssertEqual(dir.path, "/Users/testuser/ownscribe")
+        XCTAssertEqual(dir.path, "/Users/testuser/clew")
     }
 
-    func testDefaultsToTildeOwnscribeWhenDirKeyMissing() {
+    func testDefaultsToTildeClewWhenDirKeyMissing() {
         let toml = "[audio]\nbackend = \"coreaudio\"\n"
         let dir = OwnscribeConfigReader.resolvedOutputDir(configText: toml, homeDir: homeDir)
-        XCTAssertEqual(dir.path, "/Users/testuser/ownscribe")
+        XCTAssertEqual(dir.path, "/Users/testuser/clew")
     }
 
     func testParsesQuotedDirValueUnderOutputSection() {
@@ -94,6 +94,47 @@ final class OwnscribeBinaryResolverTests: XCTestCase {
         )
         XCTAssertNil(resolved)
     }
+
+    func testPrefersClewOverrideEnvVarOverLegacyOwnscribeOne() {
+        let resolved = OwnscribeBinaryResolver.resolve(
+            homeDir: homeDir,
+            environment: ["CLEW_BIN": "/opt/custom/clew", "OWNSCRIBE_BIN": "/opt/custom/ownscribe"],
+            isExecutableFile: { $0 == "/opt/custom/clew" || $0 == "/opt/custom/ownscribe" }
+        )
+        XCTAssertEqual(resolved?.path, "/opt/custom/clew")
+    }
+
+    func testFallsBackToClewRepoRootUnderHomeWhenNoOverride() {
+        let expectedPath = "/Users/testuser/meeting-scribe/.venv/bin/clew"
+        let resolved = OwnscribeBinaryResolver.resolve(
+            homeDir: homeDir,
+            environment: [:],
+            isExecutableFile: { $0 == expectedPath }
+        )
+        XCTAssertEqual(resolved?.path, expectedPath)
+    }
+
+    func testPrefersClewBinaryOverLegacyOwnscribeBinaryWhenBothExist() {
+        let resolved = OwnscribeBinaryResolver.resolve(
+            homeDir: homeDir,
+            environment: [:],
+            isExecutableFile: { path in
+                path == "/Users/testuser/meeting-scribe/.venv/bin/clew"
+                    || path == "/Users/testuser/meeting-scribe/.venv/bin/ownscribe"
+            }
+        )
+        XCTAssertEqual(resolved?.path, "/Users/testuser/meeting-scribe/.venv/bin/clew")
+    }
+
+    func testHonoursClewRepoRootOverrideEnvVar() {
+        let expectedPath = "/opt/repo/.venv/bin/clew"
+        let resolved = OwnscribeBinaryResolver.resolve(
+            homeDir: homeDir,
+            environment: ["CLEW_REPO_ROOT": "/opt/repo"],
+            isExecutableFile: { $0 == expectedPath }
+        )
+        XCTAssertEqual(resolved?.path, expectedPath)
+    }
 }
 
 final class ProgressEventParserTests: XCTestCase {
@@ -154,7 +195,7 @@ final class NDJSONLineBufferTests: XCTestCase {
 final class MeetingOutputPathsTests: XCTestCase {
     func testDirectoryNameMatchesPythonTimestampFormat() {
         let date = Date(timeIntervalSince1970: 1_772_200_000)
-        let baseDir = URL(fileURLWithPath: "/tmp/ownscribe")
+        let baseDir = URL(fileURLWithPath: "/tmp/clew")
         let paths = MeetingOutputPaths(baseDir: baseDir, now: date)
 
         let referenceFormatter = DateFormatter()

@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>OwnscribeMenuBar</string>
 	<key>CFBundleName</key>
-	<string>MeetingScribe</string>
+	<string>Clew</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>
@@ -19,9 +19,9 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>ownscribe captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
+	<string>Clew captures system audio (e.g. a Zoom or Teams call) so it can transcribe the meeting.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ownscribe records your microphone so it can transcribe your side of the meeting.</string>
+	<string>Clew records your microphone so it can transcribe your side of the meeting.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -31,7 +31,7 @@
 			<string>Viewer</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>ownscribe</string>
+				<string>clew</string>
 			</array>
 		</dict>
 	</array>

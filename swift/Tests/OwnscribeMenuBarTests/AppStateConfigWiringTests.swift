@@ -8,7 +8,7 @@ final class AppStateConfigWiringTests: XCTestCase {
         try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        let configDir = tempDir.appendingPathComponent(".config/ownscribe")
+        let configDir = tempDir.appendingPathComponent(".config/clew")
         try! FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
 
         let configPath = configDir.appendingPathComponent("config.toml")
@@ -30,7 +30,7 @@ final class AppStateConfigWiringTests: XCTestCase {
         try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        let configDir = tempDir.appendingPathComponent(".config/ownscribe")
+        let configDir = tempDir.appendingPathComponent(".config/clew")
         try! FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
 
         let configPath = configDir.appendingPathComponent("config.toml")

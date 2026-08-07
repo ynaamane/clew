@@ -11,7 +11,7 @@ public struct MeetingCounts {
             resolvedConfigURL = configURL
         } else {
             let homeDir = fileManager.homeDirectoryForCurrentUser
-            resolvedConfigURL = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+            resolvedConfigURL = homeDir.appendingPathComponent(".config/clew/config.toml")
         }
 
         guard let summary = MeetingInspectorState.loadSummary(

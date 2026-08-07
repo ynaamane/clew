@@ -79,7 +79,7 @@ func describe(_ element: AXUIElement, depth: Int, into lines: inout [String], li
     }
 }
 
-let owner = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "MeetingScribe"
+let owner = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Clew"
 let outputDir = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "/tmp/ui-evidence"
 let depthLimit = CommandLine.arguments.count > 3 ? (Int(CommandLine.arguments[3]) ?? 12) : 12
 

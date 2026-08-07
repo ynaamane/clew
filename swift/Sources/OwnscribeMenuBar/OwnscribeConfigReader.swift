@@ -10,7 +10,7 @@ public struct OutputSettings {
 }
 
 public struct OwnscribeConfigReader {
-    public static let defaultOutputDirName = "ownscribe"
+    public static let defaultOutputDirName = "clew"
 
     public static func resolvedOutputDir(configText: String?, homeDir: URL) -> URL {
         if let configText, let dir = parseOutputDir(fromTOML: configText) {

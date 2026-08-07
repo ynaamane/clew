@@ -12,7 +12,7 @@ struct MenuBarContentView: View {
             Divider()
             recentMeetingsSection
             Divider()
-            Button("Ouvrir MeetingScribe") {
+            Button("Ouvrir Clew") {
                 openWindow(id: LibraryWindow.sceneID)
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
@@ -21,7 +21,7 @@ struct MenuBarContentView: View {
             SettingsLink {
                 Text("Settings…")
             }
-            Button("Quit ownscribe") {
+            Button("Quit Clew") {
                 appState.restoreUnmutedOnQuit()
                 NSApplication.shared.terminate(nil)
             }

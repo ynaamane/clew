@@ -35,9 +35,9 @@ final class DesignRenderTests: XCTestCase {
     }
 
     private func copyMeetingsToTemp() -> URL {
-        let liveDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("ownscribe")
-        let tempHome = URL(fileURLWithPath: "/tmp/ownscribe-render-isolated")
-        let tempMeetingsDir = tempHome.appendingPathComponent("ownscribe")
+        let liveDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("clew")
+        let tempHome = URL(fileURLWithPath: "/tmp/clew-render-isolated")
+        let tempMeetingsDir = tempHome.appendingPathComponent("clew")
 
         try? FileManager.default.removeItem(at: tempHome)
         try? FileManager.default.createDirectory(at: tempMeetingsDir, withIntermediateDirectories: true)

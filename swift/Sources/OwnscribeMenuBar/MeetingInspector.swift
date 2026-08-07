@@ -161,7 +161,7 @@ struct MeetingInspector: View {
 
     private func loadSummary() -> SummaryDocument? {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        let configURL = homeDir.appendingPathComponent(".config/ownscribe/config.toml")
+        let configURL = homeDir.appendingPathComponent(".config/clew/config.toml")
         return MeetingInspectorState.loadSummary(
             from: meeting.directory,
             configURL: configURL,

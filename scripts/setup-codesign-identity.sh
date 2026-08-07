@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CERT_NAME="MeetingScribeDev"
+CERT_NAME="MeetingScribeDev"  # unchanged on purpose after the Clew rename: this identity
+                               # is what TCC (Screen/System Audio Recording, Microphone)
+                               # grants are anchored to on an existing dev machine; a new
+                               # name means a new identity, which resets every grant.
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 if security find-identity -v -p codesigning "$KEYCHAIN" 2>/dev/null | grep -q "\"$CERT_NAME\""; then
