@@ -24,6 +24,7 @@ Record, transcribe, and summarize meetings and system audio entirely on your mac
 - [Speaker Diarization](#speaker-diarization)
 - [Headphones vs Speakers (Owner Track Purity)](#headphones-vs-speakers-owner-track-purity)
 - [What I Inherited vs What I Built](#what-i-inherited-vs-what-i-built)
+- [Legal and privacy notice](#legal-and-privacy-notice)
 - [Acknowledgments](#acknowledgments)
 - [Contributing](#contributing)
 - [License](#license)
@@ -441,6 +442,9 @@ Speaker identification requires a HuggingFace token with access to the pyannote 
 
 Diarization always runs on CPU. See `NOTES.md` for why the MPS path is disabled here rather than upstream's `device = "auto"` default.
 
+Voiceprints created by enrollment (below) are biometric data with real legal weight: see
+[Legal and privacy notice](#legal-and-privacy-notice) before enrolling anyone.
+
 ## Speaker Naming
 
 Enroll a speaker's voice from a short reference clip (a few seconds of them speaking, isolated) to have their real name appear in transcripts instead of a generic `SPEAKER_00` label:
@@ -525,6 +529,33 @@ Distinctive additions built in this fork, not present upstream:
 - **Voiceprint-based speaker enrollment and naming**: `ownscribe enroll` computes a voiceprint from a reference clip and matches it against future diarized speakers by cosine similarity, replacing generic `SPEAKER_00` labels with real names. Upstream has no speaker-identity system at all.
 - **Hardware-verified microphone mute**: the system-wide mute is verified by reading the device state back after setting it, instead of trusting that the set call succeeded.
 - **The SwiftUI menu-bar app** (`swift/Sources/OwnscribeMenuBar/`): a three-column library window, search, claim anchoring in the inspector, an RMS envelope strip, and settings, layered on the same CLI pipeline. Upstream's `swift/` directory holds a single Swift file, `swift/Sources/AudioCapture.swift`; this fork's `swift/Sources/` now holds 65.
+
+## Legal and privacy notice
+
+**Recording consent is your responsibility.** The rules differ by country and by US
+state: some allow one participant to record, others require every participant to agree.
+In France, recording private conversations without consent is a criminal offence under
+article 226-1 of the Code penal, and consent is presumed only when the recording happens
+openly and participants are able to object. Saying at the start of a meeting that you are
+recording is the simplest way to stay on the right side of most of these rules, and in
+several jurisdictions it is what the law expects.
+
+**Nothing leaves your machine.** Audio, transcripts, embeddings and summaries are written
+to local disk only. There is no account, no telemetry, and no network call for
+transcription, diarization or summarization.
+
+**Voiceprints are biometric data.** Diarization on its own only separates speakers within
+a recording (Speaker 1, Speaker 2) and enrolls nobody. Naming a speaker is an explicit,
+separate step: `ownscribe enroll --name "Alice" clip.wav` stores a voice embedding in
+`~/.config/meeting-scribe/voiceprints/voiceprints.json`. Under the GDPR, a voiceprint used
+to recognise a specific person is special category data, and if you record work meetings
+you are the controller of it. Run `ownscribe speakers` to list what is enrolled,
+`ownscribe unenroll "Alice"` to remove one person, or delete that file to remove all of
+them.
+
+This notice is informational and is not legal advice. If you record conversations with
+clients, employees or patients, check your obligations with someone qualified in your
+jurisdiction.
 
 ## Acknowledgments
 
