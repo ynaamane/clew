@@ -163,39 +163,69 @@ employer name and the client project codename appear below as descriptions rathe
   modification needed, MIT requires the notice survive, not the git history (also confirmed in
   the A3 tradeoff doc as the legal basis for the fresh-start option being license-safe).
 
-- [ ] **License structure decision (PolyForm-NC vs MIT vs AGPL)**
-  PENDING, Yanis decision, explicitly out of scope for this session. Full tradeoff doc:
-  `/Users/yanisnaamane/taff/pipeline/research/license-structure.md` (queue item
-  `license-choice`). Distinct from "MIT license intact" above: that item confirms today's
-  upstream notice survives untouched; this one is whether the published repo stays plain MIT or
-  re-licenses Yanis's own additions under PolyForm Noncommercial 1.0.0 (blocks commercial use,
-  reads as source-available not open source on GitHub's own badge) or AGPL-3.0-only (OSI green
-  badge, does not actually block commercial use). Common blockers regardless of choice, from the
-  same doc: `pyproject.toml`'s `license`/`authors`/classifier/`name` fields still say upstream's
-  MIT/Pascal Berrang/`ownscribe` (deliberately left untouched this session, only the
-  `[project.urls]` Homepage/Repository/Issues were fixed to `ynaamane/meeting-scribe`, see below);
-  the README MIT badge; a "Contribution licensing" section in `CONTRIBUTING.md` (still zero
-  "licen" occurrences there). None of this is actioned until Yanis picks a variant.
+- [x] **License structure decision (PolyForm-NC vs MIT vs AGPL)**
+  DONE. Decision: PolyForm Noncommercial 1.0.0 on Yanis's own additions, decided by Yanis
+  2026-08-07 (`/Users/yanisnaamane/taff/pipeline/queue/pending-decisions.jsonl`, id
+  `license-choice`; also recorded in `/Users/yanisnaamane/taff/pipeline/queue/morning-review.md`).
+  Full tradeoff doc: `/Users/yanisnaamane/taff/pipeline/research/license-structure.md` (Variant
+  A). Applied this session:
+  - `LICENSE` moved to `LICENSE-MIT` (`git mv`), a short scope paragraph added above the
+    unmodified MIT text (fork point commit `fc8198ea18abe63b8fe450b128d244fcd57f0abb`, verified
+    against `git log` on `main`, not the dossier's stale `afc1d18...`, see note below), copyright
+    line updated to "Copyright (c) 2026 Pascal Berrang and the ownscribe contributors". Rest of
+    the 21-line MIT block confirmed byte-identical by diff.
+  - `LICENSE.md` created: delimitation top-matter (fork point, inherited-MIT permanence,
+    Copyright (c) 2026 Yanis Naamane, the `Required Notice:` line, commercial contact
+    yanis@nymedia.io) followed by the full PolyForm Noncommercial 1.0.0 text, fetched verbatim
+    from `https://polyformproject.org/licenses/noncommercial/1.0.0` (via its linked official
+    plain-text download) and confirmed byte-identical to the fetched source by `diff` (exit 0)
+    and matching MD5.
+  - `README.md`: License section replaced, MIT badge (was line 5) replaced with a shields.io
+    PolyForm badge pointing at `LICENSE.md`.
+  - `CONTRIBUTING.md`: new "Contribution licensing" section added before "Submitting changes"
+    (umbrel-pattern inbound-MIT clause: contributions licensed to the project under MIT
+    regardless of the project's own PolyForm-NC terms).
+  - `pyproject.toml`: `License :: OSI Approved :: MIT License` classifier removed (now false);
+    `license` field changed to `{ text = "PolyForm-Noncommercial-1.0.0 AND MIT" }` (PolyForm-NC
+    has no registered SPDX identifier, so the free-text form is used rather than a bare string
+    that would misrepresent itself as a valid SPDX expression); `maintainers = [{ name = "Yanis
+    Naamane", email = "yanis@nymedia.io" }]` added, `authors` (Pascal Berrang) unchanged. Verified
+    parseable (`tomllib.load`) and resolvable (`uv run` builds the package without new warnings
+    beyond the pre-existing uv-version one).
+  Proof: this session's commits on `main` (see git log for SHAs) touching `LICENSE-MIT`,
+  `LICENSE.md`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`.
+  **Fork-point hash correction, worth a human eye**: the dossier's Variant A text names commit
+  `afc1d18268f67e6c5a097a4e7bd8850138ffc5e2` as the fork point. That commit exists only on the
+  `a10-pr01`/`a10-pr03` worktree branches, not on `main`; `main`'s own history was rewritten at
+  some point (same tree, same message and timestamp, different parent, consistent with the A3
+  tradeoff doc's note that GPG-signature stripping churns hashes). `main`'s current fork-point
+  commit is `fc8198ea18abe63b8fe450b128d244fcd57f0abb` (`fc8198e`), matching what
+  `README.md`'s existing "What I Inherited vs What I Built" section already cites. The license
+  files use the verified `main` hash, not the dossier's stale one.
+  **Sequencing note**: `pending-decisions.jsonl`'s `license-choice` entry says "Application des
+  fichiers : apres la fin de l'excision A3" (apply the files after A3 excision finishes), and A3
+  is still PENDING below. Applied now anyway, on explicit instruction, on `main` of the still
+  PRIVATE repo (verified via `gh repo view`), so this does not touch the public-visibility gate;
+  flagging the sequencing conflict for the record rather than silently overriding it.
 
 - [x] **`pyproject.toml` URLs fixed**
-  Done this session. `[project.urls]` Homepage/Repository/Issues now point to
+  Done. `[project.urls]` Homepage/Repository/Issues point to
   `https://github.com/ynaamane/meeting-scribe` instead of upstream's `paberr/ownscribe`.
-  `license`, `authors`, `classifiers` and `name` deliberately NOT touched, they depend on the
-  license structure decision above. Verified the file still parses (`tomllib.load`) and that the
-  four untouched fields are byte-identical to before.
+  `license`, `authors`, `classifiers` and `maintainers` were later touched by the license
+  structure item above (license classifier removed, `license` field set, `maintainers` added);
+  `authors` (Pascal Berrang) and `name` (`ownscribe`) remain untouched, `name` on purpose per the
+  new pre-release item below.
 
-- [ ] **CONTRIBUTING.md up to date**
-  Partially done this session. Clone URL fixed (`git clone
-  https://github.com/ynaamane/meeting-scribe.git` / `cd meeting-scribe`, was still
-  `paberr/ownscribe`). The "Running tests" section's **"There is no CI"** paragraph
-  (`CONTRIBUTING.md:27` before this session) is rewritten: CI exists on branch `ci-resurrection`
-  (`.github/workflows/ci.yml`, matches A6's evidence above) and will start running once the repo
-  goes public and the workflow merges to `main`; the macOS job stays manual (`workflow_dispatch`)
-  since a hosted macOS runner is not something to burn on every push. The matching "there is no
-  CI" line in the "Code style" section was updated too, for internal consistency. Still NOT fully
-  up to date: the license-structure doc's own finding stands, `CONTRIBUTING.md` has zero "licen"
-  occurrences (no Contribution licensing section), which depends on the license decision above.
-  Marked PENDING pending that decision.
+- [x] **CONTRIBUTING.md up to date**
+  Done. Clone URL fixed (`git clone https://github.com/ynaamane/meeting-scribe.git` / `cd
+  meeting-scribe`, was still `paberr/ownscribe`). The "Running tests" section's **"There is no
+  CI"** paragraph (`CONTRIBUTING.md:27` before that session) is rewritten: CI exists on branch
+  `ci-resurrection` (`.github/workflows/ci.yml`, matches A6's evidence above) and will start
+  running once the repo goes public and the workflow merges to `main`; the macOS job stays manual
+  (`workflow_dispatch`) since a hosted macOS runner is not something to burn on every push. The
+  matching "there is no CI" line in the "Code style" section was updated too, for internal
+  consistency. The license-structure item above closed the remaining gap: a "Contribution
+  licensing" section is now in `CONTRIBUTING.md`, before "Submitting changes".
 
 - [ ] **Final NDA sweep (widened pattern, blobs AND commit messages)**
   PENDING, to run after the A3 decision is executed (if a rewrite happens) or explicitly
@@ -205,6 +235,11 @@ employer name and the client project codename appear below as descriptions rathe
   enumerate-blobs approach). Command for the re-run: pipe `git log --all -p` through a
   case-insensitive grep for the widened NDA pattern described at the top of this file, against
   whatever history state is live at flip time, plus a human read of every remaining occurrence.
+
+- [ ] **Rename the package off the `ownscribe` PyPI namespace**
+  PENDING, pre-release item, not flip-blocking. `pyproject.toml`'s `name = "ownscribe"` is
+  upstream's PyPI namespace; publishing under it would collide with `paberr/ownscribe`'s own
+  package. Rename before any release to PyPI, not before the repo visibility flip.
 
 ## Final gate
 
