@@ -16,23 +16,23 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
 
 ## First launch
 
-- [ ] `open /Applications/MeetingScribe.app` (or double-click it in Finder — do NOT
+- [x] `open /Applications/MeetingScribe.app` (or double-click it in Finder — do NOT
       run the inner binary directly, see `BUILD.md` § 3).
-- [ ] Gatekeeper shows an "unidentified developer" warning (expected —
+- [x] Gatekeeper shows an "unidentified developer" warning (expected —
       self-signed, no Apple notarization). Right-click → Open, confirm once.
-- [ ] A waveform icon appears in the menu bar. No Dock icon (LSUIElement).
-- [ ] Click the menu bar icon → the dropdown opens (Start Recording /
+- [x] A waveform icon appears in the menu bar. No Dock icon (LSUIElement).
+- [x] Click the menu bar icon → the dropdown opens (Start Recording /
       recent meetings / Settings… / Quit).
 
 ## Permission prompts
 
-- [ ] Click "Start Recording". macOS should show the System Audio Recording
+- [x] Click "Start Recording". macOS should show the System Audio Recording
       permission prompt (System Settings → Privacy & Security → Screen &
       System Audio Recording). Grant it.
-- [ ] If you enable "also capture microphone" in Settings and start a
+- [x] If you enable "also capture microphone" in Settings and start a
       recording, macOS should separately prompt for Microphone access.
       Grant it.
-- [ ] After granting, recording actually starts — the menu shows "Stop
+- [x] After granting, recording actually starts — the menu shows "Stop
       Recording" and a running timer/indicator.
 
 ## Grants survive a rebuild (the whole point of the stable identity)
