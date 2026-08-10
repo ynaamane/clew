@@ -134,6 +134,36 @@ final class HomeDirectoryTests: XCTestCase {
         XCTAssertTrue(scanned.contains("callSite()"))
     }
 
+    // Block comments are skipped with nesting, newlines preserved. Round-6
+    // review found a regression: a /* */ containing an odd number of triple
+    // quotes opened a phantom multiline string and silently blanked the rest
+    // of the file. Skipping block comments also means their text can neither
+    // trigger the guard nor carry its whitelist phrase.
+    func testCodeTextSkipsBlockCommentTextIncludingTripleQuotes() {
+        let source = """
+        /* Note: use \"\"\" for multiline literals. */
+        callSite()
+        """
+        let scanned = Self.codeText(of: source)
+        XCTAssertTrue(scanned.contains("callSite()"))
+        XCTAssertFalse(scanned.contains("Note"))
+    }
+
+    func testCodeTextBlockCommentCannotWhitelistSameLineCode() {
+        let scanned = Self.codeText(of: "realCall() /* fallback: fileManager.homeDirectoryForCurrentUser */")
+        XCTAssertTrue(scanned.contains("realCall()"))
+        XCTAssertFalse(scanned.contains("fallback:"))
+    }
+
+    func testCodeTextHandlesNestedBlockCommentsAndKeepsNewlines() {
+        let scanned = Self.codeText(of: "/* a /* b\n c */ d */ after()\nnext()")
+        XCTAssertTrue(scanned.contains("after()"))
+        XCTAssertTrue(scanned.contains("\n"))
+        XCTAssertTrue(scanned.contains("next()"))
+        XCTAssertFalse(scanned.contains("b"))
+        XCTAssertFalse(scanned.contains("d"))
+    }
+
     // Source-scan guard: every home resolution in the app target must go
     // through HomeDirectory.resolve() so CLEW_HOME isolation cannot silently
     // regress when a new call site is added.
@@ -274,6 +304,8 @@ final class HomeDirectoryTests: XCTestCase {
                     i += opened.delimiter.count
                 } else if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
                     while i < chars.count, chars[i] != "\n" { i += 1 }
+                } else if c == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+                    skipBlockComment()
                 } else {
                     out.append(c)
                     i += 1
@@ -281,5 +313,26 @@ final class HomeDirectoryTests: XCTestCase {
             }
         }
         return String(out)
+
+        // Swift block comments nest. Their text is dropped entirely (so a
+        // stray \"\"\" or the whitelist phrase inside one is inert), but
+        // newlines are kept so line numbers stay aligned. An unterminated
+        // /* cannot occur in code that compiles.
+        func skipBlockComment() {
+            var depth = 1
+            i += 2
+            while i < chars.count, depth > 0 {
+                if chars[i] == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+                    depth += 1
+                    i += 2
+                } else if chars[i] == "*", i + 1 < chars.count, chars[i + 1] == "/" {
+                    depth -= 1
+                    i += 2
+                } else {
+                    if chars[i] == "\n" { out.append("\n") }
+                    i += 1
+                }
+            }
+        }
     }
 }
