@@ -61,9 +61,13 @@ final class HomeDirectoryTests: XCTestCase {
         for case let url as URL in enumerator where url.pathExtension == "swift" {
             let content = try String(contentsOf: url, encoding: .utf8)
             for (index, line) in content.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-                guard line.contains("homeDirectoryForCurrentUser") || line.contains("NSHomeDirectory(") else { continue }
+                // Match on the code portion only: a comment on the same line
+                // must never be able to whitelist real code (review finding,
+                // 2026-08-10: `call() // fallback: ...` slipped through).
+                let code = line.components(separatedBy: "//").first ?? ""
+                guard code.contains("homeDirectoryForCurrentUser") || code.contains("NSHomeDirectory(") else { continue }
                 let isDefinition = url.lastPathComponent == "HomeDirectory.swift"
-                let isExplicitFallback = line.contains("fallback: fileManager.homeDirectoryForCurrentUser")
+                let isExplicitFallback = code.contains("fallback: fileManager.homeDirectoryForCurrentUser")
                 if !isDefinition && !isExplicitFallback {
                     violations.append("\(url.lastPathComponent):\(index + 1): \(line.trimmingCharacters(in: .whitespaces))")
                 }
