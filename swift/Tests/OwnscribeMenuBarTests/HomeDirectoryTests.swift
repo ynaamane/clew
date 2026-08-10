@@ -185,8 +185,16 @@ final class HomeDirectoryTests: XCTestCase {
             // form can hide or whitelist real code.
             let scanned = Self.codeText(of: content)
             let originalLines = content.split(separator: "\n", omittingEmptySubsequences: false)
+            // Every API that reaches the real home, not just the two the app
+            // once used: URL.homeDirectory and urls(for:in:) resolve the
+            // account home too and would bypass CLEW_HOME just as silently
+            // (review finding, 2026-08-10).
+            let triggers = [
+                "homeDirectoryForCurrentUser", "NSHomeDirectory(", "URL.homeDirectory",
+                "urls(for:", "NSSearchPathForDirectoriesInDomains", "homeDirectory(forUser",
+            ]
             for (index, code) in scanned.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-                guard code.contains("homeDirectoryForCurrentUser") || code.contains("NSHomeDirectory(") else { continue }
+                guard triggers.contains(where: code.contains) else { continue }
                 let isDefinition = url.lastPathComponent == "HomeDirectory.swift"
                 let isExplicitFallback = code.contains("fallback: fileManager.homeDirectoryForCurrentUser")
                 if !isDefinition && !isExplicitFallback {
