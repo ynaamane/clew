@@ -8,6 +8,9 @@ struct OwnscribeMenuBarApp: App {
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
         UrlOpenHandler.shared.install()
+        if let override = HomeDirectory.activeOverride() {
+            AppLogger.library.warning("CLEW_HOME override active, using \(override, privacy: .public) as home")
+        }
     }
 
     var body: some Scene {

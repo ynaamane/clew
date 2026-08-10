@@ -12,9 +12,19 @@ public enum HomeDirectory {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         fallback: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> URL {
-        if let override = environment["CLEW_HOME"], !override.isEmpty {
+        if let override = activeOverride(environment: environment) {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return fallback
+    }
+
+    /// The CLEW_HOME override in effect, or nil. Callers that honor it must
+    /// say so out loud (the app logs it at startup): pointing an instance at
+    /// another home has to stay observable, never silent.
+    public static func activeOverride(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        guard let override = environment["CLEW_HOME"], !override.isEmpty else { return nil }
+        return override
     }
 }
