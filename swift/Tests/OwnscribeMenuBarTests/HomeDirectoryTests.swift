@@ -85,6 +85,22 @@ final class HomeDirectoryTests: XCTestCase {
         XCTAssertFalse(scanned.contains("tail"))
     }
 
+    // Raw strings interpolate with \#(...) and close with "#: both must be
+    // understood or a raw-string call is a silent miss (review finding,
+    // 2026-08-10, round 4 — the codebase already uses #"..."# for TOML/JSON
+    // fixtures, so this is ordinary future code, not an adversarial case).
+    func testCodePortionKeepsRawStringInterpolatedCodeVisible() {
+        let scanned = Self.codePortion(of: ##"print(#"path: \#(FileManager.default.homeDirectoryForCurrentUser)"#)"##)
+        XCTAssertTrue(scanned.contains("homeDirectoryForCurrentUser"))
+    }
+
+    func testCodePortionBlanksRawStringTextIncludingSlashesAndQuotes() {
+        let scanned = Self.codePortion(of: ##"let s = #"see https://x.co "quoted" homeDirectoryForCurrentUser"#; f()"##)
+        XCTAssertFalse(scanned.contains("https"))
+        XCTAssertFalse(scanned.contains("homeDirectoryForCurrentUser"))
+        XCTAssertTrue(scanned.contains("f()"))
+    }
+
     // Source-scan guard: every home resolution in the app target must go
     // through HomeDirectory.resolve() so CLEW_HOME isolation cannot silently
     // regress when a new call site is added.
@@ -125,47 +141,60 @@ final class HomeDirectoryTests: XCTestCase {
     }
 
     /// The line's code, with real comments dropped and string-literal TEXT
-    /// blanked (quotes kept). A "//" inside a string is not a comment; text
-    /// inside a string is not code; but a \( ... ) interpolation REOPENS a
-    /// code context, recursively, and its content stays visible.
+    /// blanked (delimiters kept). A "//" inside a string is not a comment;
+    /// text inside a string is not code; but interpolation (\( ... ) in plain
+    /// strings, \#( ... ) in raw #"..."# strings, pound count respected)
+    /// REOPENS a code context, recursively, and its content stays visible.
     private static func codePortion(of line: String) -> String {
         enum ScanMode {
-            case string
+            case string(pounds: Int)
             case interpolation(parenDepth: Int)
         }
         var out: [Character] = []
         var stack: [ScanMode] = []
-        var escaped = false
         let chars = Array(line)
         var i = 0
+
+        func run(of char: Character, from index: Int) -> Int {
+            var n = 0
+            while index + n < chars.count, chars[index + n] == char { n += 1 }
+            return n
+        }
+
         while i < chars.count {
             let c = chars[i]
             switch stack.last {
-            case .string:
-                if escaped {
-                    escaped = false
-                    if c == "(" {
+            case .string(let pounds):
+                if c == "\\" {
+                    // Interpolation opener: backslash + `pounds` pounds + "(".
+                    if run(of: "#", from: i + 1) >= pounds, i + 1 + pounds < chars.count, chars[i + 1 + pounds] == "(" {
                         stack.append(.interpolation(parenDepth: 1))
-                        out.append(c)
+                        out.append(contentsOf: String(repeating: " ", count: 1 + pounds) + "(")
+                        i += 2 + pounds
+                    } else if pounds == 0, i + 1 < chars.count {
+                        out.append(contentsOf: "  ")  // escape pair, e.g. \" or \\
+                        i += 2
                     } else {
-                        out.append(" ")
+                        out.append(" ")  // literal backslash in a raw string
+                        i += 1
                     }
-                } else if c == "\\" {
-                    escaped = true
-                    out.append(" ")
-                } else if c == "\"" {
+                } else if c == "\"", run(of: "#", from: i + 1) >= pounds {
                     stack.removeLast()
-                    out.append(c)
+                    out.append(contentsOf: "\"" + String(repeating: "#", count: pounds))
+                    i += 1 + pounds
                 } else {
                     out.append(" ")
+                    i += 1
                 }
             case .interpolation(let depth):
-                if c == "\"" {
-                    stack.append(.string)
-                    out.append(c)
+                if let opened = openStringIfDelimiter(at: i) {
+                    stack.append(.string(pounds: opened.pounds))
+                    out.append(contentsOf: opened.delimiter)
+                    i += opened.delimiter.count
                 } else if c == "(" {
                     stack[stack.count - 1] = .interpolation(parenDepth: depth + 1)
                     out.append(c)
+                    i += 1
                 } else if c == ")" {
                     if depth == 1 {
                         stack.removeLast()
@@ -173,21 +202,33 @@ final class HomeDirectoryTests: XCTestCase {
                         stack[stack.count - 1] = .interpolation(parenDepth: depth - 1)
                     }
                     out.append(c)
+                    i += 1
                 } else {
                     out.append(c)
+                    i += 1
                 }
             case nil:
-                if c == "\"" {
-                    stack.append(.string)
-                    out.append(c)
+                if let opened = openStringIfDelimiter(at: i) {
+                    stack.append(.string(pounds: opened.pounds))
+                    out.append(contentsOf: opened.delimiter)
+                    i += opened.delimiter.count
                 } else if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
                     return String(out)
                 } else {
                     out.append(c)
+                    i += 1
                 }
             }
-            i += 1
         }
         return String(out)
+
+        // A string opener at `index`: either a bare quote or pounds + quote.
+        func openStringIfDelimiter(at index: Int) -> (pounds: Int, delimiter: String)? {
+            if chars[index] == "\"" { return (0, "\"") }
+            guard chars[index] == "#" else { return nil }
+            let pounds = run(of: "#", from: index)
+            guard index + pounds < chars.count, chars[index + pounds] == "\"" else { return nil }
+            return (pounds, String(repeating: "#", count: pounds) + "\"")
+        }
     }
 }
