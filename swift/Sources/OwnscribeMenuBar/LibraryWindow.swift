@@ -212,7 +212,7 @@ private struct MeetingRow: View {
     private func loadSummaryExcerpt() {
         guard meeting.hasSummary, summaryExcerpt == nil else { return }
 
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let homeDir = HomeDirectory.resolve()
         let configPath = homeDir.appendingPathComponent(".config/clew/config.toml")
 
         summaryExcerpt = MeetingRowSummary.loadExcerpt(

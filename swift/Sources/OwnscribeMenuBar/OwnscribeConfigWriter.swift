@@ -10,7 +10,7 @@ public struct OwnscribeConfigWriter {
     private static let ownerOnlyDirectoryMode = NSNumber(value: UInt16(0o700))
 
     public static func defaultConfigURL(
-        homeDir: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeDir: URL = HomeDirectory.resolve()
     ) -> URL {
         homeDir.appendingPathComponent(".config/clew/config.toml")
     }

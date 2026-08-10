@@ -38,7 +38,7 @@ public final class PipelineRunner: PipelineRunning {
         self.tokenStore = tokenStore
     }
 
-    public static func makeDefault(homeDir: URL = FileManager.default.homeDirectoryForCurrentUser) -> PipelineRunner? {
+    public static func makeDefault(homeDir: URL = HomeDirectory.resolve()) -> PipelineRunner? {
         guard let binary = OwnscribeBinaryResolver.resolve(homeDir: homeDir) else { return nil }
         return PipelineRunner(binary: binary)
     }

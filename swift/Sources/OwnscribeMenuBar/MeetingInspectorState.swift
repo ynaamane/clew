@@ -51,7 +51,7 @@ public struct MeetingInspectorState {
         from directory: URL,
         fileManager: FileManager = .default
     ) -> [KeyPointWithAnchors]? {
-        let homeDir = fileManager.homeDirectoryForCurrentUser
+        let homeDir = HomeDirectory.resolve(fallback: fileManager.homeDirectoryForCurrentUser)
         let configURL = homeDir.appendingPathComponent(".config/clew/config.toml")
         return loadKeyPointsWithAnchors(from: directory, configURL: configURL, fileManager: fileManager)
     }

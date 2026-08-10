@@ -10,7 +10,7 @@ public struct MeetingCounts {
         if let configURL {
             resolvedConfigURL = configURL
         } else {
-            let homeDir = fileManager.homeDirectoryForCurrentUser
+            let homeDir = HomeDirectory.resolve(fallback: fileManager.homeDirectoryForCurrentUser)
             resolvedConfigURL = homeDir.appendingPathComponent(".config/clew/config.toml")
         }
 

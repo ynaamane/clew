@@ -160,7 +160,7 @@ struct MeetingInspector: View {
     }
 
     private func loadSummary() -> SummaryDocument? {
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let homeDir = HomeDirectory.resolve()
         let configURL = homeDir.appendingPathComponent(".config/clew/config.toml")
         return MeetingInspectorState.loadSummary(
             from: meeting.directory,

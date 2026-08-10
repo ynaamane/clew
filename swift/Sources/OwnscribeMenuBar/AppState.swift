@@ -39,7 +39,7 @@ public final class AppState {
     private var pipelineRunner: PipelineRunning?
 
     public init(
-        homeDir: URL = FileManager.default.homeDirectoryForCurrentUser,
+        homeDir: URL = HomeDirectory.resolve(),
         muteDevice: AudioMuteDevice = DefaultInputAudioMuteDevice(),
         terminationSignals: TerminationSignalHandlers? = nil
     ) {
