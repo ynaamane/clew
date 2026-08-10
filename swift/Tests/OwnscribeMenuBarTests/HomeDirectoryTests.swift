@@ -69,6 +69,22 @@ final class HomeDirectoryTests: XCTestCase {
         XCTAssertTrue(blanked.hasSuffix("\")"))
     }
 
+    // Interpolation reopens a real code context inside a string: a call in
+    // \( ... ) must stay visible to the guard (review finding, 2026-08-10:
+    // print("... \(FileManager.default.homeDirectoryForCurrentUser)") was
+    // blanked as text and slipped through).
+    func testCodePortionKeepsInterpolatedCodeVisible() {
+        let scanned = Self.codePortion(of: #"print("home resolved as \(FileManager.default.homeDirectoryForCurrentUser)")"#)
+        XCTAssertTrue(scanned.contains("homeDirectoryForCurrentUser"))
+    }
+
+    func testCodePortionBlanksNestedStringInsideInterpolation() {
+        let scanned = Self.codePortion(of: #"log("\(f("https://x.co")) tail")"#)
+        XCTAssertTrue(scanned.contains("f("))
+        XCTAssertFalse(scanned.contains("https"))
+        XCTAssertFalse(scanned.contains("tail"))
+    }
+
     // Source-scan guard: every home resolution in the app target must go
     // through HomeDirectory.resolve() so CLEW_HOME isolation cannot silently
     // regress when a new call site is added.
@@ -108,43 +124,68 @@ final class HomeDirectoryTests: XCTestCase {
                 + violations.joined(separator: "\n"))
     }
 
-    /// The line's code, with real comments dropped and string-literal
-    /// contents blanked (quotes kept). A "//" inside a string is not a
-    /// comment; text inside a string is not code.
+    /// The line's code, with real comments dropped and string-literal TEXT
+    /// blanked (quotes kept). A "//" inside a string is not a comment; text
+    /// inside a string is not code; but a \( ... ) interpolation REOPENS a
+    /// code context, recursively, and its content stays visible.
     private static func codePortion(of line: String) -> String {
+        enum ScanMode {
+            case string
+            case interpolation(parenDepth: Int)
+        }
         var out: [Character] = []
-        var inString = false
+        var stack: [ScanMode] = []
         var escaped = false
         let chars = Array(line)
         var i = 0
         while i < chars.count {
             let c = chars[i]
-            if inString {
+            switch stack.last {
+            case .string:
                 if escaped {
                     escaped = false
-                    out.append(" ")
+                    if c == "(" {
+                        stack.append(.interpolation(parenDepth: 1))
+                        out.append(c)
+                    } else {
+                        out.append(" ")
+                    }
                 } else if c == "\\" {
                     escaped = true
                     out.append(" ")
                 } else if c == "\"" {
-                    inString = false
+                    stack.removeLast()
                     out.append(c)
                 } else {
                     out.append(" ")
                 }
-                i += 1
-                continue
+            case .interpolation(let depth):
+                if c == "\"" {
+                    stack.append(.string)
+                    out.append(c)
+                } else if c == "(" {
+                    stack[stack.count - 1] = .interpolation(parenDepth: depth + 1)
+                    out.append(c)
+                } else if c == ")" {
+                    if depth == 1 {
+                        stack.removeLast()
+                    } else {
+                        stack[stack.count - 1] = .interpolation(parenDepth: depth - 1)
+                    }
+                    out.append(c)
+                } else {
+                    out.append(c)
+                }
+            case nil:
+                if c == "\"" {
+                    stack.append(.string)
+                    out.append(c)
+                } else if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
+                    return String(out)
+                } else {
+                    out.append(c)
+                }
             }
-            if c == "\"" {
-                inString = true
-                out.append(c)
-                i += 1
-                continue
-            }
-            if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
-                break
-            }
-            out.append(c)
             i += 1
         }
         return String(out)
