@@ -164,6 +164,18 @@ final class HomeDirectoryTests: XCTestCase {
         XCTAssertFalse(scanned.contains("d"))
     }
 
+    // Interpolations are code, so block comments inside them are skipped too
+    // (round-7 review: a /* */ inside \( ... ) was scanned as code, letting
+    // it carry the whitelist phrase or reopen the round-6 blackout).
+    func testCodeTextSkipsBlockCommentsInsideInterpolation() {
+        let whitelisted = Self.codeText(of: #"print("x \(realCall() /* fallback: fileManager.homeDirectoryForCurrentUser */)")"#)
+        XCTAssertTrue(whitelisted.contains("realCall()"))
+        XCTAssertFalse(whitelisted.contains("fallback:"))
+
+        let blackout = Self.codeText(of: "let a = \"x \\(1 /* \"\"\" */)\"\nafter()")
+        XCTAssertTrue(blackout.contains("after()"))
+    }
+
     // Source-scan guard: every home resolution in the app target must go
     // through HomeDirectory.resolve() so CLEW_HOME isolation cannot silently
     // regress when a new call site is added.
@@ -289,6 +301,8 @@ final class HomeDirectoryTests: XCTestCase {
                     stack.append(.string(pounds: opened.pounds, multiline: opened.multiline))
                     out.append(contentsOf: opened.delimiter)
                     i += opened.delimiter.count
+                } else if c == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+                    skipBlockComment()
                 } else if c == "(" {
                     stack[stack.count - 1] = .interpolation(parenDepth: depth + 1)
                     out.append(c)
