@@ -43,6 +43,10 @@ On macOS, the Swift audio capture helper is downloaded automatically on first ru
 right-click → Open on first launch (self-signed, not notarized). See
 [docs/advanced.md](docs/advanced.md#the-macos-app) for what the app adds over the CLI.
 
+<p align="center">
+  <img src="docs/demo-app.gif" alt="The Clew library window: meetings, anchored key points, and transcripts" width="750">
+</p>
+
 Alternative summarization backends, Homebrew, installing from source, and the full
 requirements/permissions list: [docs/configuration.md](docs/configuration.md).
 
