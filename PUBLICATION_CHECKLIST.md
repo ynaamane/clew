@@ -122,6 +122,16 @@ employer name and the client project codename appear below as descriptions rathe
   endpoints 404 with the available token, so this could not be confirmed programmatically).
   `ci.yml` is deliberately NOT on `main` yet: the plan's done-criterion ("Linux job green") is
   not met. The run URL above is evidence of the diagnosis, not of completion.
+  **Root cause CONFIRMED 2026-08-10, post-flip** (superseding "could not be confirmed
+  programmatically" above; `ci.yml` has also since merged to `main`): a `workflow_dispatch` run
+  on the now-public repo (`31394710701`) failed in 5 seconds with zero steps started, and its
+  check-run annotation reads "The job was not started because your account is locked due to a
+  billing issue." The lock is at the ACCOUNT level; public-repo free minutes do not bypass it.
+  Billable timing for that run is 0 ms (public repos bill nothing), so unlocking cannot create
+  CI spend here. Unlock is Yanis-only: GitHub Settings, Billing and plans. Re-dispatch
+  afterwards with `gh workflow run ci.yml -R ynaamane/clew`; the `ubuntu` job re-runs on the
+  next push. Meanwhile the CI badge was removed from the README until runs resume (`a5c1581`,
+  on Yanis's request; restoration note tracked in the taff ledger).
 
 - [x] **A7: README attribution section + CI badge fix**
   Done. Local commit `4eab296` on `main`, verified: `README.md` only, 13 insertions. Section
@@ -331,6 +341,33 @@ employer name and the client project codename appear below as descriptions rathe
   only if the PEP 541 claim is rejected. Not started this session (this session only renamed the
   local package; nothing was published or submitted to PyPI, per this repo's standing rule to
   never publish).
+
+## Post-flip status (2026-08-10)
+
+The final gate below was satisfied: Yanis gave the explicit go and executed the flip himself
+on 2026-08-10; `gh repo view ynaamane/clew` confirms `private: false`. Post-flip hygiene, each
+point verified against the PUBLIC rendering, not the local tree:
+
+- README renders with all three GIFs decoded in a real browser (Playwright `img.decode()`:
+  demo-pipeline 1200x760, demo-ask 1200x620, demo-app 1080x660); each asset also serves 200
+  `image/gif` from `raw.githubusercontent.com/ynaamane/clew/main/docs/`.
+- Release v0.13.2 is public (not draft, not prerelease); `Clew.app.zip` (582,208 bytes)
+  downloads anonymously (ranged GET returns 206).
+- Leak scan of the rendered surfaces (repo home, releases page, license page, Actions tab,
+  rendered README HTML): zero matches for the employer name, the client codename, and the
+  colleague first names (patterns kept out of this file per the convention at the top).
+- Repo description set from the README tagline, plus 8 topics (transcription, whisper,
+  meeting-notes, macos, local-first, privacy, diarization, speech-to-text) via `gh repo edit`,
+  re-read after the edit. Previous description ("... Personal tool.") is recorded in the
+  session log if a rollback is ever wanted.
+- Profile pin: not possible via API (GraphQL schema introspected: no profile-pin mutation
+  exists, only `pinIssue` and friends). One manual click left for Yanis: profile, Customize
+  your pins, check `clew`.
+- First upstream PR opened with Yanis's explicit go: `paberr/ownscribe#41`, head
+  `ynaamane:fix-output-dir-rename-collision` (local branch `a10-pr01`, tip `5e51f39`, on the
+  true upstream base `afc1d18`). Rendered PR page checked: zero em/en-dashes, zero internal
+  tokens.
+- CI: still blocked; root cause now confirmed at the account level, see A6 above.
 
 ## Final gate
 
