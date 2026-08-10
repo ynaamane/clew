@@ -44,26 +44,26 @@ final class HomeDirectoryTests: XCTestCase {
         XCTAssertNil(HomeDirectory.activeOverride(environment: ["CLEW_HOME": ""]))
     }
 
-    // codePortion strips comments and blanks string-literal contents so that
-    // neither can hide real code from the guard below (review findings,
-    // 2026-08-10: a same-line comment whitelisted a real call, then a URL's
-    // "//" inside a string truncated the scanned code before the call).
-    func testCodePortionDropsRealComments() {
+    // codeText strips comments and blanks string-literal text so that neither
+    // can hide real code from the guard below (review findings, 2026-08-10:
+    // a same-line comment whitelisted a real call, then a URL's "//" inside a
+    // string truncated the scanned code before the call).
+    func testCodeTextDropsRealComments() {
         XCTAssertEqual(
-            Self.codePortion(of: "let a = b // fallback: fileManager.homeDirectoryForCurrentUser"),
+            Self.codeText(of: "let a = b // fallback: fileManager.homeDirectoryForCurrentUser"),
             "let a = b "
         )
     }
 
-    func testCodePortionIgnoresSlashesInsideStrings() {
+    func testCodeTextIgnoresSlashesInsideStrings() {
         XCTAssertEqual(
-            Self.codePortion(of: #"let _ = "see https://x.co"; return callSite()"#),
+            Self.codeText(of: #"let _ = "see https://x.co"; return callSite()"#),
             #"let _ = "                "; return callSite()"#
         )
     }
 
-    func testCodePortionBlanksStringContentsSoTheyNeverTriggerOrWhitelist() {
-        let blanked = Self.codePortion(of: #"log("homeDirectoryForCurrentUser \" quoted")"#)
+    func testCodeTextBlanksStringContentsSoTheyNeverTriggerOrWhitelist() {
+        let blanked = Self.codeText(of: #"log("homeDirectoryForCurrentUser \" quoted")"#)
         XCTAssertFalse(blanked.contains("homeDirectoryForCurrentUser"))
         XCTAssertTrue(blanked.hasPrefix("log(\""))
         XCTAssertTrue(blanked.hasSuffix("\")"))
@@ -73,13 +73,13 @@ final class HomeDirectoryTests: XCTestCase {
     // \( ... ) must stay visible to the guard (review finding, 2026-08-10:
     // print("... \(FileManager.default.homeDirectoryForCurrentUser)") was
     // blanked as text and slipped through).
-    func testCodePortionKeepsInterpolatedCodeVisible() {
-        let scanned = Self.codePortion(of: #"print("home resolved as \(FileManager.default.homeDirectoryForCurrentUser)")"#)
+    func testCodeTextKeepsInterpolatedCodeVisible() {
+        let scanned = Self.codeText(of: #"print("home resolved as \(FileManager.default.homeDirectoryForCurrentUser)")"#)
         XCTAssertTrue(scanned.contains("homeDirectoryForCurrentUser"))
     }
 
-    func testCodePortionBlanksNestedStringInsideInterpolation() {
-        let scanned = Self.codePortion(of: #"log("\(f("https://x.co")) tail")"#)
+    func testCodeTextBlanksNestedStringInsideInterpolation() {
+        let scanned = Self.codeText(of: #"log("\(f("https://x.co")) tail")"#)
         XCTAssertTrue(scanned.contains("f("))
         XCTAssertFalse(scanned.contains("https"))
         XCTAssertFalse(scanned.contains("tail"))
@@ -89,16 +89,49 @@ final class HomeDirectoryTests: XCTestCase {
     // understood or a raw-string call is a silent miss (review finding,
     // 2026-08-10, round 4 — the codebase already uses #"..."# for TOML/JSON
     // fixtures, so this is ordinary future code, not an adversarial case).
-    func testCodePortionKeepsRawStringInterpolatedCodeVisible() {
-        let scanned = Self.codePortion(of: ##"print(#"path: \#(FileManager.default.homeDirectoryForCurrentUser)"#)"##)
+    func testCodeTextKeepsRawStringInterpolatedCodeVisible() {
+        let scanned = Self.codeText(of: ##"print(#"path: \#(FileManager.default.homeDirectoryForCurrentUser)"#)"##)
         XCTAssertTrue(scanned.contains("homeDirectoryForCurrentUser"))
     }
 
-    func testCodePortionBlanksRawStringTextIncludingSlashesAndQuotes() {
-        let scanned = Self.codePortion(of: ##"let s = #"see https://x.co "quoted" homeDirectoryForCurrentUser"#; f()"##)
+    func testCodeTextBlanksRawStringTextIncludingSlashesAndQuotes() {
+        let scanned = Self.codeText(of: ##"let s = #"see https://x.co "quoted" homeDirectoryForCurrentUser"#; f()"##)
         XCTAssertFalse(scanned.contains("https"))
         XCTAssertFalse(scanned.contains("homeDirectoryForCurrentUser"))
         XCTAssertTrue(scanned.contains("f()"))
+    }
+
+    // The scan is file-level: string state crosses physical lines. Round-5
+    // review disproved the "multiline strings fail loud" prediction with a
+    // stray unbalanced quote inside a multiline raw string hiding a real
+    // interpolated call on the next line (silent miss, user-arbitrated
+    // 2026-08-10: fix, do not document away).
+    func testCodeTextTracksMultilineRawStringAcrossLines() {
+        let source = """
+        static let doc = #\"\"\"
+        say "hi then \\#(FileManager.default.homeDirectoryForCurrentUser)
+        \"\"\"#
+        """
+        let scanned = Self.codeText(of: source)
+        XCTAssertTrue(scanned.contains("homeDirectoryForCurrentUser"))
+        XCTAssertFalse(scanned.contains("say"))
+        XCTAssertFalse(scanned.contains("hi"))
+    }
+
+    func testCodeTextBlanksClassicMultilineStringTextWithoutFalsePositive() {
+        let source = """
+        let d = \"\"\"
+        prose with a stray " quote and homeDirectoryForCurrentUser in text
+        \"\"\"
+        """
+        let scanned = Self.codeText(of: source)
+        XCTAssertFalse(scanned.contains("homeDirectoryForCurrentUser"))
+        XCTAssertFalse(scanned.contains("prose"))
+    }
+
+    func testCodeTextClosesUnterminatedPlainStringAtLineEnd() {
+        let scanned = Self.codeText(of: "let s = \"oops\ncallSite()")
+        XCTAssertTrue(scanned.contains("callSite()"))
     }
 
     // Source-scan guard: every home resolution in the app target must go
@@ -117,18 +150,18 @@ final class HomeDirectoryTests: XCTestCase {
         var violations: [String] = []
         for case let url as URL in enumerator where url.pathExtension == "swift" {
             let content = try String(contentsOf: url, encoding: .utf8)
-            for (index, line) in content.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-                // Match on the code portion only: comments and string
-                // contents must never be able to hide or whitelist real code.
-                // Known accepted limitation: lines inside multiline string
-                // literals are scanned as code, which can only produce a LOUD
-                // false positive, never a silent miss.
-                let code = Self.codePortion(of: String(line))
+            // Scan the whole file at once (newlines preserved), so string
+            // state carries across lines and neither comments nor any string
+            // form can hide or whitelist real code.
+            let scanned = Self.codeText(of: content)
+            let originalLines = content.split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, code) in scanned.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 guard code.contains("homeDirectoryForCurrentUser") || code.contains("NSHomeDirectory(") else { continue }
                 let isDefinition = url.lastPathComponent == "HomeDirectory.swift"
                 let isExplicitFallback = code.contains("fallback: fileManager.homeDirectoryForCurrentUser")
                 if !isDefinition && !isExplicitFallback {
-                    violations.append("\(url.lastPathComponent):\(index + 1): \(line.trimmingCharacters(in: .whitespaces))")
+                    let original = index < originalLines.count ? originalLines[index] : code
+                    violations.append("\(url.lastPathComponent):\(index + 1): \(original.trimmingCharacters(in: .whitespaces))")
                 }
             }
         }
@@ -140,19 +173,21 @@ final class HomeDirectoryTests: XCTestCase {
                 + violations.joined(separator: "\n"))
     }
 
-    /// The line's code, with real comments dropped and string-literal TEXT
-    /// blanked (delimiters kept). A "//" inside a string is not a comment;
-    /// text inside a string is not code; but interpolation (\( ... ) in plain
-    /// strings, \#( ... ) in raw #"..."# strings, pound count respected)
-    /// REOPENS a code context, recursively, and its content stays visible.
-    private static func codePortion(of line: String) -> String {
+    /// The source's code, with comments dropped and string-literal TEXT
+    /// blanked (delimiters and newlines kept, so line numbers survive).
+    /// A "//" inside a string is not a comment; text inside a string is not
+    /// code; interpolation (\( ... ), or \#( ... ) at the matching pound
+    /// count) REOPENS a code context, recursively. String state crosses
+    /// newlines for multiline literals (\"\"\" and #\"\"\"), while an
+    /// unterminated single-line string closes at end of line, as in Swift.
+    private static func codeText(of source: String) -> String {
         enum ScanMode {
-            case string(pounds: Int)
+            case string(pounds: Int, multiline: Bool)
             case interpolation(parenDepth: Int)
         }
         var out: [Character] = []
         var stack: [ScanMode] = []
-        let chars = Array(line)
+        let chars = Array(source)
         var i = 0
 
         func run(of char: Character, from index: Int) -> Int {
@@ -161,34 +196,59 @@ final class HomeDirectoryTests: XCTestCase {
             return n
         }
 
+        // A string opener at `index`: optional pounds, then one quote
+        // (single-line) or three (multiline).
+        func openStringIfDelimiter(at index: Int) -> (pounds: Int, multiline: Bool, delimiter: String)? {
+            let pounds = chars[index] == "#" ? run(of: "#", from: index) : 0
+            guard index + pounds < chars.count, chars[index + pounds] == "\"" else { return nil }
+            let quotes = run(of: "\"", from: index + pounds)
+            let multiline = quotes >= 3
+            let delimiter = String(repeating: "#", count: pounds) + String(repeating: "\"", count: multiline ? 3 : 1)
+            return (pounds, multiline, delimiter)
+        }
+
         while i < chars.count {
             let c = chars[i]
             switch stack.last {
-            case .string(let pounds):
-                if c == "\\" {
+            case .string(let pounds, let multiline):
+                if c == "\n" {
+                    if !multiline { stack.removeLast() }
+                    out.append("\n")
+                    i += 1
+                } else if c == "\\" {
                     // Interpolation opener: backslash + `pounds` pounds + "(".
                     if run(of: "#", from: i + 1) >= pounds, i + 1 + pounds < chars.count, chars[i + 1 + pounds] == "(" {
                         stack.append(.interpolation(parenDepth: 1))
                         out.append(contentsOf: String(repeating: " ", count: 1 + pounds) + "(")
                         i += 2 + pounds
-                    } else if pounds == 0, i + 1 < chars.count {
+                    } else if pounds == 0, i + 1 < chars.count, chars[i + 1] != "\n" {
                         out.append(contentsOf: "  ")  // escape pair, e.g. \" or \\
                         i += 2
                     } else {
                         out.append(" ")  // literal backslash in a raw string
                         i += 1
                     }
-                } else if c == "\"", run(of: "#", from: i + 1) >= pounds {
-                    stack.removeLast()
-                    out.append(contentsOf: "\"" + String(repeating: "#", count: pounds))
-                    i += 1 + pounds
+                } else if c == "\"" {
+                    let quotes = run(of: "\"", from: i)
+                    if multiline, quotes >= 3, run(of: "#", from: i + 3) >= pounds {
+                        stack.removeLast()
+                        out.append(contentsOf: "\"\"\"" + String(repeating: "#", count: pounds))
+                        i += 3 + pounds
+                    } else if !multiline, run(of: "#", from: i + 1) >= pounds {
+                        stack.removeLast()
+                        out.append(contentsOf: "\"" + String(repeating: "#", count: pounds))
+                        i += 1 + pounds
+                    } else {
+                        out.append(" ")  // a stray quote is just text
+                        i += 1
+                    }
                 } else {
                     out.append(" ")
                     i += 1
                 }
             case .interpolation(let depth):
                 if let opened = openStringIfDelimiter(at: i) {
-                    stack.append(.string(pounds: opened.pounds))
+                    stack.append(.string(pounds: opened.pounds, multiline: opened.multiline))
                     out.append(contentsOf: opened.delimiter)
                     i += opened.delimiter.count
                 } else if c == "(" {
@@ -209,11 +269,11 @@ final class HomeDirectoryTests: XCTestCase {
                 }
             case nil:
                 if let opened = openStringIfDelimiter(at: i) {
-                    stack.append(.string(pounds: opened.pounds))
+                    stack.append(.string(pounds: opened.pounds, multiline: opened.multiline))
                     out.append(contentsOf: opened.delimiter)
                     i += opened.delimiter.count
                 } else if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
-                    return String(out)
+                    while i < chars.count, chars[i] != "\n" { i += 1 }
                 } else {
                     out.append(c)
                     i += 1
@@ -221,14 +281,5 @@ final class HomeDirectoryTests: XCTestCase {
             }
         }
         return String(out)
-
-        // A string opener at `index`: either a bare quote or pounds + quote.
-        func openStringIfDelimiter(at index: Int) -> (pounds: Int, delimiter: String)? {
-            if chars[index] == "\"" { return (0, "\"") }
-            guard chars[index] == "#" else { return nil }
-            let pounds = run(of: "#", from: index)
-            guard index + pounds < chars.count, chars[index + pounds] == "\"" else { return nil }
-            return (pounds, String(repeating: "#", count: pounds) + "\"")
-        }
     }
 }
