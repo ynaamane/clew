@@ -118,7 +118,7 @@ capture_backend = "coreaudio"  # the native helper's own mechanism: "coreaudio" 
 silence_timeout = 300     # seconds of silence before auto-stop; 0 = disabled
 
 [transcription]
-model = "large-v3"        # tiny, base, small, medium, large-v3
+model = "large-v3"        # tiny, base, small, medium, large-v3, turbo (large-v3-turbo: ~4x faster decode, near-parity quality on spontaneous FR/EN)
 language = ""             # empty = auto-detect (locked per-file from the first ~30s, not per-segment)
 initial_prompt = "..."    # defaults to a bilingual FR/EN sentence to prime code-switching; override freely
 # hotwords = ""           # comma-separated words to boost recognition (softer hint than initial_prompt)

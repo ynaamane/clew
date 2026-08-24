@@ -2,6 +2,35 @@
 
 Contexte de construction (2026-07-23 → 08-03), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
 
+## Session 2026-08-24 — team complète : 4 fixes revus/poussés, incident du vieux bundle, verdict BMAD diarisation, app enfin installée
+
+Résumé (détail + liste des 14 bugs/doutes : `TODO.md § 2026-08-24`) :
+- **Incident du jour** : un vrai meeting de 68 min enregistré par le VIEUX bundle
+  `/Applications/MeetingScribe.app` (du 03/08, jamais rebuildé après le rename Clew du 07/08) →
+  parti dans `~/ownscribe/` legacy, intranscriptible par lui (l'alias CLI `ownscribe` n'existe
+  plus). Récupéré à la main ; **Clew.app est enfin buildée+installée** (HEAD `8fb526e`), vieux
+  bundle à la corbeille, e2e complet re-validé sur un clip stimulus (48 kHz, phrase retrouvée
+  mot pour mot dans le transcript, pipeline auto-déclenché, slug généré).
+- **4 fixes produits** (TDD, mutation-check, revue indépendante ré-exécutant les preuves, push
+  après verdict, validés sur le meeting réel) : filtre d'hallucinations Whisper (`178f527`),
+  langue du résumé inférée du transcript (`9e2ae8b`, décision Yanis), badge d'actions débarrassé
+  des placeholders none-family (`0e839b9`), fenêtre de contexte du summarizer dimensionnée au
+  vrai modèle au lieu d'un 8192 en dur (`e3f8d49`+`8fb526e` — le crash : 36 676 tokens, la clé
+  `context_size` documentée « auto » n'avait AUCUN consommateur).
+- **turbo est le modèle ASR de cette machine** (décision Yanis, `~/.config/clew/config.toml` ;
+  le défaut CODE reste large-v3). Le rejet historique de turbo reposait sur une citation
+  invalide — voir la note SUPERSEDED dans `LESSONS_LEARNED.md`.
+- **BMAD diarisation** (10 agents, réfutations à preuves fraîches) : embeddings = ~92 % du coût ;
+  plan classé dans `TODO.md` — (1) gate MPS jamais exécuté (le kernel qui crashe n'existe pas
+  dans notre torch 2.8, ~9-13× en jeu), (2) spike FluidAudio, (3) stride gaté anti-centroïde-zéro
+  (2,67× mesuré, pas 8,5×). Bug latent HIGH découvert en route : un centroïde VBx tout-à-zéro
+  rend un locuteur définitivement in-nommable, en silence.
+- **ZÉRO voiceprint sur disque** : le fix `cleanup --all` du 08-07 a purgé les 3 empreintes du
+  03/08 — le bloc « 3 voix enrôlées » ci-dessous décrit un état RÉVOLU ; ré-enrôler avant que
+  l'auto-nommage revive.
+- Côté pipeline : les tâches de fond du harness Claude meurent à ~60 min (groupe entier, sans
+  marqueur) — tout job >1 h passe en `nohup … & disown` détaché avec marqueurs disque.
+
 ## Session 2026-08-03 (suite) — premier VRAI appel vérifié bout en bout, 3 voix enrôlées
 
 Le premier appel réel (`2026-08-03_1401_pptx-tool-bug-review-update`, 32:45, fr, en salle avec
@@ -290,7 +319,10 @@ Point de départ : remplacer Spark AI par une solution locale, fiable, avec diar
 Décisions tranchées par débat adversarial (BMAD) + recherche cross-vérifiée, puis par un pilote empirique :
 
 - **Fork `paberr/ownscribe`** plutôt que greenfield — il apportait déjà la capture macOS + le pipeline whisperx/pyannote. Construire de zéro était de la sur-ingénierie.
-- **Whisper large-v3**, pas turbo, pas Parakeet, pas Canary. Turbo est plus faible en FR. Parakeet n'a aucun conditionnement de langue → il **traduit involontairement** le français spontané en anglais (falsification silencieuse, disqualifiant). Canary était un vrai candidat A/B (il a `source_lang`) mais le **pilote sur audio réel code-switché l'a fait perdre de 66 points** sur les spans de bascule → whisperx reste défaut.
+- **Whisper large-v3**, pas turbo, pas Parakeet, pas Canary. *(Volet turbo SUPERSEDÉ le
+  2026-08-24 — tests utilisateur + audit BMAD : turbo ≈ large-v3 en fr spontané, la citation
+  anti-turbo d'origine était invalide ; `turbo` est le modèle de cette machine via config.toml,
+  le défaut code reste large-v3. Voir LESSONS_LEARNED.md.)* Turbo est plus faible en FR. Parakeet n'a aucun conditionnement de langue → il **traduit involontairement** le français spontané en anglais (falsification silencieuse, disqualifiant). Canary était un vrai candidat A/B (il a `source_lang`) mais le **pilote sur audio réel code-switché l'a fait perdre de 66 points** sur les spans de bascule → whisperx reste défaut.
 - **Capture = CoreAudio process tap** (macOS 14.2+), pas ScreenCaptureKit : SCK exige la permission « Enregistrement d'écran » même pour de l'audio seul, ce qui contredisait l'exigence « audio uniquement ». Le tap utilise la permission audio-only. SCK gardé en fallback <14.2.
 - **Ta voix vs le call = deux sources physiques**, pas de la diarisation : ton micro (ce que tu envoies) = `mic.wav` = « Owner » ; le tap système (ce que tu reçois) = `system.wav` = diarisé. Séparation parfaite par construction — mais seulement **au casque** (sur haut-parleurs, l'audio du call re-rentre dans le micro → `echo_cancellation`).
 - **Diarisation pyannote community-1 sur CPU**, jamais MPS. De toute façon tout le chemin ASR est CPU-bound (CTranslate2 n'a pas de backend Metal), donc forcer CPU ne coûte rien.

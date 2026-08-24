@@ -315,8 +315,13 @@ employer name and the client project codename appear below as descriptions rathe
   not inside a sandboxed test. Documented here rather than left silent.
   Proof: this session's commits on `main` (see git log for SHAs).
 
-- [ ] **Regenerate demo GIFs with Clew branding**
-  PENDING, investigated and found infeasible with existing tooling this session (2026-08-07).
+- [x] **Regenerate demo GIFs with Clew branding**
+  DONE after all (2026-08-10, superseding the infeasibility finding below): commits `f99d3bd`
+  ("docs: regenerate demo GIFs with Clew branding, commit the tooling") and `332269e` (library
+  window tour GIF) landed the regenerated assets plus the capture tooling; the post-flip check
+  verified all three GIFs decode on the public README. The 2026-08-07 analysis below is kept as
+  the historical record of why it initially looked infeasible.
+  ~~PENDING, investigated and found infeasible with existing tooling this session (2026-08-07).~~
   `docs/demo-pipeline.gif` and `docs/demo-ask.gif` were added upstream by Pascal Berrang
   (`e1f106e` / `a272390`, Feb 2026, both pre-fork) as "README simulations": the only trace of
   how they were built is a `.gitignore` comment, `# asciinema recordings (regenerated from

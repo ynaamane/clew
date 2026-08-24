@@ -6,10 +6,47 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
 
 - **Fork ownscribe, don't greenfield.** It already ships the hardest part — macOS audio capture with separate mic+system taps, whisperx+pyannote pipeline, per-speaker Markdown/JSON output. Building from scratch was over-engineering.
 - **Whisper large-v3, NOT turbo, NOT Parakeet, NOT Canary.** large-v3 wins on FR/EN. Turbo's pruned decoder is weaker on French. Parakeet has NO language conditioning → involuntarily TRANSLATES spontaneous French to English (silent falsification — disqualifying). Canary was a real A/B candidate (has source_lang) but the pilot on real code-switched audio showed it LOSES by 66pts on switch spans → whisperx stays default.
+  **SUPERSEDED for the turbo half (2026-08-24, user decision):** Yanis's own repeated tests find turbo ≈ large-v3 on both FR and EN, and the BMAD audit found the original anti-turbo citation was an SEO blog mislabeling an English-only number (real spontaneous-French data: turbo ties or wins — TODO.md § Performance item 2). `model = "turbo"` is now set in this machine's `~/.config/clew/config.toml`; the CODE default stays `large-v3` (changing it is a separate, reviewable decision). The Parakeet/Canary halves stand unchanged.
 - **Capture = CoreAudio process tap (macOS 14.2+), NOT ScreenCaptureKit.** SCK requires Screen Recording permission even for audio-only. The CoreAudio tap uses the audio-only permission (assures the user the app can't see the screen) AND is testable headless. SCK kept as a <14.2 fallback.
 - **Your voice vs the call = TWO PHYSICAL SOURCES**, not diarization: your mic (what you send) = mic.wav = "Owner", the system tap (what you receive) = system.wav = diarized. Perfect separation by construction — but only on HEADPHONES (see echo below).
 - **Diarization: pyannote community-1 on CPU, never MPS.** The whole ASR path is CPU-bound anyway (CTranslate2 has no Metal backend), so forcing CPU costs nothing extra. MPS re-test deferred to the token pass.
+  **PREMISE CORRECTED (2026-08-24, BMAD):** the Metal kernel that crashes pytorch#181650 was added to torch AFTER the 2.8.0 this project runs — MPS here is UNTESTED, not proven blocked, and two independent sources put the potential diarization gain at ~9-13x. The never-run parity gate (`scripts/verify_with_token.py check_mps_vs_cpu_diarization`) is the decision point; it must be extended with per-centroid norm+cosine cells first, because segment-set equality cannot see the zero-norm-centroid failure below.
 - **Naming reuses pyannote's own per-cluster embeddings** (DiarizationPipeline return_embeddings=True) — no separate ECAPA/SpeechBrain dependency.
+
+## The 2026-08-24 team session — a real 68-min meeting as the forcing function
+
+- **BUG: a stale installed bundle records against migrated paths.** The 08-07 Clew rename shipped in
+  git but `swift/build-app.sh` was never re-run: `/Applications/MeetingScribe.app` (built 08-03) kept
+  running, could not find its migrated config, fell back to defaults, and recorded the day's real
+  68-min meeting into legacy `~/ownscribe/` — then could not transcribe it (its resolver only knows
+  `.venv/bin/ownscribe`, which the rename removed). The CLI migration is a deliberate no-op when
+  `~/clew` exists, so the meeting sat orphaned. Recovery: quit old app, verify decoded audio, `mv`
+  into `~/clew`, run the pipeline manually. Lesson: **a rename is not shipped until the artifact the
+  user LAUNCHES is rebuilt** — same family as BUG5's "test the artifact production loads."
+- **BUG (fixed, `e3f8d49`): `n_ctx=8192` hardcoded while `config.context_size` had zero consumers.**
+  The config template even promised "0 = auto-detect from model" — never implemented. First meeting
+  long enough (36,676 tokens) crashed `clew summarize` at the very end of the pipeline. Fix sizes the
+  window to the real GGUF (`llama_model_n_ctx_train` = 131072 for phi-4-mini; beware
+  `vocab_only=True` reports 0), raises a clear `SummarizationContextError` BEFORE inference, and
+  invalidates a cached-smaller `Llama` instance. Third instance of the dead-consumer class
+  (`silence_timeout`, sidebar counters) — **grep a config key to its consumer before trusting it.**
+- **Environment fact: harness background tasks are killed at ~60 min, process group included, no
+  marker written.** A first transcription run died at exactly 3600s mid-run; the launcher pattern
+  (`run_in_background`) was the cage. Any job that can exceed the hour runs detached
+  (`nohup … & disown`, re-parented to launchd) with DONE/FAILED marker files on disk as the ONLY
+  completion signal. Also measured: outputs were all end-of-run, so the kill cost the whole hour —
+  checkpointable stages (`clew transcribe` then `summarize`) are the cheap insurance.
+- **Latent HIGH bug found by the BMAD's devil's advocate actually testing a speedup:** widening the
+  pyannote stride can return an ALL-ZERO VBx centroid for a speaker (pyannote zero-pads;
+  `matching.py` scores it 0.0 < 0.65) — the speaker becomes permanently un-nameable with speaker
+  count, boundaries and DER all looking healthy. Dormant only because zero voiceprints are enrolled
+  (the 08-07 `cleanup --all` fix purged all three — re-enroll before auto-naming can work again).
+  Guard to build before ANY stride/engine/device change. Full verdict + ranked speedup plan:
+  TODO.md § 2026-08-24; the four headline gain figures researchers brought back (8.5x, 22-32x, 30x,
+  batch-size) were ALL wrong or void — only debate-surviving, locally-measured numbers were kept.
+- **`PipelineProgress.__exit__` paints every step green above its own traceback** (reproduced with a
+  live injected crash), and `fail()` renders a step as never-started — a real fix needs a "failed"
+  visual state, not a one-liner. Explains why a dead run can look complete in scrollback.
 
 ## Looking is necessary and not sufficient (2026-07-30, the first real renders)
 
