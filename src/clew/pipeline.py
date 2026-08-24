@@ -10,6 +10,7 @@ import sys
 import termios
 import time
 import tty
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -247,14 +248,62 @@ def _shift_result(result, offset: float):
 
 _MIC_SEGMENT_SILENCE_THRESHOLD = 1e-4
 
+# Above the hard silence cutoff but still near-total silence: a real 2026-08-03 repro
+# measured 0.0163 RMS here and produced the canonical Whisper silence hallucination as
+# the sole Owner turn. Comfortably below normal speech (the test suite's "loud" fixture
+# sits around 0.0707) so it never widens into a text-wide filter.
+_QUASI_SILENCE_RMS_THRESHOLD = 0.03
+
+# Canonical Whisper hallucinations on silent/near-silent audio, sourced from
+# training-data caption credits (YouTube auto-caption boilerplate baked into the
+# training corpus). Widely documented, e.g. openai/whisper hallucination-on-silence
+# issues and the "Careless Whisper" (Koenecke et al. 2024) hallucination survey.
+# Kept conservative -- normalized-exact match only, and only ever consulted inside
+# the quasi-silence RMS band above.
+_KNOWN_HALLUCINATION_PHRASES = frozenset(
+    {
+        "sous titrage societe radio canada",
+        "sous titres realises par la communaute d amara org",
+        "sous titres par la communaute d amara org",
+        "merci d avoir regarde cette video",
+        "merci d avoir regarde la video",
+        "merci d avoir regarde",
+        "abonnez vous a la chaine",
+        "n hesitez pas a vous abonner",
+        "thanks for watching",
+        "thank you for watching",
+        "please subscribe",
+        "subtitles by the amara org community",
+        "captions by the amara org community",
+    }
+)
+
+
+def _normalize_for_hallucination_match(text: str) -> str:
+    """Lowercase, strip accents/punctuation, collapse whitespace for hallucination matching."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    ascii_only = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    letters_and_digits = re.sub(r"[^a-z0-9]+", " ", ascii_only.lower())
+    return " ".join(letters_and_digits.split())
+
+
+def _is_known_hallucination(text: str) -> bool:
+    """True if text normalizes to a known Whisper silence-hallucination phrase."""
+    return _normalize_for_hallucination_match(text) in _KNOWN_HALLUCINATION_PHRASES
+
 
 def gate_silent_mic_segments(result, mic_path: Path, threshold: float = _MIC_SEGMENT_SILENCE_THRESHOLD):
-    """Drop segments whose corresponding span in mic_path is acoustically silent.
+    """Drop segments whose corresponding span in mic_path is acoustically silent, and drop
+    known Whisper hallucinations produced over a quasi-silent (but not hard-silent) span.
 
     Complements the manual mute: even if the mic isn't muted (forgotten, or a mute
     that only reached the call app and not the recording), a genuinely silent mic
-    span should never produce an Owner line. Gates emission only -- never fabricates
-    a segment that wasn't there. Returns result unchanged if mic_path is unreadable.
+    span should never produce an Owner line. A span that is quiet but not hard-silent
+    (see _QUASI_SILENCE_RMS_THRESHOLD) can still trigger Whisper's well-documented
+    silence hallucination -- those known phrases are dropped too, but ONLY in that
+    near-silence band, so real speech elsewhere is never touched. Gates emission only
+    -- never fabricates a segment that wasn't there. Returns result unchanged if
+    mic_path is unreadable.
     """
     from dataclasses import replace
 
@@ -276,8 +325,11 @@ def gate_silent_mic_segments(result, mic_path: Path, threshold: float = _MIC_SEG
         if start_frame >= end_frame:
             continue
         span_rms = float(np.sqrt(np.mean(np.square(data[start_frame:end_frame]))))
-        if span_rms >= threshold:
-            kept_segments.append(seg)
+        if span_rms < threshold:
+            continue
+        if span_rms < _QUASI_SILENCE_RMS_THRESHOLD and _is_known_hallucination(seg.text):
+            continue
+        kept_segments.append(seg)
 
     return replace(result, segments=kept_segments)
 

@@ -156,6 +156,118 @@ class TestGateSilentMicSegments:
         assert real_world_repro_owner_segment_rms / _MIC_SEGMENT_SILENCE_THRESHOLD > 100
 
 
+class TestGateSilentMicSegmentsHallucinationFilter:
+    """Item 6: the 2026-08-03 meeting's ~6 unmuted-but-quasi-silent mic seconds produced the
+    canonical Whisper silence hallucination ("Sous-titrage Societe Radio-Canada") as the sole
+    Owner turn. That span's RMS (0.0163) sits two orders of magnitude above the hard
+    _MIC_SEGMENT_SILENCE_THRESHOLD, so the existing hard drop never reaches it."""
+
+    _REAL_WORLD_REPRO_RMS = 0.016304502
+
+    def test_known_hallucination_at_real_world_repro_rms_is_dropped(self, tmp_path):
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav_at_exact_rms(mic_path, self._REAL_WORLD_REPRO_RMS, total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="Sous-titrage Société Radio-Canada", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_english_known_hallucination_at_quasi_silence_rms_is_dropped(self, tmp_path):
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav_at_exact_rms(mic_path, self._REAL_WORLD_REPRO_RMS, total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="Thank you for watching.", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_amara_credit_variant_at_quasi_silence_rms_is_dropped(self, tmp_path):
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav_at_exact_rms(mic_path, self._REAL_WORLD_REPRO_RMS, total_seconds=2.0)
+
+        result = TranscriptResult(
+            segments=[Segment(text="Sous-titres réalisés par la communauté d'Amara.org", start=0.0, end=2.0)]
+        )
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_hallucination_match_is_case_and_punctuation_insensitive(self, tmp_path):
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav_at_exact_rms(mic_path, self._REAL_WORLD_REPRO_RMS, total_seconds=2.0)
+
+        result = TranscriptResult(
+            segments=[Segment(text="  sous-titrage   société radio-canada...  ", start=0.0, end=2.0)]
+        )
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert gated.segments == []
+
+    def test_legitimate_speech_at_quasi_silence_rms_is_kept(self, tmp_path):
+        """The filter is scoped to KNOWN hallucination text, not to every quiet segment --
+        someone speaking quietly must still survive."""
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav_at_exact_rms(mic_path, self._REAL_WORLD_REPRO_RMS, total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="let's push that to next sprint", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["let's push that to next sprint"]
+
+    def test_known_hallucination_text_at_normal_speech_rms_is_kept(self, tmp_path):
+        """A participant who really says these words at a normal recording level must survive --
+        the filter only fires in the quasi-silence RMS band, never text-wide."""
+        from clew.pipeline import gate_silent_mic_segments
+
+        mic_path = tmp_path / "mic.wav"
+        _write_segmented_wav(mic_path, loud_spans=[(0.0, 2.0)], total_seconds=2.0)
+
+        result = TranscriptResult(segments=[Segment(text="Thank you for watching", start=0.0, end=2.0)])
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["Thank you for watching"]
+
+    def test_mixed_segments_only_hallucination_dropped(self, tmp_path):
+        import numpy as np
+
+        from clew.pipeline import gate_silent_mic_segments
+
+        sample_rate = 16000
+        quasi_silent_span = np.full(2 * sample_rate, self._REAL_WORLD_REPRO_RMS, dtype="float32")
+        loud_span = (np.sin(np.linspace(0, 100 * np.pi, sample_rate)) * 0.1).astype("float32")
+
+        mic_path = tmp_path / "mic.wav"
+        _write_wav(mic_path, np.concatenate([quasi_silent_span, loud_span]), sample_rate)
+
+        result = TranscriptResult(
+            segments=[
+                Segment(text="Sous-titrage Société Radio-Canada", start=0.0, end=2.0),
+                Segment(text="okay let's get started", start=2.0, end=3.0),
+            ]
+        )
+        gated = gate_silent_mic_segments(result, mic_path)
+
+        assert [seg.text for seg in gated.segments] == ["okay let's get started"]
+
+    def test_quasi_silence_threshold_covers_repro_rms_with_margin_below_loud_speech(self):
+        from clew.pipeline import _QUASI_SILENCE_RMS_THRESHOLD
+
+        loud_test_sample_rms = 0.1 / (2**0.5)  # amplitude used by _loud_samples / _write_segmented_wav
+        assert self._REAL_WORLD_REPRO_RMS < _QUASI_SILENCE_RMS_THRESHOLD
+        assert loud_test_sample_rms > _QUASI_SILENCE_RMS_THRESHOLD
+
+
 class TestTrackRms:
     def test_silent_track_has_near_zero_rms(self, tmp_path):
         from clew.pipeline import _track_rms
