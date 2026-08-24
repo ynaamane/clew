@@ -47,6 +47,16 @@ see the `codesign -dvvv` / `--entitlements -` output printed at the end of
 /Applications/Clew.app` for `Authority=MeetingScribeDev`, not
       `Signature=adhoc`.
 
+Recording can be driven WITHOUT a human click (2026-08-24, used for the post-install e2e sound
+test): the library window's toolbar record button carries `.accessibilityIdentifier`
+`library.recordButton` — `open "clew://library"`, then via System Events click the button of
+`toolbar 1 of window 1` whose `AXIdentifier` is `library.recordButton` (its AXTitle reads as
+`missing value`, match on the identifier only). Two traps: the window can report `count of
+windows = 0` for a couple of seconds after `open` (retry, don't conclude "no window" — the
+MenuBarExtra popover itself remains AX-invisible, this button is the only programmatic route),
+and the tap records what the machine OUTPUTS, so generate a stimulus (`say "<known sentence>"`)
+during capture and grep the transcript for it afterwards.
+
 ## End-to-end recording
 
 - [ ] Play some audio (a YouTube video, a call, anything with sound) and
