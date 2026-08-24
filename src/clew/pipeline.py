@@ -28,6 +28,7 @@ from clew.progress import (
 from clew.summarization import create_summarizer
 from clew.summarization.anchoring import anchor_summary_claims
 from clew.summarization.anchors_output import save_anchors
+from clew.summarization.base import SummarizationContextError
 from clew.summarization.grounding import find_ungrounded_names
 
 # A standard WAV file header (RIFF + fmt + data chunk header) is 44 bytes.
@@ -753,7 +754,12 @@ def run_summarize(config: Config, transcript_file: str) -> None:
                         err=True,
                     )
                     raise SystemExit(1) from None
-            summary = summarizer.summarize(transcript_text, language=language)
+            try:
+                summary = summarizer.summarize(transcript_text, language=language)
+            except SummarizationContextError as exc:
+                progress.fail("summarizing")
+                click.echo(f"Error: {exc}", err=True)
+                raise SystemExit(1) from None
             ungrounded_names = find_ungrounded_names(summary, transcript_text)
             title_slug = _generate_title_slug(summary, summarizer)
             progress.complete("summarizing")
@@ -815,6 +821,7 @@ def _do_transcribe_and_summarize(
     title_slug = ""
     sum_unavailable = False
     sum_failed = False
+    sum_failed_reason: str | None = None
     correction_unavailable = False
     correction_failed = False
     ungrounded_names: list[str] = []
@@ -898,6 +905,10 @@ def _do_transcribe_and_summarize(
                         summary_path.write_text(summary_str or summary)
                         title_slug = _generate_title_slug(summary, summarizer)
                         progress.complete("summarizing")
+                    except SummarizationContextError as exc:
+                        progress.fail("summarizing")
+                        sum_failed = True
+                        sum_failed_reason = str(exc)
                     except Exception:
                         progress.fail("summarizing")
                         sum_failed = True
@@ -935,8 +946,9 @@ def _do_transcribe_and_summarize(
                 err=True,
             )
     elif sum_failed:
+        reason = f" {sum_failed_reason}" if sum_failed_reason else ""
         click.echo(
-            f"\nWarning: Summarization failed. "
+            f"\nWarning: Summarization failed.{reason} "
             f"Transcript is saved at {transcript_path}\n"
             f"Resume with: clew resume {out_dir}",
             err=True,

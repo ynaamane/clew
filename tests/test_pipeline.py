@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 
 from clew.config import Config
+from clew.summarization.base import SummarizationContextError
 from clew.transcription.models import Segment, TranscriptResult, Word
 
 
@@ -2328,6 +2329,153 @@ class TestRunTranscribeColocation:
             run_transcribe(config, str(audio_path))
 
         assert (audio_dir / "transcript.md").exists()
+
+
+class TestRunSummarizeContextError:
+    """A transcript exceeding the model's/config's context window must produce a
+    clear, actionable error and SystemExit(1) -- never an uncaught traceback. This
+    is the real repro path: reprocessing an already-transcribed meeting via
+    `clew summarize <file>` (run_summarize had no try/except around summarize())."""
+
+    def test_context_error_exits_cleanly_with_message_not_traceback(self, tmp_path, capsys):
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.side_effect = SummarizationContextError(
+            "This transcript needs about 37700 tokens of context (36676 prompt + "
+            "1024 output margin), but model 'phi-4-mini' supports at most 8192 tokens."
+        )
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            run_summarize(config, str(tx_path))
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "37700 tokens" in captured.err
+        assert "Traceback" not in captured.err
+
+    def test_context_error_does_not_write_a_summary_file(self, tmp_path):
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.side_effect = SummarizationContextError("too big")
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+            contextlib.suppress(SystemExit),
+        ):
+            run_summarize(config, str(tx_path))
+
+        assert not (tx_dir / "summary.md").exists()
+
+    def test_context_error_still_closes_the_summarizer(self, tmp_path):
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.side_effect = SummarizationContextError("too big")
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+            contextlib.suppress(SystemExit),
+        ):
+            run_summarize(config, str(tx_path))
+
+        mock_summarizer.close.assert_called_once()
+
+    def test_other_exceptions_still_propagate_unchanged(self, tmp_path):
+        """Only SummarizationContextError gets the clean-exit treatment -- an
+        unrelated backend crash must not be silently swallowed either."""
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.side_effect = RuntimeError("GPU OOM, unrelated to sizing")
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+            pytest.raises(RuntimeError, match="GPU OOM"),
+        ):
+            run_summarize(config, str(tx_path))
+
+
+class TestDoTranscribeAndSummarizeContextError:
+    """The live pipeline already degrades any summarize() exception into a
+    'Summarization failed' warning without crashing -- confirm a context-sizing
+    failure specifically surfaces its own actionable message, not a generic one."""
+
+    def test_context_error_message_is_surfaced_specifically(self, tmp_path, capsys):
+        from clew.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="Hello world.", start=0.0, end=1.5)],
+            language="en",
+            duration=1.5,
+        )
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.side_effect = SummarizationContextError("needs 37700 tokens, model supports 8192")
+
+        with (
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)  # must not raise
+
+        captured = capsys.readouterr()
+        assert "needs 37700 tokens, model supports 8192" in captured.err
+        assert (tmp_path / "transcript.md").exists()
+        assert not (tmp_path / "summary.md").exists()
 
 
 class TestRunSummarizeColocation:

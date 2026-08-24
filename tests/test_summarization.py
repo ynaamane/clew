@@ -8,6 +8,7 @@ import pytest
 
 from clew.config import Config, SummarizationConfig, TemplateConfig
 from clew.summarization import create_summarizer
+from clew.summarization.base import SummarizationContextError
 from clew.summarization.prompts import (
     LECTURE_SUMMARY_SYSTEM,
     MEETING_SUMMARY_SYSTEM,
@@ -442,8 +443,18 @@ def _mock_llm_response(content: str) -> dict:
 
 @pytest.fixture()
 def mock_llama():
-    """Patch llama_cpp.Llama and _ensure_model so no real model is loaded."""
+    """Patch llama_cpp.Llama and _ensure_model so no real model is loaded.
+
+    Also stubs tokenize()/n_ctx()/model and the llama_model_n_ctx_train binding
+    that _required_ctx() (llama_cpp_summarizer.py) consults before every call --
+    without these, .model is an unconfigured MagicMock and the real C binding
+    segfaults trying to dereference it as a llama_model_p. Tests that care about
+    context sizing use the dedicated llama_stub_factory fixture instead.
+    """
     llm_instance = MagicMock()
+    llm_instance.n_ctx.return_value = 131072
+    llm_instance.model = object()
+    llm_instance.tokenize.return_value = [1] * 10
     with (
         patch(
             "clew.summarization.llama_cpp_summarizer._ensure_model",
@@ -457,6 +468,11 @@ def mock_llama():
         patch(
             "llama_cpp.Llama",
             llama_cls,
+            create=True,
+        ),
+        patch(
+            "llama_cpp.llama_model_n_ctx_train",
+            return_value=131072,
             create=True,
         ),
     ):
@@ -719,6 +735,208 @@ class TestLlamaCppLanguageInstruction:
 
         call_args = mock_llama.create_chat_completion.call_args
         assert call_args[1]["messages"][0]["content"] == MEETING_SUMMARY_SYSTEM
+
+
+@pytest.fixture()
+def llama_stub_factory():
+    """Patch llama_cpp.Llama with a per-call factory (unlike mock_llama's single fixed
+    instance) so context-sizing tests can inspect every construction's n_ctx kwarg and
+    control tokenize()/n_ctx_train() independently. Also patches _ensure_model and the
+    low-level llama_cpp.llama_model_n_ctx_train binding.
+
+    Yields (constructions, state): constructions is a list of the n_ctx kwarg passed to
+    each Llama(...) call, in order; state["tokens"] controls what tokenize() returns
+    (as a token-id list) and state["n_ctx_train"] controls the model's reported trained
+    context length.
+    """
+    constructions: list[int] = []
+    state = {"tokens": [1] * 10, "n_ctx_train": 131072}
+    instances: list[MagicMock] = []
+
+    def _make_instance(*args, **kwargs):
+        constructions.append(kwargs.get("n_ctx"))
+        instance = MagicMock()
+        instance.n_ctx.return_value = kwargs.get("n_ctx")
+        instance.model = object()
+        instance.tokenize.side_effect = lambda *a, **k: list(state["tokens"])
+        instance.create_chat_completion.return_value = _mock_llm_response("Summary.")
+        instances.append(instance)
+        return instance
+
+    with (
+        patch(
+            "clew.summarization.llama_cpp_summarizer._ensure_model",
+            return_value="/fake/model.gguf",
+        ),
+        patch("clew.summarization.llama_cpp_summarizer.Llama", side_effect=_make_instance, create=True),
+        patch("llama_cpp.Llama", side_effect=_make_instance, create=True),
+        patch("llama_cpp.llama_model_n_ctx_train", side_effect=lambda model: state["n_ctx_train"], create=True),
+    ):
+        yield constructions, state, instances
+
+
+class TestLlamaCppContextSizing:
+    """Item: n_ctx=8192 was hardcoded (llama_cpp_summarizer.py), while
+    SummarizationConfig.context_size existed with zero consumers -- the exact
+    'dead consumer' pattern documented in ownscribe-pipeline-traps. Real repro:
+    2026-08-24_1104 meeting, 36676 measured prompt tokens, crashed against the
+    hardcoded 8192 window. phi-4-mini Q4_K_M's real n_ctx_train measured this
+    session = 131072."""
+
+    def test_explicit_context_size_is_used_as_is(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 100  # small need -- explicit config must still win
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=4096)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("short transcript")
+
+        assert constructions[-1] == 4096
+
+    def test_explicit_context_size_too_small_raises_before_inference(self, llama_stub_factory):
+        constructions, state, instances = llama_stub_factory
+        state["tokens"] = [1] * 5000  # needs 5000 + margin > 2048
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=2048)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize("a very long transcript")
+
+        assert all(i.create_chat_completion.call_count == 0 for i in instances)
+        assert 2048 not in constructions
+
+    def test_explicit_context_size_boundary_exact_fit_succeeds(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 1000  # needs exactly 1000 + 1024 margin = 2024
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=2024)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("transcript")  # must not raise
+
+        assert constructions[-1] == 2024
+
+    def test_explicit_context_size_boundary_one_over_raises(self, llama_stub_factory):
+        _constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 1000  # needs 1000 + 1024 margin = 2024
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=2023)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize("transcript")
+
+    def test_auto_context_size_uses_min_of_need_and_model_limit(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 2000
+        state["n_ctx_train"] = 131072
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("transcript")
+
+        assert constructions[-1] == 2000 + 1024
+
+    def test_auto_context_size_need_exceeds_model_limit_raises(self, llama_stub_factory):
+        _constructions, state, instances = llama_stub_factory
+        state["tokens"] = [1] * 200000
+        state["n_ctx_train"] = 131072
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize("an unsummarizably long transcript")
+
+        assert all(i.create_chat_completion.call_count == 0 for i in instances)
+
+    def test_reproduces_real_meeting_now_succeeds(self, llama_stub_factory):
+        """The exact real-world repro: 36676 measured prompt tokens against
+        phi-4-mini's measured n_ctx_train of 131072, in auto (0) mode."""
+        constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 36676
+        state["n_ctx_train"] = 131072
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        result = summarizer.summarize("the real 68-minute transcript text")
+
+        assert "Summary" in result
+        assert constructions[-1] == 36676 + 1024
+
+    def test_cached_instance_reused_when_it_already_covers_a_smaller_later_need(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["tokens"] = [1] * 50000  # first call needs a big context
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("big transcript")
+        constructions_after_first = list(constructions)
+
+        state["tokens"] = [1] * 50  # second call needs far less
+        summarizer.generate_title("short summary")
+
+        assert constructions == constructions_after_first  # no new construction
+
+    def test_cached_small_instance_is_replaced_not_reused_for_a_bigger_later_prompt(self, llama_stub_factory):
+        """Item 3's exact concern: a cached small-context instance must never
+        silently serve a request it cannot cover."""
+        constructions, state, instances = llama_stub_factory
+        state["tokens"] = [1] * 50  # first call: small
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.generate_title("short summary")
+        first_instance = instances[-1]
+
+        state["tokens"] = [1] * 50000  # second call: big
+        summarizer.summarize("big transcript")
+
+        assert constructions[-1] == 50000 + 1024
+        assert first_instance.close.call_count >= 1
+
+    def test_chat_is_sized_but_never_raises_returns_empty_when_too_large(self, llama_stub_factory):
+        """chat() feeds search.py's ask() and correction.py, neither of which wraps it
+        in a try/except -- it must keep its long-standing 'never raises, returns "" on
+        any failure' contract even when the failure is a sizing problem, not just a
+        backend error. summarize()/generate_title() are the ones allowed to raise,
+        because their pipeline.py callers are built to catch it."""
+        _constructions, state, instances = llama_stub_factory
+        state["tokens"] = [1] * 5000
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=1024)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        result = summarizer.chat("system prompt", "a very long user prompt")
+
+        assert result == ""
+        assert all(i.create_chat_completion.call_count == 0 for i in instances)
 
 
 class TestLlamaCppClose:

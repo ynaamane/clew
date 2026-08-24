@@ -5,6 +5,14 @@ from __future__ import annotations
 import abc
 
 
+class SummarizationContextError(RuntimeError):
+    """Raised when a prompt cannot fit in the backend's context window.
+
+    Callers must be able to catch this specifically and report it before any
+    inference is attempted -- it signals a sizing problem, not a backend failure.
+    """
+
+
 class Summarizer(abc.ABC):
     """Base class for summarization backends."""
 

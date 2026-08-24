@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from clew.progress import DownloadProgressEvent, DownloadProgressWriter
-from clew.summarization.base import Summarizer
+from clew.summarization.base import SummarizationContextError, Summarizer
 from clew.summarization.prompts import clean_response
 
 if TYPE_CHECKING:
@@ -28,6 +28,15 @@ _MODEL_REGISTRY: dict[str, tuple[str, str]] = {
         "Phi-4-mini-instruct-Q4_K_M.gguf",
     ),
 }
+
+# Cheap first load used to read the model's tokenizer and trained context length
+# (n_ctx_train) -- vocab_only=True reports n_ctx_train as 0 (measured against
+# phi-4-mini Q4_K_M, llama-cpp-python 0.3.16), so this must be a real, if small, load.
+# Reused as the actual inference instance whenever it already covers what's needed.
+_PROBE_N_CTX = 512
+
+# Headroom reserved for the model's own reply, on top of the prompt's token count.
+_OUTPUT_MARGIN_TOKENS = 1024
 
 
 def _ensure_model(
@@ -126,23 +135,72 @@ class LlamaCppSummarizer(Summarizer):
         except Exception:
             pass
 
-    def _get_llm(self) -> Llama:
-        """Lazy-load the model on first use."""
-        if self._llm is not None:
+    def _get_llm(self, min_ctx: int = _PROBE_N_CTX) -> Llama:
+        """Lazy-load the model, sized to at least min_ctx tokens of context.
+
+        Reuses the cached instance when its context already covers min_ctx.
+        Otherwise (re)loads with a bigger n_ctx -- llama.cpp's KV cache is fixed
+        at construction, so a cached small-context instance must never silently
+        serve a request it cannot cover.
+        """
+        if self._llm is not None and self._llm.n_ctx() >= min_ctx:
             return self._llm
 
         from llama_cpp import Llama
 
+        if self._llm is not None:
+            self._llm.close()
+            self._llm = None
+
         model_path = _ensure_model(self._config.model)
-        logger.info("Loading model from %s", model_path)
+        n_ctx = max(min_ctx, _PROBE_N_CTX)
+        logger.info("Loading model from %s (n_ctx=%d)", model_path, n_ctx)
         with _suppress_stderr():
             self._llm = Llama(
                 model_path=str(model_path),
-                n_ctx=8192,
+                n_ctx=n_ctx,
                 n_gpu_layers=-1,  # auto: offloads to Metal/CUDA when available, falls back to CPU
                 verbose=False,
             )
         return self._llm
+
+    def _required_ctx(self, *texts: str) -> int:
+        """Tokenize these prompt texts with the model's own tokenizer and return the
+        context window they need (prompt tokens + a generation margin).
+
+        context_size > 0 is used as-is (an explicit budget the caller committed to);
+        context_size == 0 (auto) sizes to min(need, the model's trained context
+        length). Raises SummarizationContextError -- before any inference call --
+        when the requirement cannot be met either way.
+        """
+        import llama_cpp
+
+        probe = self._get_llm()
+        combined = "\n".join(texts).encode("utf-8")
+        prompt_tokens = len(probe.tokenize(combined, add_bos=True))
+        needed = prompt_tokens + _OUTPUT_MARGIN_TOKENS
+
+        if self._config.context_size > 0:
+            limit = self._config.context_size
+            if needed > limit:
+                raise SummarizationContextError(
+                    f"This transcript needs about {needed} tokens of context "
+                    f"({prompt_tokens} prompt + {_OUTPUT_MARGIN_TOKENS} output margin), "
+                    f"but [summarization] context_size is set to {limit}. Increase "
+                    "context_size in your config, or summarize a shorter transcript."
+                )
+            return limit
+
+        model_limit = llama_cpp.llama_model_n_ctx_train(probe.model)
+        if needed > model_limit:
+            raise SummarizationContextError(
+                f"This transcript needs about {needed} tokens of context "
+                f"({prompt_tokens} prompt + {_OUTPUT_MARGIN_TOKENS} output margin), "
+                f"but model '{self._config.model}' supports at most {model_limit} "
+                "tokens. Use a model with a longer context window, or summarize a "
+                "shorter transcript."
+            )
+        return min(needed, model_limit)
 
     def chat(
         self,
@@ -151,7 +209,11 @@ class LlamaCppSummarizer(Summarizer):
         json_mode: bool = False,
         json_schema: dict | None = None,
     ) -> str:
-        llm = self._get_llm()
+        try:
+            min_ctx = self._required_ctx(system_prompt, user_prompt)
+            llm = self._get_llm(min_ctx)
+        except SummarizationContextError:
+            return ""
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -193,7 +255,8 @@ class LlamaCppSummarizer(Summarizer):
         system, prompt = resolve_template(self._config.template, self._templates)
         system += language_instruction(language or "")
         user = prompt.format(transcript=transcript_text)
-        llm = self._get_llm()
+        min_ctx = self._required_ctx(system, user)
+        llm = self._get_llm(min_ctx)
         response = llm.create_chat_completion(
             messages=[
                 {"role": "system", "content": system},
@@ -205,11 +268,13 @@ class LlamaCppSummarizer(Summarizer):
     def generate_title(self, summary_text: str) -> str:
         from clew.summarization.prompts import TITLE_PROMPT, TITLE_SYSTEM
 
-        llm = self._get_llm()
+        user = TITLE_PROMPT.format(summary=summary_text)
+        min_ctx = self._required_ctx(TITLE_SYSTEM, user)
+        llm = self._get_llm(min_ctx)
         response = llm.create_chat_completion(
             messages=[
                 {"role": "system", "content": TITLE_SYSTEM},
-                {"role": "user", "content": TITLE_PROMPT.format(summary=summary_text)},
+                {"role": "user", "content": user},
             ],
         )
         return clean_response(response["choices"][0]["message"]["content"] or "").strip()
