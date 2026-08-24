@@ -1,5 +1,75 @@
 # TODO — meeting-scribe
 
+## 2026-08-24 — session team : 4 fixes livrés/revus/poussés, app enfin installée, verdict BMAD diarisation
+
+**Livré ce jour** (chaque fix : TDD deux directions, mutation-check mesuré, revue indépendante qui
+ré-exécute les preuves, push après verdict, validé sur le meeting réel de 68 min) :
+- `178f527` — filtre d'hallucinations Whisper scopé à une bande RMS quasi-silence (0.03) sur la piste Owner.
+- `9e2ae8b` — langue du résumé INFÉRÉE du transcript (décision Yanis : jamais forcée, pas de clé de config).
+- `0e839b9` — badge d'actions : les placeholders none-family (`- None mentioned.` etc.) ne comptent plus
+  (comparaison exacte post-normalisation, jamais par préfixe — les deux directions testées aux deux niveaux).
+- `e3f8d49`+`8fb526e` — fenêtre de contexte du summarizer local dimensionnée au VRAI modèle
+  (n_ctx_train lu = 131072 ; `context_size` de la config enfin consommé ; `SummarizationContextError`
+  précoce au lieu du ValueError llama_cpp en fin de pipeline). Repro du crash : le meeting du jour,
+  36 676 tokens contre le 8192 en dur. Validé en réel : summarize OK en ~3 min.
+
+**Décisions/état du jour** : `turbo` est le modèle ASR par défaut (décision Yanis, `config.toml
+[transcription]`, tranche l'item « re-measure turbo » plus bas — ses propres tests fr/en concluent parité).
+Clew.app ENFIN installée (le bundle installé était resté MeetingScribe.app du 03/08 : le meeting du jour
+a été enregistré par le vieux binaire dans `~/ownscribe/`, récupéré à la main — la migration CLI est no-op
+quand `~/clew` existe). Vieux bundle à la corbeille. **ZÉRO voiceprint sur disque** : le fix `cleanup --all`
+du 08-07 a purgé les 3 empreintes (comportement voulu du cleanup, conséquence non anticipée) — ré-enrôler
+Yanis/Devon/Kamal avant que l'auto-nommage revive.
+
+**Verdict BMAD diarisation** (10 agents, 28 contestations DA, 4 lanes de réfutation à preuves fraîches ;
+dossier complet : workflow `wf_c1b82628-8d0`) : l'extraction d'EMBEDDINGS = ~92 % du temps de diarisation
+(mesuré 3×) — seul étage à optimiser. Plan classé : (1) **lancer le gate MPS existant**
+(`scripts/verify_with_token.py check_mps_vs_cpu_diarization`, jamais exécuté) — le kernel Metal qui
+crashe (#181650) N'EXISTE PAS dans notre torch 2.8.0, MPS est non-testé pas bloqué, ~9-13× si la parité
+tient ; étendre le gate de cellules centroïdes avant de le lancer ; (2) spike FluidAudio (ANE ; son CLI
+émet déjà segments+embeddings via `--output`, pas de target Swift à écrire) ; (3) stride 1,5-2 s
+(2,67× mesuré à 3 s, PAS 8,5×) UNIQUEMENT derrière un garde anti-centroïde-zéro ; (4) sweep de threads
+(indice : 4 peut battre 12, n=2) ; (5) ONNX parké. Chiffres tués par le débat, ne pas re-litiger :
+8,5× stride / 22-32× MPS / 30× ONNX / batch-size (déjà à 32).
+
+**Liste consolidée bugs/doutes de la session (à trier) :**
+1. **HIGH** — centroïde VBx tout-à-zéro traverse en silence → locuteur définitivement in-nommable
+   (`speakers/matching.py:16-19` rend 0.0, `whisperx_transcriber.py:358-364` émet les lignes verbatim ;
+   pyannote zero-padde à `speaker_diarization.py:763-766`). Reproduit 2× à stride 3 s. Garde dure à coder
+   — s'arme au premier enrollment ou changement de stride/moteur.
+2. **MED** — `PipelineProgress.__exit__` peint tout en vert au-dessus de sa propre traceback
+   (`progress.py:330-341`) ; `fail()` rend un step comme jamais-démarré (`:385-390`) — il faut un état
+   visuel « failed », pas « quelques lignes ». Reproduit par crash injecté.
+3. **MED** — `mic.wav` du 24/08 : pic +7,07 dBFS (>1.0 float) sur la capture du vieux bundle —
+   creuser le gain côté Swift (les autres pistes ≤1.0).
+4. **MED** — `search.py:24` `_DEFAULT_CONTEXT_SIZE = 8192` : `clew ask` plafonne son chunking à
+   l'ancienne limite alors que le modèle en supporte 131k — des transcripts sont sautés trop tôt.
+5. **MED** — backend Ollama : même trou de contexte, mais pas de tokenizer local — fix séparé
+   (endpoint tokenize d'Ollama ou heuristique).
+6. **DOUTE** — SIGTRAP 3/3 (`ContiguousArrayBuffer Index out of range`) sous mutation extrême
+   « tout bullet est placeholder », 0/5 ailleurs — possible bug latent de bornes dans la suite Swift,
+   repro exacte dans le rapport swift-fix du 24/08.
+7. **LOW** — `SummaryDocument.init(json:)` n'applique pas le filtre none-family (chemin non alimenté
+   aujourd'hui — latent si branché).
+8. **LOW** — `actionItemsPlaceholder` retombe sur la première ligne non-bulletée si tous les bullets
+   sont filtrés (forme jamais exercée).
+9. **LOW** — marge de sortie 1024 tokens (`_OUTPUT_MARGIN_TOKENS`) : choix non mesuré contre les
+   longueurs réelles de résumés.
+10. **LOW** — liste d'hallucinations (13 phrases) + seuil 0.03 calibrés sur N=1 cas réel — liste vivante,
+    étendre sur repros réels.
+11. **LOW** — la génération de TITRE ne reçoit pas d'instruction de langue (hérite implicitement de la
+    langue du résumé) — question de périmètre produit.
+12. **INFO** — le n_ctx choisi n'est pas observable en sortie CLI (logger sans handler) — le journaliser.
+13. **INFO** — fait d'environnement : les tâches Bash de fond du harness Claude meurent à ~60 min
+    (groupe de processus entier, sans marqueur) — tout job >1 h passe par nohup+disown détaché,
+    marqueurs DONE/FAILED sur disque.
+14. **INFO** — `run_summarize` sur fichier passe le texte BRUT (en-têtes compris) au summarizer
+    (pré-existant, inchangé).
+
+**Côté Yanis** : regarder la fenêtre de Clew.app (installée, ouverte, ton meeting du jour dedans) ·
+ré-enrôler les 3 voix · débloquer le billing GitHub (CI) · ticket GitHub Support pour purger les objets
+non-atteignables (`178b05d` encore servi par SHA sur le repo public) · épingler `clew` sur ton profil.
+
 ## WHAT IS ACTUALLY LEFT (2026-08-03)
 
 Everything below this block is history and traps worth keeping. This is the open list, rewritten
@@ -34,19 +104,19 @@ for 1, 2, 5 live in the enrollment/overlap paragraphs below — read them before
 2. **Multi-sample `VoiceprintDB`** — `upsert` currently overwrites; store N samples per name,
    match against max/centroid. Empirical driver: Kamal-print vs a Devon segment = 0.637, only
    0.013 under the 0.65 threshold (argmax saves it today; one contaminated sample could not).
-3. **Action-badge lie** — the LLM writes `- None mentioned.` under `## Action Items` and
-   `SummaryDocument.bullets` counts it: the row shows "1 action" for a zero-action meeting
-   (`MeetingCounts.swift:26`). Filter none-family bullets parser-side; test BOTH directions.
+3. ~~**Action-badge lie**~~ **DONE 2026-08-24** (`0e839b9`, reviewed+pushed — exact-match
+   none-family filter in `SummaryDocument.bullets()`, both directions tested at parser AND
+   `MeetingCounts.compute()` level; bonus `stripBulletMarker` fix on the placeholder display).
 4. **Last two design items**: prominent record button in the toolbar + empty-state permission
    rows (item 9 below).
 5. **Overlap surfaced as uncertainty** — mark pyannote overlap regions "chevauchement" in the
    transcript instead of confidently attributing; exclude them from embeddings.
-6. **Owner-track hallucination filter** — the ~6 unmuted seconds produced the canonical Whisper
-   silence-hallucination ("Sous-titrage Société Radio-Canada") as the only Owner turn. Filter
-   against the known-hallucination list at the gate that already RMS-drops silent mic segments.
-7. **Summary language** — today's fr meeting got an ENGLISH summary (built-in template). Needs
-   the user's pick: force French, or infer from transcript language. One-line prompt change once
-   decided.
+6. ~~**Owner-track hallucination filter**~~ **DONE 2026-08-24** (`178f527`, reviewed+pushed —
+   13 known FR/EN phrases, exact-normalized match, scoped to a quasi-silence RMS band 0.03;
+   list + threshold are N=1-calibrated, see the 2026-08-24 doubt list item 10).
+7. ~~**Summary language**~~ **DONE 2026-08-24** (`9e2ae8b`, reviewed+pushed — Yanis picked INFER
+   from transcript language; instruction injected at the shared summarizer seam, all 3 backends,
+   both call paths. Title generation still has no language instruction — doubt list item 11).
 8. **Anchor-chip → scroll e2e on real data** — the never-exercised path; today's meeting has
    first-class anchors (5 tokens) to drive it via AX.
 9. (deprioritized) Item 10's original code path — diarize `mic.wav` + match Owner by voiceprint;
