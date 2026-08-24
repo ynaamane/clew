@@ -54,4 +54,38 @@ final class SummaryDocumentTests: XCTestCase {
         XCTAssertTrue(doc.keyPoints.isEmpty)
         XCTAssertTrue(doc.actionItems.isEmpty)
     }
+
+    func testBulletedNoneMentionedIsFilteredFromActionItems() throws {
+        let doc = try SummaryDocument(markdown: """
+        ## Summary
+        Short.
+
+        ## Action Items
+        - None mentioned.
+        """)
+
+        XCTAssertTrue(doc.actionItems.isEmpty, "A bulleted \"None mentioned.\" must not count as an action item")
+        XCTAssertEqual(doc.actionItemsPlaceholder, "None mentioned.")
+    }
+
+    func testOtherNoneFamilyPlaceholdersAreAlsoFilteredWhenBulleted() throws {
+        for placeholder in ["None.", "N/A", "Aucune.", "Aucun."] {
+            let doc = try SummaryDocument(markdown: """
+            ## Action Items
+            - \(placeholder)
+            """)
+
+            XCTAssertTrue(doc.actionItems.isEmpty, "\"\(placeholder)\" must not count as an action item")
+        }
+    }
+
+    func testALegitimateActionItemStartingWithNoneIsKept() throws {
+        let doc = try SummaryDocument(markdown: """
+        ## Action Items
+        - None of the proposals were accepted — revisit next week.
+        """)
+
+        XCTAssertEqual(doc.actionItems.count, 1, "A real action item must not be dropped just because it starts with \"None\"")
+        XCTAssertEqual(doc.actionItems.first, "None of the proposals were accepted — revisit next week.")
+    }
 }

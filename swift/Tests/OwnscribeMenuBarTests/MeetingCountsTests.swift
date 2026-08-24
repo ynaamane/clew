@@ -170,4 +170,48 @@ final class MeetingCountsTests: XCTestCase {
 
         XCTAssertEqual(result.unanchoredClaimCount, 0, "All key points match despite mixed case")
     }
+
+    func testActionBadgeDoesNotCountABulletedNoneMentionedPlaceholder() {
+        let summaryURL = tempDir.appendingPathComponent("summary.md")
+
+        let summaryMd = """
+        # Meeting Summary
+
+        ## Key Points
+        - Gary discussed architecture
+
+        ## Action Items
+        - None mentioned.
+        """
+        try! summaryMd.write(to: summaryURL, atomically: true, encoding: .utf8)
+
+        let result = MeetingCounts.compute(
+            summaryDirectory: tempDir,
+            fileManager: fileManager
+        )
+
+        XCTAssertEqual(result.actionItemCount, 0, "A bulleted \"None mentioned.\" placeholder must not read as one action item")
+    }
+
+    func testActionBadgeStillCountsARealActionItemStartingWithNone() {
+        let summaryURL = tempDir.appendingPathComponent("summary.md")
+
+        let summaryMd = """
+        # Meeting Summary
+
+        ## Key Points
+        - Gary discussed architecture
+
+        ## Action Items
+        - None of the proposals were accepted — revisit next week.
+        """
+        try! summaryMd.write(to: summaryURL, atomically: true, encoding: .utf8)
+
+        let result = MeetingCounts.compute(
+            summaryDirectory: tempDir,
+            fileManager: fileManager
+        )
+
+        XCTAssertEqual(result.actionItemCount, 1, "A real action item beginning with \"None\" must still count")
+    }
 }

@@ -28,7 +28,7 @@ public struct SummaryDocument: Equatable {
 
         let actionLines = sections["action items"] ?? []
         actionItems = Self.bullets(in: actionLines)
-        actionItemsPlaceholder = actionItems.isEmpty ? actionLines.first ?? "" : ""
+        actionItemsPlaceholder = actionItems.isEmpty ? Self.stripBulletMarker(actionLines.first ?? "") : ""
     }
 
     public init(json data: Data) throws {
@@ -51,10 +51,37 @@ public struct SummaryDocument: Equatable {
         }
     }
 
+    private static let noneFamilyPlaceholders: Set<String> = [
+        "none mentioned",
+        "none noted",
+        "none",
+        "n/a",
+        "na",
+        "aucune mentionnée",
+        "aucun mentionné",
+        "aucune",
+        "aucun",
+    ]
+
+    private static func stripBulletMarker(_ line: String) -> String {
+        guard line.hasPrefix("- ") || line.hasPrefix("* ") else { return line }
+        return String(line.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func isNoneFamilyPlaceholder(_ text: String) -> Bool {
+        let normalized = text
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
+        return noneFamilyPlaceholders.contains(normalized)
+    }
+
     private static func bullets(in lines: [String]) -> [String] {
         lines.compactMap { line in
             guard line.hasPrefix("- ") || line.hasPrefix("* ") else { return nil }
-            return String(line.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            let text = stripBulletMarker(line)
+            guard !isNoneFamilyPlaceholder(text) else { return nil }
+            return text
         }
     }
 }
