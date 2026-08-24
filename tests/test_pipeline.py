@@ -948,6 +948,68 @@ class TestDoTranscribeAndSummarize:
         assert (tmp_path / "summary.md").exists()
         assert "Summary" in (tmp_path / "summary.md").read_text()
 
+    def test_transcript_language_is_passed_to_summarizer(self, tmp_path):
+        """Item 7: infer summary language from the transcript, never force it (Yanis, 2026-08-24)."""
+        from clew.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        fr_transcript = TranscriptResult(
+            segments=[Segment(text="Bonjour tout le monde.", start=0.0, end=1.5)],
+            language="fr",
+            duration=1.5,
+        )
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = fr_transcript
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nBonne reunion."
+
+        with (
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        assert mock_summarizer.summarize.call_args.kwargs["language"] == "fr"
+
+    def test_undetected_language_passes_none_never_forces_english(self, tmp_path):
+        """No detected language must never force a language -- the decision is infer, not force."""
+        from clew.pipeline import _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.summarization.enabled = True
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+
+        undetected_transcript = TranscriptResult(
+            segments=[Segment(text="...", start=0.0, end=1.5)],
+            language="",
+            duration=1.5,
+        )
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = undetected_transcript
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nUnclear."
+
+        with (
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=True)
+
+        assert mock_summarizer.summarize.call_args.kwargs["language"] is None
+
     def test_summary_with_invented_name_triggers_grounding_warning(self, tmp_path, capsys):
         from clew.pipeline import _do_transcribe_and_summarize
 
@@ -2353,6 +2415,81 @@ class TestRunSummarizeColocation:
         renamed_audio_dir = audio_dir.parent / f"{audio_dir.name}_test-title"
         assert (renamed_audio_dir / "recording.wav").exists()
         assert not audio_dir.exists()
+
+    def test_language_detected_from_markdown_transcript_is_passed_to_summarizer(self, tmp_path):
+        """Item 7: `clew summarize <file>` must infer the language from the saved transcript,
+        not just the live pipeline path -- same bug class, same file the user drops in."""
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\n**Language:** fr  \n**Duration:** 00:05  \n\nBonjour tout le monde.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nBonne reunion."
+        mock_summarizer.generate_title.return_value = "test-title"
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            run_summarize(config, str(tx_path))
+
+        assert mock_summarizer.summarize.call_args.kwargs["language"] == "fr"
+
+    def test_language_detected_from_json_transcript_is_passed_to_summarizer(self, tmp_path):
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.json"
+        tx_path.write_text(json.dumps({"segments": [], "language": "en", "duration": 1.5}))
+
+        config = Config()
+        config.summarization.enabled = True
+        config.output.format = "json"
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = '{"summary": "All good."}'
+        mock_summarizer.generate_title.return_value = "test-title"
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            run_summarize(config, str(tx_path))
+
+        assert mock_summarizer.summarize.call_args.kwargs["language"] == "en"
+
+    def test_missing_language_in_saved_transcript_passes_none(self, tmp_path):
+        from clew.pipeline import run_summarize
+
+        tx_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        tx_dir.mkdir(parents=True)
+        tx_path = tx_dir / "transcript.md"
+        tx_path.write_text("# Transcript\nHello world.")
+
+        config = Config()
+        config.summarization.enabled = True
+
+        mock_summarizer = mock.MagicMock()
+        mock_summarizer.is_available.return_value = True
+        mock_summarizer.summarize.return_value = "## Summary\nGood meeting."
+        mock_summarizer.generate_title.return_value = "test-title"
+
+        with (
+            mock.patch("clew.pipeline.create_summarizer", return_value=mock_summarizer),
+            mock.patch("clew.summarization.llama_cpp_summarizer._ensure_model"),
+        ):
+            run_summarize(config, str(tx_path))
+
+        assert mock_summarizer.summarize.call_args.kwargs["language"] is None
 
     def test_leaves_audio_dir_alone_for_transcript_outside_output_tree(self, tmp_path):
         """A same-named directory under audio_dir must not be renamed when the

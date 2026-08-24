@@ -5,6 +5,7 @@ from clew.summarization.prompts import (
     MEETING_SUMMARY_PROMPT,
     MEETING_SUMMARY_SYSTEM,
     TEMPLATES,
+    language_instruction,
     list_templates,
     resolve_template,
 )
@@ -86,6 +87,36 @@ class TestResolveTemplate:
         system, prompt = resolve_template("meeting", user_templates)
         assert system == "Custom system."
         assert prompt == "Custom prompt: {transcript}"
+
+
+class TestLanguageInstruction:
+    """Item 7: the summary must come out in the transcript's detected language --
+    infer, never force, no config key (Yanis's decision, 2026-08-24)."""
+
+    def test_empty_language_returns_empty_string(self):
+        assert language_instruction("") == ""
+
+    def test_known_code_names_the_language(self):
+        instruction = language_instruction("fr")
+        assert "French" in instruction
+
+    def test_english_code_names_the_language(self):
+        instruction = language_instruction("en")
+        assert "English" in instruction
+
+    def test_is_case_insensitive(self):
+        assert "French" in language_instruction("FR")
+
+    def test_unknown_code_falls_back_to_the_raw_code(self):
+        instruction = language_instruction("xx")
+        assert "xx" in instruction
+
+    def test_known_code_instruction_is_appendable_to_a_system_prompt(self):
+        """The instruction must read as a standalone addition, not replace the system prompt."""
+        instruction = language_instruction("fr")
+        combined = MEETING_SUMMARY_SYSTEM + instruction
+        assert combined.startswith(MEETING_SUMMARY_SYSTEM)
+        assert "French" in combined
 
 
 class TestMeetingSummaryPrompt:

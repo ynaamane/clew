@@ -187,10 +187,11 @@ class LlamaCppSummarizer(Summarizer):
         except ImportError:
             return False
 
-    def summarize(self, transcript_text: str) -> str:
-        from clew.summarization.prompts import resolve_template
+    def summarize(self, transcript_text: str, language: str | None = None) -> str:
+        from clew.summarization.prompts import language_instruction, resolve_template
 
         system, prompt = resolve_template(self._config.template, self._templates)
+        system += language_instruction(language or "")
         user = prompt.format(transcript=transcript_text)
         llm = self._get_llm()
         response = llm.create_chat_completion(

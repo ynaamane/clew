@@ -9,8 +9,12 @@ class Summarizer(abc.ABC):
     """Base class for summarization backends."""
 
     @abc.abstractmethod
-    def summarize(self, transcript_text: str) -> str:
-        """Summarize a transcript and return the summary text."""
+    def summarize(self, transcript_text: str, language: str | None = None) -> str:
+        """Summarize a transcript and return the summary text.
+
+        When language (an ISO 639-1 code, e.g. "fr") is given, the summary is
+        written in that language. An unset language never forces one.
+        """
 
     @abc.abstractmethod
     def generate_title(self, summary_text: str) -> str:

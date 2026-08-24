@@ -676,10 +676,33 @@ def run_warmup(config: Config) -> None:
         click.echo(f"Summarization model ready: {config.summarization.model}")
 
 
+_MARKDOWN_LANGUAGE_LINE_RE = re.compile(r"^\*\*Language:\*\*\s*(\S+)", re.MULTILINE)
+
+
+def _detect_transcript_language(transcript_text: str) -> str | None:
+    """Best-effort language extraction from an already-saved transcript file (markdown or
+    JSON, per output.format) -- both formats round-trip TranscriptResult.language, see
+    output/markdown.py and output/json_output.py. Returns None if absent/unreadable, never
+    forcing a language `run_summarize` can't infer."""
+    import json
+
+    try:
+        data = json.loads(transcript_text)
+    except (ValueError, TypeError):
+        data = None
+    if isinstance(data, dict):
+        return data.get("language") or None
+
+    if match := _MARKDOWN_LANGUAGE_LINE_RE.search(transcript_text):
+        return match.group(1)
+    return None
+
+
 def run_summarize(config: Config, transcript_file: str) -> None:
     """Summarize a transcript file and save the summary alongside the input."""
     transcript_path = Path(transcript_file).resolve()
     transcript_text = transcript_path.read_text()
+    language = _detect_transcript_language(transcript_text)
 
     try:
         summarizer = create_summarizer(config)
@@ -730,7 +753,7 @@ def run_summarize(config: Config, transcript_file: str) -> None:
                         err=True,
                     )
                     raise SystemExit(1) from None
-            summary = summarizer.summarize(transcript_text)
+            summary = summarizer.summarize(transcript_text, language=language)
             ungrounded_names = find_ungrounded_names(summary, transcript_text)
             title_slug = _generate_title_slug(summary, summarizer)
             progress.complete("summarizing")
@@ -862,7 +885,7 @@ def _do_transcribe_and_summarize(
                                 "downloading_model",
                             )
                             progress.complete("downloading_model")
-                        summary = summarizer.summarize(result.full_text)
+                        summary = summarizer.summarize(result.full_text, language=result.language or None)
                         ungrounded_names = find_ungrounded_names(summary, result.full_text)
 
                         from clew.output.markdown import format_transcript

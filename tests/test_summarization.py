@@ -10,6 +10,7 @@ from clew.config import Config, SummarizationConfig, TemplateConfig
 from clew.summarization import create_summarizer
 from clew.summarization.prompts import (
     LECTURE_SUMMARY_SYSTEM,
+    MEETING_SUMMARY_SYSTEM,
     clean_response,
 )
 
@@ -637,6 +638,87 @@ class TestLlamaCppTemplatePassthrough:
         assert call_args[1]["messages"][0]["content"] == LECTURE_SUMMARY_SYSTEM
         assert "Today we discuss photosynthesis." in call_args[1]["messages"][1]["content"]
         assert "Key Concepts" in call_args[1]["messages"][1]["content"]
+
+
+class TestOllamaLanguageInstruction:
+    """Item 7: language=... must reach the system prompt sent to the backend."""
+
+    def test_language_appends_instruction_to_system_prompt(self, httpserver):
+        import json
+
+        response_body = {"message": {"role": "assistant", "content": "Resume."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        summarizer.summarize("Bonjour tout le monde", language="fr")
+
+        request = httpserver.log[0][0]
+        body = json.loads(request.data)
+        assert body["messages"][0]["content"].startswith(MEETING_SUMMARY_SYSTEM)
+        assert "French" in body["messages"][0]["content"]
+
+
+class TestOpenAILanguageInstruction:
+    """Item 7: language=... must reach the system prompt sent to the backend."""
+
+    def test_language_appends_instruction_to_system_prompt(self, httpserver):
+        import json
+
+        response_body = {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "Resume."}, "finish_reason": "stop"}],
+            "model": "test-model",
+        }
+        httpserver.expect_request("/v1/chat/completions", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="openai", model="test-model")
+
+        from clew.summarization.openai_summarizer import OpenAISummarizer
+
+        summarizer = OpenAISummarizer(config)
+        summarizer.summarize("Bonjour tout le monde", language="fr")
+
+        request = httpserver.log[0][0]
+        body = json.loads(request.data)
+        assert body["messages"][0]["content"].startswith(MEETING_SUMMARY_SYSTEM)
+        assert "French" in body["messages"][0]["content"]
+
+
+class TestLlamaCppLanguageInstruction:
+    """Item 7: language=... must reach the system prompt sent to the backend."""
+
+    def test_language_appends_instruction_to_system_prompt(self, mock_llama):
+        mock_llama.create_chat_completion.return_value = _mock_llm_response("Resume.")
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini")
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("Bonjour tout le monde", language="fr")
+
+        call_args = mock_llama.create_chat_completion.call_args
+        assert call_args[1]["messages"][0]["content"].startswith(MEETING_SUMMARY_SYSTEM)
+        assert "French" in call_args[1]["messages"][0]["content"]
+
+    def test_no_language_leaves_system_prompt_unchanged(self, mock_llama):
+        """No detected language must never force one -- Yanis's decision: infer, never force."""
+        mock_llama.create_chat_completion.return_value = _mock_llm_response("Summary.")
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini")
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("Hello everyone")
+
+        call_args = mock_llama.create_chat_completion.call_args
+        assert call_args[1]["messages"][0]["content"] == MEETING_SUMMARY_SYSTEM
 
 
 class TestLlamaCppClose:

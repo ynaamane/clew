@@ -87,6 +87,30 @@ TEMPLATES: dict[str, dict[str, str]] = {
 }
 
 
+# ISO 639-1 -> readable name, for the languages whisperx/faster-whisper commonly detect.
+# A code missing from this map still gets an instruction -- naming the raw code is better
+# than staying silent about a detected-but-unmapped language.
+_LANGUAGE_NAMES: dict[str, str] = {
+    "fr": "French",
+    "en": "English",
+    "es": "Spanish",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "nl": "Dutch",
+}
+
+
+def language_instruction(language: str) -> str:
+    """Build a system-prompt suffix asking the LLM to answer in the transcript's own
+    language. Empty/falsy language returns "" so the caller can always append it --
+    an undetected language never forces one (infer, never force)."""
+    if not language:
+        return ""
+    name = _LANGUAGE_NAMES.get(language.lower(), language)
+    return f"\n\nWrite your entire response in {name}, matching the transcript's language."
+
+
 TITLE_SYSTEM = "You generate short meeting titles."
 
 TITLE_PROMPT = (
