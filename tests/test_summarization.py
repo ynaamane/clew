@@ -745,12 +745,16 @@ def llama_stub_factory():
     low-level llama_cpp.llama_model_n_ctx_train binding.
 
     Yields (constructions, state): constructions is a list of the n_ctx kwarg passed to
-    each Llama(...) call, in order; state["tokens"] controls what tokenize() returns
-    (as a token-id list) and state["n_ctx_train"] controls the model's reported trained
-    context length.
+    each Llama(...) call, in order. state["tokens"] controls what tokenize() returns (as
+    a token-id list) unless it is the sentinel "AUTO", in which case the returned count
+    tracks the actual byte length of whatever was passed to tokenize() -- for tests that
+    must prove tokenize() was fed the REAL combined content, not just a canned length.
+    state["n_ctx_train"] controls the model's reported trained context length.
+    state["tokenize_calls"] records every bytes argument tokenize() was actually called
+    with, in order.
     """
     constructions: list[int] = []
-    state = {"tokens": [1] * 10, "n_ctx_train": 131072}
+    state = {"tokens": [1] * 10, "n_ctx_train": 131072, "tokenize_calls": []}
     instances: list[MagicMock] = []
 
     def _make_instance(*args, **kwargs):
@@ -758,7 +762,14 @@ def llama_stub_factory():
         instance = MagicMock()
         instance.n_ctx.return_value = kwargs.get("n_ctx")
         instance.model = object()
-        instance.tokenize.side_effect = lambda *a, **k: list(state["tokens"])
+
+        def _tokenize(text_bytes, *a, **k):
+            state["tokenize_calls"].append(text_bytes)
+            if state["tokens"] == "AUTO":
+                return [1] * len(text_bytes)
+            return list(state["tokens"])
+
+        instance.tokenize.side_effect = _tokenize
         instance.create_chat_completion.return_value = _mock_llm_response("Summary.")
         instances.append(instance)
         return instance
@@ -937,6 +948,44 @@ class TestLlamaCppContextSizing:
 
         assert result == ""
         assert all(i.create_chat_completion.call_count == 0 for i in instances)
+
+    def test_tokenize_receives_both_system_and_user_content(self, llama_stub_factory):
+        """Reviewer-confirmed gap (review-py8): the fixture's tokenize() stub used to
+        ignore its argument entirely, so a mutation tokenizing only texts[0] (dropping
+        the user prompt, which carries the transcript in production) stayed green
+        against all 15 prior tests. Prove the ACTUAL combined content reaches
+        tokenize(), not just that its return value drives the sizing math."""
+        _constructions, state, _instances = llama_stub_factory
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("UNIQUE_TRANSCRIPT_MARKER_7f3a")
+
+        combined = b"".join(state["tokenize_calls"])
+        assert b"UNIQUE_TRANSCRIPT_MARKER_7f3a" in combined
+        assert b"meeting notes assistant" in combined
+
+    def test_dropping_the_user_prompt_would_shrink_the_needed_context(self, llama_stub_factory):
+        """Length-based companion to the marker test above: if sizing tokenized only
+        texts[0] (the system prompt, a few hundred bytes), a huge transcript passed as
+        texts[1] (the user prompt) would not enlarge the computed context at all."""
+        constructions, state, _instances = llama_stub_factory
+        state["tokens"] = "AUTO"  # token count tracks the real byte length tokenized
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini", context_size=0)
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        huge_transcript = "word " * 20000  # ~100000 bytes, dwarfs the system prompt
+        summarizer.summarize(huge_transcript)
+
+        # MEETING_SUMMARY_SYSTEM alone is a few hundred bytes -- only the huge
+        # transcript (carried in the user prompt) explains a construction this big.
+        assert constructions[-1] > 50000
 
 
 class TestLlamaCppClose:
