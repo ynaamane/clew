@@ -218,6 +218,15 @@ class TestMergeToml:
         with pytest.raises(ValueError, match=r"diarization\.device must be one of"):
             _merge_toml(cfg, data)
 
+    def test_diarization_device_case_and_whitespace_variants_are_rejected_not_coerced(self):
+        # No normalization: an exact-match check rejects "CPU", "cpu " (trailing
+        # space) etc. outright rather than silently reinterpreting them as "auto"
+        # (which would flip the user's intended device to MPS-if-available).
+        cfg = Config()
+        for bad_value in ("CPU", "cpu ", " auto", "Auto", "MPS"):
+            with pytest.raises(ValueError, match=r"diarization\.device must be one of"):
+                _merge_toml(cfg, {"diarization": {"device": bad_value}})
+
     def test_template_from_toml(self):
         cfg = Config()
         data = {"summarization": {"template": "lecture"}}
