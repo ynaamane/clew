@@ -11,7 +11,35 @@ Bug journal + key decisions. Read before debugging. Format: what broke / root ca
 - **Your voice vs the call = TWO PHYSICAL SOURCES**, not diarization: your mic (what you send) = mic.wav = "Owner", the system tap (what you receive) = system.wav = diarized. Perfect separation by construction — but only on HEADPHONES (see echo below).
 - **Diarization: pyannote community-1 on CPU, never MPS.** The whole ASR path is CPU-bound anyway (CTranslate2 has no Metal backend), so forcing CPU costs nothing extra. MPS re-test deferred to the token pass.
   **PREMISE CORRECTED (2026-08-24, BMAD):** the Metal kernel that crashes pytorch#181650 was added to torch AFTER the 2.8.0 this project runs — MPS here is UNTESTED, not proven blocked, and two independent sources put the potential diarization gain at ~9-13x. The never-run parity gate (`scripts/verify_with_token.py check_mps_vs_cpu_diarization`) is the decision point; it must be extended with per-centroid norm+cosine cells first, because segment-set equality cannot see the zero-norm-centroid failure below.
+  **RESOLVED (2026-08-25, gate run + flip shipped):** the extended gate ran against real audio — bit-faithful CPU/MPS parity (84/84 segments, per-centroid cosine 1.000000, no degenerate norm) and a measured **29.46x** on diarization (CPU 144.1s → MPS 4.9s on a 240s clip; mechanism verified per-stage: embeddings 30.7x, segmentation 22.8x — `.to("mps")` moves the WHOLE pipeline, which is why the 9-13x "embeddings-only" ceiling of ~11.6x was beaten). Diarization now defaults to MPS via `diarization.device = "auto"` (de08f45..0c49d33; graceful CPU fallback, loud ValueError on invalid config values). The original "never MPS" line above is fully superseded.
 - **Naming reuses pyannote's own per-cluster embeddings** (DiarizationPipeline return_embeddings=True) — no separate ECAPA/SpeechBrain dependency.
+
+## The 2026-08-25 team session — the BMAD plan executed, and what the reviews caught
+
+- **`mock.patch.dict("sys.modules", {...})` erases modules first-imported INSIDE the block.** It
+  snapshots the ENTIRE dict on `__enter__` and restores that snapshot on `__exit__` — so when
+  production newly gained an unconditional `import torch`, every existing test wrapping that call
+  path in a `sys.modules` patch (without torch imported first) silently wiped torch afterward,
+  breaking UNRELATED tests several files downstream (`RuntimeError: ... already has a docstring`).
+  Fix: hoist `import torch  # noqa: F401` above the patch. One pre-existing test in the repo already
+  used this defensive pattern — whoever wrote it had hit this before and it went uncapitalized.
+- **A stale `.pyc` can make a restored source lie.** Rapid sed-mutate → git-restore cycles within
+  the same wall-clock second collide with `__pycache__`'s timestamp-based invalidation: the source
+  reads `all(...)` while the interpreter runs the mutated `any(...)`. Caught only because the result
+  was suspiciously wrong against the visible source. Purge `__pycache__` between mutate/restore
+  cycles on the same file.
+- **The verifier side of "confirming a value is not verifying its construction":** a reviewer
+  INFIRMED a correct figure (12.458) because no artifact stored that number — while the audited
+  sentence CONSTRUCTED it in plain sight (`144.097 − 131.639`). Retracted after recomputation. A
+  verifier greps for stored values; a construction is checked by reading the sentence and redoing
+  the arithmetic.
+- **A code flip invalidates prose 98 lines away in the same file.** The MPS flip updated the config
+  block of `docs/configuration.md` but a prose section below still said "Diarization always runs on
+  CPU" — self-contradicting the same document. Only the independent doc review caught it. Grep the
+  whole doc surface for the OLD behavior's phrasing after any default change.
+- **Message crossings are survivable if the receiver checks disk first.** Two directives crossed
+  reports in this session; the lane re-read the repo state before acting and answered "already fixed
+  in <hash>, here is the proof" instead of re-implementing a stale instruction blind.
 
 ## The 2026-08-24 team session — a real 68-min meeting as the forcing function
 

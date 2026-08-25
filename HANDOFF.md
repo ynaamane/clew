@@ -2,6 +2,27 @@
 
 Contexte de construction (2026-07-23 → 08-03), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
 
+## Session 2026-08-25 — team complète : plan BMAD exécuté, diarisation 29,5× via MPS, 5 bugs du triage traités
+
+Résumé (détail + chiffres audités : `TODO.md § 2026-08-25`) :
+- **La diarisation tourne sur MPS par défaut** (`diarization.device = "auto"`, fallback CPU sans
+  crash, valeur invalide = ValueError au chargement). Gate de parité exécuté en réel AVANT le flip :
+  84/84 segments identiques, cosine 1,000000 par centroïde, **29,46×** mesuré (RTF 0,60 → 0,020,
+  convention calcul/audio), mécanisme vérifié par stage (embeddings 30,7×, segmentation 22,8×).
+  Attendu sur un meeting de 68 min : ~41 min → ~1,4 min de diarisation (extrapolé, à confirmer).
+- **FluidAudio : mesuré et clos « pas nécessaire »** — son mode offline est le MÊME pipeline
+  (community-1) porté Core ML/ANE ; encore ~4,5× au-delà de pyannote-MPS mais le goulot a disparu
+  et le pont Swift↔Python + la re-validation du seuil voiceprints ne se justifient plus.
+- **5 bugs de la liste du 24/08 traités** : garde zero-norm centroid (HIGH, `e271a00`) · progress
+  rend un état « ✗ failed » (`57110c1`) · `clew ask` chunke sur la vraie limite du modèle, seam
+  `native_context_length()` (`8d48cd9`) · garde de contexte Ollama + fix densité CJK
+  (`7c39d2f`+`30111b8`) · mic.wav +7,07 dBFS **clos pas-un-bug** (transient physique unique, mix
+  ASR déjà clampé — vérifié en relisant le WAV brut).
+- **Process** : 12 commits, chacun TDD+mutation par sa lane puis review indépendante ré-exécutant
+  les preuves AVANT push ; TODO.md audité contre les artefacts disque avant son propre push.
+  Leçons nouvelles (patch.dict/sys.modules, .pyc périmé, côté vérificateur de « valeur ≠
+  construction ») : `LESSONS_LEARNED.md § 2026-08-25`.
+
 ## Session 2026-08-24 — team complète : 4 fixes revus/poussés, incident du vieux bundle, verdict BMAD diarisation, app enfin installée
 
 Résumé (détail + liste des 14 bugs/doutes : `TODO.md § 2026-08-24`) :
@@ -355,7 +376,7 @@ Cette boucle a attrapé, entre autres : une preuve de vérification inexacte, un
 
 whisperx impose `threads=4` par défaut (`asr.py:329`) et le code ne le surchargeait pas : sur un M4 Max à 12 cœurs performance, un quart de la machine travaillait. La transcription se dimensionne maintenant sur `hw.perflevel0.physicalcpu`. Mesuré sur 90 s du vrai call : **30,9 s → 20,5 s, transcript identique au mot près**. Contre-intuitif : 16 threads est PIRE (23-25 s), les 4 cœurs d'efficacité freinent le lot.
 
-La diarisation est désormais l'étape la plus chère (0,63x temps réel contre 0,33x pour l'ASR). Le détail des pistes ouvertes (FluidAudio, turbo, mlx-whisper) et des mesures est dans `TODO.md` § Performance.
+La diarisation est désormais l'étape la plus chère (0,63x temps réel contre 0,33x pour l'ASR). Le détail des pistes ouvertes (FluidAudio, turbo, mlx-whisper) et des mesures est dans `TODO.md` § Performance. *(SUPERSEDÉ le 2026-08-25 : la diarisation tourne sur MPS par défaut — RTF 0,60 → 0,020 mesuré, 29,5×, parité bit-fidèle vérifiée par gate ; voir `TODO.md § 2026-08-25`. FluidAudio mesuré et clos « pas nécessaire ».)*
 
 ## Points ouverts / pièges connus
 
