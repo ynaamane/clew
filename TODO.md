@@ -1,5 +1,61 @@
 # TODO — meeting-scribe
 
+## 2026-08-25 — session team : plan BMAD exécuté, diarisation 29,5× via MPS, 5 bugs de la liste traités
+
+**Livré et poussé** (chaque commit : TDD, mutation-check, review indépendante qui ré-exécute les
+preuves AVANT push) — deux lots :
+- Lot 1 (`0d4520b..30111b8`) : cellules par-centroïde du gate MPS (`1209d7b`) · progress rend un
+  état « ✗ failed » au lieu de vert/jamais-lancé (`57110c1`, ferme aussi le trou transcribe/diarize
+  sans `fail()` rattrapé seulement par `__exit__`) · garde zero-norm/NaN sur les centroïdes avant le
+  matching voiceprints (`e271a00` — exclusion + warning, le label brut survit au lieu d'Unknown-N) ·
+  garde de contexte Ollama pré-requête + `num_ctx` épinglé (`7c39d2f`) · seam
+  `Summarizer.native_context_length()` : `clew ask` chunke sur la vraie limite du modèle, dead code
+  `model_info` supprimé, un seul `/api/show` (`8d48cd9`) · estimation sensible à la densité
+  non-ASCII, trou CJK 8,6× fermé (`30111b8`).
+- Lot 2 (`de08f45..0c49d33`) : **la diarisation tourne sur MPS par défaut** —
+  `diarization.device = "auto"` (mps si dispo, fallback CPU sans crash, warning seulement sur
+  `"mps"` explicite, valeur invalide = ValueError au chargement, aucune coercition de casse) + doc.
+
+**Gate MPS exécuté en réel** (slice 240 s, 3 locuteurs) : parité bit-fidèle (84/84 segments, delta
+frontières 0,000000, cosine 1,000000 par centroïde), **29,46×** mesuré (CPU 144,1 s → MPS 4,9 s ;
+RTF, convention calcul/audio : 0,60 → 0,020), deux runs concordants, calcul GPU prouvé (5,1 GiB
+driver MPS, pas de var de fallback). Mécanisme : `.to("mps")` déplace TOUT le pipeline — embeddings
+30,7× ET segmentation 22,8×. Le « 22-32× MPS » tué par le débat BMAD du 24/08 l'était comme
+NON-VÉRIFIÉ (dérivé d'une division de conventions) ; la valeur mesurée retombe dans cette bande par
+un mécanisme différent et vérifié. Le plafond « seuls les embeddings s'accélèrent » (11,6×) est la
+bande 9-13× prédite — dépassé parce que la segmentation bouge aussi. Sur le meeting de 68 min :
+diarisation ~41 min → **~1,4 min attendu** (à confirmer sur le prochain vrai meeting).
+
+**Spike FluidAudio : clos, « mesuré, pas nécessaire ».** Son mode offline EST le même pipeline
+(community-1 : powerset+WeSpeaker+VBx) porté Core ML/ANE — pas un concurrent. Chaud : 1,09 s sur le
+même slice (RTF 0,0045, ~4,5× au-delà de pyannote-MPS ; leur `realTimeFactor: 248` = convention
+réciproque). Qualité proche (3 locuteurs, temps de parole à 2,7 %, embeddings 256-dim quasi-alignés
+cosine >0,996 sur UN run), mais pont Swift↔Python + re-validation du seuil 0,65 non justifiés
+maintenant que la diarisation n'est plus le goulot. Artefacts : scratchpad `bmad-diar/`.
+Item (3) stride du plan BMAD : SANS OBJET pour la vitesse (levier CPU 2,67× éclipsé par MPS) ;
+item (4) sweep threads : idem, ne vaut que si un jour MPS régresse.
+
+**Nouveaux items de triage (2026-08-25) :**
+- **INFO** — `clew ask` : `SummarizationContextError` remonte en traceback brute (aucun
+  `try/except` dans search.py/cli.py) — la troncature est bien empêchée, le message d'échec est
+  inélégant. Pré-existant.
+- **INFO** — garde Ollama : l'estimation reste une heuristique (chars/4, chars/1.5 si >30 %
+  non-ASCII) — resserre le trou CJK sans le fermer exactement (pas de tokenizer local Ollama).
+- **INFO** — docs/configuration.md : `min_speakers`/`max_speakers` non documentés (dérive
+  pré-existante signalée par la lane).
+- **INFO** — piège pytest : `mock.patch.dict("sys.modules", ...)` snapshot/restore TOUT le dict —
+  un module importé pour la 1ʳᵉ fois DANS le bloc est effacé après, et casse des tests torch
+  plusieurs crans plus loin. Parade : importer le module au-dessus du patch (corrigé dans
+  `de08f45`, pattern déjà présent dans un test antérieur).
+- Item 3 du 24/08 (mic.wav +7,07 dBFS) : **CLOS, pas un bug** — transient physique unique de
+  ~60 ms à 24:16 (346 échantillons >|1.0| sur 197 M), aucun code de gain dans la chaîne Swift, le
+  mix `recording.wav` qui nourrit l'ASR est déjà clampé [-1,1] ; la 2ᵉ réunion du 24/08, même code,
+  est normale. Option non retenue pour l'instant : compteur d'overs par enregistrement.
+
+**Côté Yanis (inchangé du 24/08)** : regarder la fenêtre Clew.app · ré-enrôler les 3 voix (le
+prochain meeting profitera du MPS mais restera SPEAKER_NN sans empreintes) · billing GitHub ·
+ticket GitHub Support (`178b05d`) · épingler `clew`.
+
 ## 2026-08-24 — session team : 4 fixes livrés/revus/poussés, app enfin installée, verdict BMAD diarisation
 
 **Livré ce jour** (chaque fix : TDD deux directions, mutation-check mesuré, revue indépendante qui
@@ -33,19 +89,19 @@ tient ; étendre le gate de cellules centroïdes avant de le lancer ; (2) spike 
 8,5× stride / 22-32× MPS / 30× ONNX / batch-size (déjà à 32).
 
 **Liste consolidée bugs/doutes de la session (à trier) :**
-1. **HIGH** — centroïde VBx tout-à-zéro traverse en silence → locuteur définitivement in-nommable
-   (`speakers/matching.py:16-19` rend 0.0, `whisperx_transcriber.py:358-364` émet les lignes verbatim ;
-   pyannote zero-padde à `speaker_diarization.py:763-766`). Reproduit 2× à stride 3 s. Garde dure à coder
-   — s'arme au premier enrollment ou changement de stride/moteur.
-2. **MED** — `PipelineProgress.__exit__` peint tout en vert au-dessus de sa propre traceback
-   (`progress.py:330-341`) ; `fail()` rend un step comme jamais-démarré (`:385-390`) — il faut un état
-   visuel « failed », pas « quelques lignes ». Reproduit par crash injecté.
-3. **MED** — `mic.wav` du 24/08 : pic +7,07 dBFS (>1.0 float) sur la capture du vieux bundle —
-   creuser le gain côté Swift (les autres pistes ≤1.0).
-4. **MED** — `search.py:24` `_DEFAULT_CONTEXT_SIZE = 8192` : `clew ask` plafonne son chunking à
-   l'ancienne limite alors que le modèle en supporte 131k — des transcripts sont sautés trop tôt.
-5. **MED** — backend Ollama : même trou de contexte, mais pas de tokenizer local — fix séparé
-   (endpoint tokenize d'Ollama ou heuristique).
+1. ~~**HIGH** — centroïde VBx tout-à-zéro traverse en silence~~ **DONE 2026-08-25** (`e271a00`,
+   reviewed+pushed — exclusion du matching + warning, le label brut survit ; mutation testée dans
+   les deux directions par la review).
+2. ~~**MED** — `PipelineProgress.__exit__` peint tout en vert~~ **DONE 2026-08-25** (`57110c1`,
+   reviewed+pushed — état `✗ failed`, `__exit__` lit `exc_type` ; couvre aussi les crashs
+   transcribe/diarize qui ne passent par aucun `fail()`).
+3. ~~**MED** — `mic.wav` du 24/08 : pic +7,07 dBFS~~ **CLOS 2026-08-25, pas un bug** (diagnostic
+   dans la section du 25/08 : transient physique unique, aucun gain dans la chaîne, mix clampé).
+4. ~~**MED** — `search.py:24` `_DEFAULT_CONTEXT_SIZE = 8192`~~ **DONE 2026-08-25** (`8d48cd9`,
+   reviewed+pushed — seam `native_context_length()`, chunking sur la vraie limite du modèle).
+5. ~~**MED** — backend Ollama : même trou de contexte~~ **DONE 2026-08-25** (`7c39d2f` + `30111b8`,
+   reviewed+pushed — garde pré-requête heuristique + densité non-ASCII, `num_ctx` épinglé ;
+   reste heuristique, voir INFO du 25/08).
 6. **DOUTE** — SIGTRAP 3/3 (`ContiguousArrayBuffer Index out of range`) sous mutation extrême
    « tout bullet est placeholder », 0/5 ailleurs — possible bug latent de bornes dans la suite Swift,
    repro exacte dans le rapport swift-fix du 24/08.
