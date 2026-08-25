@@ -134,6 +134,7 @@ max_tokens_per_segment = 200
 enabled = false
 hf_token = ""             # HuggingFace token for pyannote
 telemetry = false         # allow HuggingFace Hub + pyannote metrics telemetry
+device = "auto"           # "auto" (MPS if available, else CPU), "cpu", or "mps"
 
 [summarization]
 enabled = true

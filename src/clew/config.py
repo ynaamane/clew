@@ -50,6 +50,7 @@ hf_token = ""             # HuggingFace token for pyannote models
 min_speakers = 0          # 0 = auto-detect
 max_speakers = 0
 telemetry = false         # set to true to allow HuggingFace Hub + pyannote metrics telemetry
+device = "auto"           # "auto" (MPS if available, else CPU), "cpu", or "mps"
 
 [correction]
 enabled = false           # opt-in LLM post-correction pass over the transcript text
@@ -114,6 +115,7 @@ class DiarizationConfig:
     min_speakers: int = 0
     max_speakers: int = 0
     telemetry: bool = False
+    device: str = "auto"
 
 
 @dataclass

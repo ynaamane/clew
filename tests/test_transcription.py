@@ -283,6 +283,11 @@ class TestDiarizeOverride:
 class TestDiarizationApiCompat:
     def test_load_diarization_pipeline_passes_token_kwarg(self):
         # pyannote.audio 4.0 renamed `use_auth_token` -> `token`.
+        # Import torch before the sys.modules patch below: mock.patch.dict restores
+        # its ENTIRE snapshot on exit, so a torch import that first happens inside
+        # the `with` block gets silently wiped afterward, corrupting later tests.
+        import torch  # noqa: F401
+
         from clew.config import DiarizationConfig, TranscriptionConfig
         from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
@@ -307,11 +312,17 @@ class TestDiarizationApiCompat:
         assert kwargs.get("token") == "hf_test_token"
         assert "use_auth_token" not in kwargs
 
-    def test_load_diarization_pipeline_always_forces_cpu(self):
+    def test_load_diarization_pipeline_forces_cpu_when_explicitly_configured(self):
+        # An explicit device="cpu" override must win even when MPS is available --
+        # the escape hatch the MPS flip is required to preserve.
+        # Import torch before the sys.modules patch below (see the note on
+        # test_load_diarization_pipeline_passes_token_kwarg).
+        import torch  # noqa: F401
+
         from clew.config import DiarizationConfig, TranscriptionConfig
         from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
-        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token", device="cpu")
         transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
 
         fake_pipeline = mock.MagicMock(return_value=mock.sentinel.diarize_model)
@@ -323,6 +334,61 @@ class TestDiarizationApiCompat:
         with (
             mock.patch.dict("sys.modules", {"whisperx.diarize": fake_diarize_module}),
             mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough),
+            mock.patch("torch.backends.mps.is_available", return_value=True),
+        ):
+            transcriber._load_diarization_pipeline()
+
+        kwargs = fake_pipeline.call_args.kwargs
+        assert kwargs.get("device") == "cpu"
+
+    def test_load_diarization_pipeline_uses_mps_when_auto_and_available(self):
+        # Import torch before the sys.modules patch below (see the note on
+        # test_load_diarization_pipeline_passes_token_kwarg).
+        import torch  # noqa: F401
+
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")  # device defaults to "auto"
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+
+        fake_pipeline = mock.MagicMock(return_value=mock.sentinel.diarize_model)
+        fake_diarize_module = types.SimpleNamespace(DiarizationPipeline=fake_pipeline)
+
+        def passthrough(_step_key, _label, fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+
+        with (
+            mock.patch.dict("sys.modules", {"whisperx.diarize": fake_diarize_module}),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough),
+            mock.patch("torch.backends.mps.is_available", return_value=True),
+        ):
+            transcriber._load_diarization_pipeline()
+
+        kwargs = fake_pipeline.call_args.kwargs
+        assert kwargs.get("device") == "mps"
+
+    def test_load_diarization_pipeline_falls_back_to_cpu_when_auto_and_mps_unavailable(self):
+        # Import torch before the sys.modules patch below (see the note on
+        # test_load_diarization_pipeline_passes_token_kwarg).
+        import torch  # noqa: F401
+
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")  # device defaults to "auto"
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+
+        fake_pipeline = mock.MagicMock(return_value=mock.sentinel.diarize_model)
+        fake_diarize_module = types.SimpleNamespace(DiarizationPipeline=fake_pipeline)
+
+        def passthrough(_step_key, _label, fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+
+        with (
+            mock.patch.dict("sys.modules", {"whisperx.diarize": fake_diarize_module}),
+            mock.patch.object(transcriber, "_capture_download_output", side_effect=passthrough),
+            mock.patch("torch.backends.mps.is_available", return_value=False),
         ):
             transcriber._load_diarization_pipeline()
 
@@ -367,6 +433,100 @@ class TestDiarizationApiCompat:
         fake_annotation.itertracks.assert_called_once_with(yield_label=True)
         assert out[0] == "assigned"
         assert transcriber.last_speaker_embeddings == {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+    def test_zero_norm_centroid_guard_still_fires_on_the_mps_resolved_path(self):
+        # The zero-norm centroid guard (e271a00) lives downstream of device selection
+        # in _extract_cluster_embeddings, which never sees which device produced the
+        # embeddings -- but this proves the MPS flip doesn't bypass it by construction.
+        import numpy as np
+        import torch  # noqa: F401
+
+        from clew.config import DiarizationConfig, TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        diar = DiarizationConfig(enabled=True, hf_token="hf_test_token")  # device defaults to "auto"
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), diar, progress=_FakeProgress())
+
+        fake_segment = types.SimpleNamespace(start=0.5, end=1.5)
+        fake_annotation = mock.MagicMock()
+        fake_annotation.itertracks.return_value = [
+            (fake_segment, "track_0", "SPEAKER_00"),
+            (fake_segment, "track_1", "SPEAKER_01"),
+        ]
+        fake_annotation.labels.return_value = ["SPEAKER_00", "SPEAKER_01"]
+        fake_diarize_output = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2, 0.3], [0.0, 0.0, 0.0]]),
+        )
+
+        fake_diarize_model = mock.MagicMock()
+        fake_diarize_model.model.return_value = fake_diarize_output
+
+        fake_whisperx = types.SimpleNamespace(assign_word_speakers=lambda df, res: ("assigned", df, res))
+
+        audio = np.zeros(16000, dtype=np.float32)
+
+        with (
+            mock.patch("torch.backends.mps.is_available", return_value=True),
+            mock.patch.object(transcriber, "_load_diarization_pipeline", return_value=fake_diarize_model),
+            mock.patch.dict("sys.modules", {"whisperx": fake_whisperx}),
+        ):
+            transcriber._diarize(audio, {"segments": []})
+
+        assert transcriber.last_speaker_embeddings == {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+
+class TestResolveDiarizationDevice:
+    """_resolve_diarization_device is the single choke point deciding cpu vs mps.
+    It must never crash a machine without MPS, regardless of the configured value.
+    """
+
+    def test_auto_resolves_to_mps_when_available(self):
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with mock.patch("torch.backends.mps.is_available", return_value=True):
+            assert _resolve_diarization_device("auto") == "mps"
+
+    def test_auto_resolves_to_cpu_when_mps_unavailable(self):
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with mock.patch("torch.backends.mps.is_available", return_value=False):
+            assert _resolve_diarization_device("auto") == "cpu"
+
+    def test_explicit_cpu_wins_even_when_mps_is_available(self):
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with mock.patch("torch.backends.mps.is_available", return_value=True):
+            assert _resolve_diarization_device("cpu") == "cpu"
+
+    def test_explicit_mps_resolves_to_mps_when_available(self):
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with mock.patch("torch.backends.mps.is_available", return_value=True):
+            assert _resolve_diarization_device("mps") == "mps"
+
+    def test_explicit_mps_falls_back_to_cpu_and_logs_a_warning_when_unavailable(self, caplog):
+        # Never crash a machine without MPS, even on an explicit override -- same
+        # "exclude + warn, never crash" contract as the zero-norm centroid guard.
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with (
+            mock.patch("torch.backends.mps.is_available", return_value=False),
+            caplog.at_level(logging.WARNING),
+        ):
+            result = _resolve_diarization_device("mps")
+
+        assert result == "cpu"
+        assert "mps" in caplog.text.lower()
+
+    def test_unrecognized_value_is_treated_as_auto(self):
+        # A typo'd or stale config value must never crash the pipeline.
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with mock.patch("torch.backends.mps.is_available", return_value=True):
+            assert _resolve_diarization_device("not-a-real-device") == "mps"
+        with mock.patch("torch.backends.mps.is_available", return_value=False):
+            assert _resolve_diarization_device("not-a-real-device") == "cpu"
 
 
 class TestPyannoteAudioIoRealDecode:

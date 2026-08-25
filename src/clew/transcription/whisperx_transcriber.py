@@ -41,6 +41,30 @@ def _is_degenerate_embedding(values: list[float]) -> bool:
     return norm == 0.0 or not math.isfinite(norm)
 
 
+def _resolve_diarization_device(configured: str) -> str:
+    """Resolve the configured diarization.device setting to a real torch device.
+
+    "cpu" always wins, even when MPS is available -- the explicit escape hatch.
+    "auto" (default) and "mps" both prefer MPS but degrade to CPU when it isn't
+    available on this machine, exactly like the zero-norm centroid guard: never
+    crash, just fall back and log why. Any unrecognized value (typo, stale
+    config) is treated as "auto" rather than crashing the pipeline.
+    """
+    if configured == "cpu":
+        return "cpu"
+
+    import torch
+
+    if torch.backends.mps.is_available():
+        return "mps"
+
+    if configured == "mps":
+        logger.warning(
+            "diarization.device is set to 'mps' but MPS is not available on this machine; falling back to CPU."
+        )
+    return "cpu"
+
+
 def _performance_core_count() -> int | None:
     import subprocess
 
@@ -185,7 +209,7 @@ class WhisperXTranscriber(Transcriber):
             "Loading diarization pipeline",
             DiarizationPipeline,
             token=self._diar_config.hf_token,
-            device="cpu",
+            device=_resolve_diarization_device(self._diar_config.device),
         )
         return self._diarize_model
 

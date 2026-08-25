@@ -50,6 +50,10 @@ class TestDefaults:
         cfg = Config()
         assert cfg.diarization.telemetry is False
 
+    def test_default_diarization_device_is_auto(self):
+        cfg = Config()
+        assert cfg.diarization.device == "auto"
+
     def test_default_summarization_template_empty(self):
         cfg = Config()
         assert cfg.summarization.template == ""
@@ -193,6 +197,12 @@ class TestMergeToml:
         data = {"diarization": {"telemetry": True}}
         merged = _merge_toml(cfg, data)
         assert merged.diarization.telemetry is True
+
+    def test_diarization_device_from_toml(self):
+        cfg = Config()
+        data = {"diarization": {"device": "cpu"}}
+        merged = _merge_toml(cfg, data)
+        assert merged.diarization.device == "cpu"
 
     def test_template_from_toml(self):
         cfg = Config()
