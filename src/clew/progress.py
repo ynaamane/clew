@@ -313,6 +313,7 @@ class PipelineProgress:
         self._step_map: dict[str, _Step] = {s.key: s for s in steps}
         self._active: set[str] = set()
         self._completed: set[str] = set()
+        self._failed: set[str] = set()
         self._progress: dict[str, float] = {}
         self._details: dict[str, str] = {}
         self._lock = threading.Lock()
@@ -327,14 +328,19 @@ class PipelineProgress:
         self._stderr = sys.stderr
         return self
 
-    def __exit__(self, *_exc) -> None:
+    def __exit__(self, exc_type, _exc_value, _traceback) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join()
-        # Final render: mark any remaining active steps as completed
+        # Final render: a still-active step exiting cleanly is done; one
+        # exiting because an exception is propagating through the `with`
+        # block crashed mid-step and must render as failed, never as done.
         with self._lock:
             for key in list(self._active):
-                self._completed.add(key)
+                if exc_type is not None:
+                    self._failed.add(key)
+                else:
+                    self._completed.add(key)
                 self._progress.pop(key, None)
                 self._details.pop(key, None)
             self._active.clear()
@@ -356,6 +362,8 @@ class PipelineProgress:
                     self._progress.pop(other_key, None)
                     self._details.pop(other_key, None)
             self._active.add(key)
+            self._completed.discard(key)
+            self._failed.discard(key)
             self._progress.pop(key, None)
             self._details.pop(key, None)
         # Lazy-start animation thread on first begin()
@@ -371,6 +379,7 @@ class PipelineProgress:
                 return
             self._active.discard(key)
             self._completed.add(key)
+            self._failed.discard(key)
             self._progress.pop(key, None)
             self._details.pop(key, None)
             # If top-level step, also complete any active sub-steps
@@ -379,13 +388,20 @@ class PipelineProgress:
                     if s.indent > 0 and s.key in self._active:
                         self._active.discard(s.key)
                         self._completed.add(s.key)
+                        self._failed.discard(s.key)
                         self._progress.pop(s.key, None)
                         self._details.pop(s.key, None)
 
     def fail(self, key: str) -> None:
-        """Mark a step as failed — removes from active without completing."""
+        """Mark a step as failed -- renders a distinct failed marker rather than
+        reverting to the never-started glyph or (via __exit__) being swept into
+        'completed', which would paint a crash as a success."""
         with self._lock:
+            if key not in self._step_map:
+                return
             self._active.discard(key)
+            self._completed.discard(key)
+            self._failed.add(key)
             self._progress.pop(key, None)
             self._details.pop(key, None)
 
@@ -428,6 +444,7 @@ class PipelineProgress:
         with self._lock:
             active = set(self._active)
             completed = set(self._completed)
+            failed = set(self._failed)
             progress = dict(self._progress)
             details = dict(self._details)
 
@@ -440,7 +457,9 @@ class PipelineProgress:
         for step in self._steps:
             indent = "    " if step.indent == 1 else "  "
 
-            if step.key in completed:
+            if step.key in failed:
+                lines.append(f"{indent}\u2717 {step.label} failed.")
+            elif step.key in completed:
                 lines.append(f"{indent}\u2714 {step.label} done.")
             elif step.key in active:
                 frac = progress.get(step.key)

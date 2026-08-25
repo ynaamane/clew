@@ -174,6 +174,59 @@ class TestPipelineProgressDetails:
         assert "preparing_models" in progress._step_map
 
 
+class TestPipelineProgressFailureState:
+    """A step that crashes must render as FAILED, never as done or unstarted.
+
+    Reproduces the 2026-08-24 MED finding: __exit__ swept a still-active step
+    into 'completed' regardless of an exception propagating through the `with`
+    block, and fail() dropped a step back to the never-started glyph, losing
+    the fact it ran at all.
+    """
+
+    def test_fail_renders_a_failed_marker_not_never_started(self):
+        progress = PipelineProgress(transcribe=True, summarize=True)
+        progress._stderr = io.StringIO()
+        progress.begin("transcribing")
+
+        progress.fail("transcribing")
+        progress._render_all(final=True)
+
+        output = progress._stderr.getvalue()
+        assert "○ Transcribing" not in output
+        assert "✗ Transcribing" in output
+        assert "failed" in output.lower()
+
+        progress._stop.set()
+        if progress._thread is not None:
+            progress._thread.join()
+
+    def test_exit_marks_still_active_step_failed_when_exception_propagates(self):
+        progress = PipelineProgress(transcribe=True, summarize=True)
+        progress._stderr = io.StringIO()
+        progress.begin("transcribing")
+
+        # Simulate __exit__ receiving a real exception, the way `with progress:`
+        # would call it if code inside the block raised without calling fail()
+        # first -- never go through __enter__, which would clobber the injected
+        # StringIO with the real sys.stderr.
+        progress.__exit__(RuntimeError, RuntimeError("boom"), None)
+
+        output = progress._stderr.getvalue()
+        assert "✔ Transcribing" not in output
+        assert "✗ Transcribing" in output
+
+    def test_exit_still_completes_active_step_when_no_exception(self):
+        progress = PipelineProgress(transcribe=True, summarize=True)
+        progress._stderr = io.StringIO()
+        progress.begin("transcribing")
+
+        progress.__exit__(None, None, None)
+
+        output = progress._stderr.getvalue()
+        assert "✔ Transcribing" in output
+        assert "✗ Transcribing" not in output
+
+
 def _read_events(stream: io.StringIO) -> list[dict]:
     return [json.loads(line) for line in stream.getvalue().strip().splitlines()]
 
