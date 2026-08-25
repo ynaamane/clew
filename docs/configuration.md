@@ -232,8 +232,9 @@ diarization model:
 3. Set `HF_TOKEN` env var or add `hf_token` to config
 4. Run with `--diarize`
 
-Diarization always runs on CPU. See `NOTES.md` for why the MPS path is disabled here
-rather than upstream's `device = "auto"` default.
+Diarization uses MPS (Apple Silicon GPU) by default when available (`device = "auto"` in
+`[diarization]`, above) — CPU/MPS parity is verified bit-for-bit, and it falls back to CPU
+automatically, with no crash, on a machine without MPS. Set `device = "cpu"` to force CPU.
 
 Voiceprints created by enrollment (below) are biometric data with real legal weight: see
 [Legal and privacy notice](../README.md#legal-and-privacy-notice) before enrolling anyone.
