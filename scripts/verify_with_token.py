@@ -15,6 +15,7 @@ Exits 0 only if every check that ran (not skipped) passed.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import traceback
@@ -183,6 +184,87 @@ def check_canary_mlx_engine(clip_fr: Path | None) -> CheckResult:
         return _fail(name, f"{type(exc).__name__}: {exc}")
 
 
+_CENTROID_ZERO_NORM_EPS = 1e-6
+_CENTROID_COSINE_PASS_THRESHOLD = 0.999
+
+
+@dataclass
+class CentroidCell:
+    label: str
+    cpu_norm: float
+    mps_norm: float
+    cosine: float
+    zero_norm: bool
+    passed: bool
+
+
+def _l2_norm(vector: list[float]) -> float:
+    return math.sqrt(sum(x * x for x in vector))
+
+
+def build_centroid_cells(
+    cpu_embeddings: dict[str, list[float]],
+    mps_embeddings: dict[str, list[float]],
+) -> list[CentroidCell]:
+    """Per-centroid CPU-vs-MPS comparison for every speaker label present on both sides.
+
+    A near-zero L2 norm on either side is flagged explicitly via zero_norm=True instead of
+    falling through to cosine_similarity's silent 0.0-on-zero-vector return (clew.speakers.
+    matching.cosine_similarity), which would be indistinguishable from a genuine low-similarity
+    failure -- exactly the pyannote-audio zero-padded-centroid failure mode this gate exists to
+    catch.
+    """
+    from clew.speakers.matching import cosine_similarity
+
+    cells: list[CentroidCell] = []
+    for label in sorted(set(cpu_embeddings) & set(mps_embeddings)):
+        cpu_vec = cpu_embeddings[label]
+        mps_vec = mps_embeddings[label]
+        cpu_norm = _l2_norm(cpu_vec)
+        mps_norm = _l2_norm(mps_vec)
+        zero_norm = cpu_norm < _CENTROID_ZERO_NORM_EPS or mps_norm < _CENTROID_ZERO_NORM_EPS
+        if zero_norm:
+            cosine = float("nan")
+            passed = False
+        else:
+            cosine = cosine_similarity(cpu_vec, mps_vec)
+            passed = cosine > _CENTROID_COSINE_PASS_THRESHOLD
+        cells.append(
+            CentroidCell(
+                label=label,
+                cpu_norm=cpu_norm,
+                mps_norm=mps_norm,
+                cosine=cosine,
+                zero_norm=zero_norm,
+                passed=passed,
+            )
+        )
+    return cells
+
+
+def all_centroid_cells_pass(cells: list[CentroidCell]) -> bool:
+    """False on an empty list on purpose -- nothing to compare must never read as a pass."""
+    if not cells:
+        return False
+    return all(cell.passed for cell in cells)
+
+
+def format_centroid_cells(cells: list[CentroidCell]) -> str:
+    if not cells:
+        return "no shared centroid labels to compare"
+    parts = []
+    for cell in cells:
+        if cell.zero_norm:
+            parts.append(f"{cell.label}: ZERO-NORM FAIL (cpu_norm={cell.cpu_norm:.6f}, mps_norm={cell.mps_norm:.6f})")
+        else:
+            status = "OK" if cell.passed else "FAIL"
+            parts.append(
+                f"{cell.label}: cosine={cell.cosine:.6f} ({status}), "
+                f"cpu_norm={cell.cpu_norm:.4f}, mps_norm={cell.mps_norm:.4f}"
+            )
+    return "; ".join(parts)
+
+
 def check_mps_vs_cpu_diarization(hf_token: str, clip: Path | None) -> CheckResult:
     name = "MPS vs CPU diarization on the same clip (catches pyannote/pyannote-audio#1886 wrong-output mode)"
     if not hf_token:
@@ -200,7 +282,8 @@ def check_mps_vs_cpu_diarization(hf_token: str, clip: Path | None) -> CheckResul
         from clew.transcription.whisperx_transcriber import WhisperXTranscriber
 
         diar_cpu = DiarizationConfig(enabled=True, hf_token=hf_token)
-        cpu_result = WhisperXTranscriber(TranscriptionConfig(), diar_cpu, progress=PipelineProgress()).transcribe(clip)
+        cpu_transcriber = WhisperXTranscriber(TranscriptionConfig(), diar_cpu, progress=PipelineProgress())
+        cpu_result = cpu_transcriber.transcribe(clip)
         cpu_speakers = sorted({seg.speaker for seg in cpu_result.segments if seg.speaker})
 
         from unittest import mock
@@ -225,7 +308,15 @@ def check_mps_vs_cpu_diarization(hf_token: str, clip: Path | None) -> CheckResul
             )
         if mps_speakers != cpu_speakers:
             return _fail(name, f"CPU speakers={cpu_speakers} != MPS speakers={mps_speakers}")
-        return _pass(name, f"CPU and MPS agree on speaker set: {cpu_speakers}")
+
+        cells = build_centroid_cells(cpu_transcriber.last_speaker_embeddings, mps_transcriber.last_speaker_embeddings)
+        cells_detail = format_centroid_cells(cells)
+        if not all_centroid_cells_pass(cells):
+            return _fail(
+                name,
+                f"speaker sets agree ({cpu_speakers}) but the per-centroid check failed -- {cells_detail}",
+            )
+        return _pass(name, f"CPU and MPS agree on speaker set {cpu_speakers}; per-centroid: {cells_detail}")
     except Exception as exc:
         return _fail(name, f"{type(exc).__name__}: {exc}")
 
