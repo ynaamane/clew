@@ -29,21 +29,17 @@ class OllamaSummarizer(Summarizer):
         self._auto_context_limit: int | None = None
         self._auto_context_queried = False
 
-    def _context_limit(self) -> int | None:
-        """Best-effort context window for the configured model.
+    def native_context_length(self) -> int | None:
+        """Best-effort native context window for the configured model, independent of
+        any explicit config.context_size override (see base class contract).
 
-        config.context_size > 0 is an explicit budget the caller committed to,
-        used as-is. Otherwise, ask Ollama for the model's own context length via
-        /api/show -- if that fails (model not pulled, server unreachable, an
-        Ollama version without the field) the limit is unknown and the
-        pre-flight check is skipped rather than guessed at. The auto-detected
-        result is memoized per instance: this runs on every summarize/chat/
-        generate_title call, and a model's context length cannot change
-        mid-session, so re-querying /api/show on every call would be a real
-        added round-trip for no new information.
+        Queried once via /api/show and memoized per instance: this runs on every
+        summarize/chat/generate_title call via _context_limit() below, and a model's
+        context length cannot change mid-session, so re-querying on every call would
+        be a real added round-trip for no new information. If the lookup fails (model
+        not pulled, server unreachable, an Ollama version without the field) the limit
+        is unknown and callers must degrade gracefully rather than guess at it.
         """
-        if self._config.context_size > 0:
-            return self._config.context_size
         if self._auto_context_queried:
             return self._auto_context_limit
         self._auto_context_queried = True
@@ -65,6 +61,14 @@ class OllamaSummarizer(Summarizer):
                 except (TypeError, ValueError):
                     continue
         return self._auto_context_limit
+
+    def _context_limit(self) -> int | None:
+        """The effective context budget for this call: an explicit config.context_size
+        is a budget the caller committed to and is used as-is; otherwise falls back to
+        the auto-detected native_context_length()."""
+        if self._config.context_size > 0:
+            return self._config.context_size
+        return self.native_context_length()
 
     def _guarded_kwargs(self, *prompt_texts: str) -> dict:
         """Raise SummarizationContextError before any request goes out when the

@@ -164,6 +164,23 @@ class LlamaCppSummarizer(Summarizer):
             )
         return self._llm
 
+    def native_context_length(self) -> int | None:
+        """The model's own trained context length (n_ctx_train), read via the same
+        cheap 512-ctx probe load _required_ctx uses -- never a second real load just
+        to answer this. Never probe with vocab_only=True: it reports n_ctx_train=0
+        (measured against phi-4-mini Q4_K_M), a known trap documented at _PROBE_N_CTX.
+        Returns None if the probe itself fails to load (download failure, bad model
+        spec) rather than raising -- this is a best-effort budget hint, not a
+        precondition any caller should have to guard.
+        """
+        import llama_cpp
+
+        try:
+            probe = self._get_llm()
+        except Exception:
+            return None
+        return llama_cpp.llama_model_n_ctx_train(probe.model)
+
     def _required_ctx(self, *texts: str) -> int:
         """Tokenize these prompt texts with the model's own tokenizer and return the
         context window they need (prompt tokens + a generation margin).

@@ -322,9 +322,7 @@ class TestOllamaContextGuard:
         assert body["options"]["num_ctx"] == 5000
 
     def test_explicit_context_size_too_small_raises_before_any_request(self, httpserver):
-        config = SummarizationConfig(
-            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=10
-        )
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=10)
 
         from clew.summarization.ollama_summarizer import OllamaSummarizer
 
@@ -1183,6 +1181,107 @@ class TestSummarizerCloseContract:
         with summarizer as entered:
             assert entered is summarizer
         summarizer.close()
+
+
+class TestSummarizerNativeContextLength:
+    """Item 4/seam (2026-08-24): search.py's chunking budget was stuck on a hardcoded
+    8192 default because nothing on the Summarizer abstraction exposed a backend's own
+    context window. native_context_length() is a concrete method on the base class
+    (default None) so every existing subclass -- including duck-typed test fakes that
+    don't inherit from Summarizer at all -- keeps working without edits; only backends
+    that know their own limit override it."""
+
+    def test_base_default_is_none_for_a_backend_that_never_overrides_it(self):
+        """OpenAISummarizer has no context-length source and must not override this --
+        proves the concrete base default (None) is what an unopinionated backend gets."""
+        config = SummarizationConfig(host="http://localhost:1", backend="openai", model="x", api_key="k")
+
+        from clew.summarization.openai_summarizer import OpenAISummarizer
+
+        summarizer = OpenAISummarizer(config)
+        assert summarizer.native_context_length() is None
+
+    def test_llama_cpp_returns_the_probes_trained_context_length(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["n_ctx_train"] = 131072
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini")
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        assert summarizer.native_context_length() == 131072
+        # Only the cheap probe load -- never a second real Llama(...) construction
+        # just to answer "what's your context length".
+        assert len(constructions) == 1
+
+    def test_llama_cpp_reuses_the_probe_already_loaded_by_a_prior_call(self, llama_stub_factory):
+        constructions, state, _ = llama_stub_factory
+        state["n_ctx_train"] = 131072
+        state["tokens"] = [1] * 10
+
+        config = SummarizationConfig(backend="local", model="phi-4-mini")
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        summarizer.summarize("short transcript")  # loads (and upsizes) the instance
+        count_before = len(constructions)
+
+        summarizer.native_context_length()
+
+        # No NEW construction just to answer "what's your context length" -- the
+        # already-loaded instance already covers the cheap probe size.
+        assert len(constructions) == count_before
+
+    def test_llama_cpp_returns_none_when_the_probe_load_fails(self, llama_stub_factory):
+        _constructions, _state, _instances = llama_stub_factory
+
+        config = SummarizationConfig(backend="local", model="nonexistent-model-xyz")
+
+        from clew.summarization.llama_cpp_summarizer import LlamaCppSummarizer
+
+        summarizer = LlamaCppSummarizer(config)
+        with patch(
+            "clew.summarization.llama_cpp_summarizer._ensure_model",
+            side_effect=RuntimeError("download failed"),
+        ):
+            assert summarizer.native_context_length() is None
+
+    def test_ollama_returns_the_auto_detected_model_info_context_length(self, httpserver):
+        httpserver.expect_request("/api/show", method="POST").respond_with_json(
+            {"model_info": {"llama.context_length": 4096}}
+        )
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        assert summarizer.native_context_length() == 4096
+
+    def test_ollama_returns_none_when_show_is_unavailable(self, httpserver):
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        assert summarizer.native_context_length() is None
+
+    def test_ollama_ignores_explicit_config_override_and_still_reports_native(self, httpserver):
+        """native_context_length() is the MODEL's own limit, independent of any explicit
+        context_size override -- search.py already checks the override separately, so
+        this method must not fold it in (that would double-apply the override)."""
+        httpserver.expect_request("/api/show", method="POST").respond_with_json(
+            {"model_info": {"llama.context_length": 4096}}
+        )
+        config = SummarizationConfig(
+            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=2000
+        )
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        assert summarizer.native_context_length() == 4096
 
 
 class TestEnsureModel:

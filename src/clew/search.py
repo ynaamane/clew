@@ -68,7 +68,7 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
             click.echo("Summarization backend is not reachable. Check your configuration.")
             return
 
-        context_size = _resolve_context_size(config)
+        context_size = _resolve_context_size(config, summarizer)
 
         # Stage 1
         label = f"Searching {len(meetings)} meetings"
@@ -101,23 +101,18 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
         click.echo(answer)
 
 
-def _resolve_context_size(config: Config) -> int:
+def _resolve_context_size(config: Config, summarizer: Summarizer) -> int:
+    """The chunking budget for this ask() run: an explicit config.context_size is a
+    budget the user committed to and wins outright (never even asks the summarizer).
+    Otherwise defers to the summarizer's own native_context_length() -- concrete on
+    the Summarizer base with a None default, so a backend that can't introspect its
+    own limit (or fails to) falls back to the historical default, same as before."""
     if config.summarization.context_size > 0:
         return config.summarization.context_size
 
-    if config.summarization.backend == "ollama":
-        try:
-            import ollama
-
-            client = ollama.Client(host=config.summarization.host)
-            info = client.show(config.summarization.model)
-            # Ollama returns model info with context window details
-            model_info = info.get("model_info", {})
-            for key, value in model_info.items():
-                if "context_length" in key:
-                    return int(value)
-        except Exception:
-            pass
+    native = summarizer.native_context_length()
+    if native is not None:
+        return native
 
     return _DEFAULT_CONTEXT_SIZE
 

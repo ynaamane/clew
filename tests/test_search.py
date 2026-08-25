@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from clew.search import (
+    _DEFAULT_CONTEXT_SIZE,
     _answer_from_transcripts,
     _build_summary_chunks,
     _discover_meetings,
@@ -18,6 +19,7 @@ from clew.search import (
     _keyword_fallback,
     _parse_relevant_ids,
     _rank_meetings,
+    _resolve_context_size,
     _verify_quotes,
 )
 
@@ -53,6 +55,63 @@ class FakeSummarizer:
             self._call_idx += 1
             return resp
         return '{"relevant": []}'
+
+
+class _StubNativeContext:
+    """Minimal stand-in for a Summarizer exposing only native_context_length(), to
+    unit-test _resolve_context_size() in isolation from any real backend."""
+
+    def __init__(self, value: int | None):
+        self._value = value
+        self.called = False
+
+    def native_context_length(self) -> int | None:
+        self.called = True
+        return self._value
+
+
+class TestResolveContextSize:
+    """Item 2/seam (2026-08-24): the chunking budget used to fall through to a stale
+    hardcoded 8192 default for every backend except ollama (and even that branch was
+    dead code -- see TestSummarizerNativeContextLength in test_summarization.py).
+    Now delegates to the Summarizer.native_context_length() seam."""
+
+    def test_explicit_config_context_size_wins_without_asking_the_summarizer(self):
+        from clew.config import Config
+
+        config = Config()
+        config.summarization.context_size = 4096
+        stub = _StubNativeContext(99999)
+
+        result = _resolve_context_size(config, stub)
+
+        assert result == 4096
+        assert stub.called is False
+
+    def test_auto_uses_the_summarizers_native_context_length(self):
+        from clew.config import Config
+
+        config = Config()
+        config.summarization.context_size = 0
+        stub = _StubNativeContext(20000)
+
+        result = _resolve_context_size(config, stub)
+
+        assert result == 20000
+
+    def test_auto_falls_back_to_the_default_when_summarizer_reports_none(self):
+        """Byte-identical to the pre-seam fallback behavior: a backend the seam
+        cannot introspect (or that fails to introspect) still gets the old default,
+        never a crash."""
+        from clew.config import Config
+
+        config = Config()
+        config.summarization.context_size = 0
+        stub = _StubNativeContext(None)
+
+        result = _resolve_context_size(config, stub)
+
+        assert result == _DEFAULT_CONTEXT_SIZE
 
 
 # -- Discovery tests --
@@ -559,11 +618,11 @@ class TestAskIntegration:
         show_response = {
             "model_info": {"general.context_length": 8192},
         }
+        # _resolve_context_size() (via summarizer.native_context_length()) and
+        # OllamaSummarizer's own per-call context guard (item 5, 2026-08-24) now share
+        # ONE memoized /api/show lookup on the summarizer instance -- the seam
+        # (2026-08-24) that replaced search.py's own ad hoc client.show() call.
         httpserver.expect_ordered_request("/api/tags", method="GET").respond_with_json({"models": []})
-        httpserver.expect_ordered_request("/api/show", method="POST").respond_with_json(show_response)
-        # OllamaSummarizer's own pre-inference context guard (item 5, 2026-08-24) queries
-        # /api/show once more, lazily, on its first chat() call -- search.py's own lookup
-        # above is a separate client/call, not shared with the summarizer's internal cache.
         httpserver.expect_ordered_request("/api/show", method="POST").respond_with_json(show_response)
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(find_response)
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(answer_response)

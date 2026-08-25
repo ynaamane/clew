@@ -42,6 +42,16 @@ class Summarizer(abc.ABC):
     def is_available(self) -> bool:
         """Check if the summarization backend is reachable."""
 
+    def native_context_length(self) -> int | None:
+        """Best-effort context window the underlying model itself supports, or None
+        when the backend has no way to know (a remote API with no introspection, or a
+        lookup that failed). Concrete with a None default -- not abstract -- so every
+        existing subclass, including duck-typed test fakes that don't inherit from
+        Summarizer at all, keeps working without edits; only a backend that knows its
+        own limit overrides it. Independent of any explicit context_size override a
+        caller may have configured -- callers apply that separately."""
+        return None
+
     def close(self) -> None:  # noqa: B027 — intentional optional hook, not abstract
         """Release any native resources. No-op by default; must be idempotent."""
 
