@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import os
 import warnings
 from pathlib import Path
@@ -23,6 +24,21 @@ from clew.transcription.base import Transcriber
 from clew.transcription.models import Segment, TranscriptResult, Word
 
 _SAMPLE_RATE = 16000
+
+logger = logging.getLogger(__name__)
+
+
+def _is_degenerate_embedding(values: list[float]) -> bool:
+    """True for a zero-norm or non-finite centroid.
+
+    pyannote zero-pads a cluster's embedding when it cannot compute a real one
+    for it (too little audio attributed to that speaker). Such a vector scores
+    0.0 against every enrolled voiceprint (cosine_similarity's own zero-norm
+    guard), so silently matching against it makes that speaker permanently
+    un-nameable and indistinguishable from a genuine no-match.
+    """
+    norm = math.sqrt(sum(v * v for v in values))
+    return norm == 0.0 or not math.isfinite(norm)
 
 
 def _performance_core_count() -> int | None:
@@ -361,4 +377,15 @@ class WhisperXTranscriber(Transcriber):
         if embeddings is None:
             return {}
         labels = diarization.speaker_diarization.labels()
-        return {label: embeddings[i].tolist() for i, label in enumerate(labels)}
+        result: dict[str, list[float]] = {}
+        for i, label in enumerate(labels):
+            values = embeddings[i].tolist()
+            if _is_degenerate_embedding(values):
+                logger.warning(
+                    "Diarized speaker %s has a degenerate (zero-norm) embedding; "
+                    "excluding it from voiceprint matching for this run.",
+                    label,
+                )
+                continue
+            result[label] = values
+        return result

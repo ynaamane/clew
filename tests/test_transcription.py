@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import types
 from unittest import mock
 
@@ -465,6 +466,76 @@ class TestExtractClusterEmbeddings:
         result = transcriber._extract_cluster_embeddings(fake_diarization)
 
         assert result == {}
+
+    def test_excludes_a_zero_norm_centroid_and_logs_which_label(self, caplog):
+        # pyannote zero-pads a cluster's centroid when it can't compute a real
+        # embedding for it (too little audio for that speaker). A zero-norm
+        # vector always scores 0.0 against every enrolled voiceprint (cosine_similarity's
+        # own zero-norm guard), so silently including it makes that speaker
+        # permanently un-nameable and indistinguishable from a genuine no-match.
+        import numpy as np
+
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_annotation = mock.MagicMock()
+        fake_annotation.labels.return_value = ["SPEAKER_00", "SPEAKER_01"]
+        fake_diarization = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2], [0.0, 0.0]]),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {"SPEAKER_00": [0.1, 0.2]}
+        assert "SPEAKER_01" in caplog.text
+        assert caplog.records[0].levelno == logging.WARNING
+
+    def test_excludes_a_nan_centroid_too(self, caplog):
+        import numpy as np
+
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_annotation = mock.MagicMock()
+        fake_annotation.labels.return_value = ["SPEAKER_00", "SPEAKER_01"]
+        fake_diarization = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2], [float("nan"), 0.1]]),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {"SPEAKER_00": [0.1, 0.2]}
+        assert "SPEAKER_01" in caplog.text
+
+    def test_keeps_every_cluster_and_logs_nothing_when_none_are_degenerate(self, caplog):
+        # Direction check: the guard must not misfire on ordinary, healthy embeddings.
+        import numpy as np
+
+        from clew.config import TranscriptionConfig
+        from clew.transcription.whisperx_transcriber import WhisperXTranscriber
+
+        transcriber = WhisperXTranscriber(TranscriptionConfig(), None)
+
+        fake_annotation = mock.MagicMock()
+        fake_annotation.labels.return_value = ["SPEAKER_00", "SPEAKER_01"]
+        fake_diarization = types.SimpleNamespace(
+            speaker_diarization=fake_annotation,
+            speaker_embeddings=np.array([[0.1, 0.2], [0.3, 0.4]]),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = transcriber._extract_cluster_embeddings(fake_diarization)
+
+        assert result == {"SPEAKER_00": [0.1, 0.2], "SPEAKER_01": [0.3, 0.4]}
+        assert caplog.text == ""
 
 
 class TestLastSpeakerEmbeddings:
