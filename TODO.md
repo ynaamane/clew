@@ -12,7 +12,7 @@ preuves AVANT push) — deux lots :
   `Summarizer.native_context_length()` : `clew ask` chunke sur la vraie limite du modèle, dead code
   `model_info` supprimé, un seul `/api/show` (`8d48cd9`) · estimation sensible à la densité
   non-ASCII, trou CJK 8,6× fermé (`30111b8`).
-- Lot 2 (`de08f45..0c49d33`) : **la diarisation tourne sur MPS par défaut** —
+- Lot 2 (4 commits, `de08f45` → `0c49d33` inclus) : **la diarisation tourne sur MPS par défaut** —
   `diarization.device = "auto"` (mps si dispo, fallback CPU sans crash, warning seulement sur
   `"mps"` explicite, valeur invalide = ValueError au chargement, aucune coercition de casse) + doc.
 
@@ -24,7 +24,8 @@ driver MPS, pas de var de fallback). Mécanisme : `.to("mps")` déplace TOUT le 
 NON-VÉRIFIÉ (dérivé d'une division de conventions) ; la valeur mesurée retombe dans cette bande par
 un mécanisme différent et vérifié. Le plafond « seuls les embeddings s'accélèrent » (11,6×) est la
 bande 9-13× prédite — dépassé parce que la segmentation bouge aussi. Sur le meeting de 68 min :
-diarisation ~41 min → **~1,4 min attendu** (à confirmer sur le prochain vrai meeting).
+diarisation ~41 min (extrapolé du RTF 0,60 mesuré × 68 min, pas mesuré sur ce fichier) →
+**~1,4 min attendu** (à confirmer sur le prochain vrai meeting).
 
 **Spike FluidAudio : clos, « mesuré, pas nécessaire ».** Son mode offline EST le même pipeline
 (community-1 : powerset+WeSpeaker+VBx) porté Core ML/ANE — pas un concurrent. Chaud : 1,09 s sur le
