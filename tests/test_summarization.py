@@ -416,6 +416,60 @@ class TestOllamaContextGuard:
         assert len(show_requests) == 1
 
 
+class TestOllamaContextGuardNonLatinDensity:
+    """Reviewer finding D (2026-08-24, review of 7c39d2f): the chars//4 estimate
+    massively underestimates CJK/non-Latin scripts. Reviewer repro: a 9000-char
+    Chinese transcript against a 4096-token window did NOT raise (chars//4 = 2250,
+    comfortably under budget) while the real BPE count was 19274 tokens (8.6x the
+    estimate) -- exactly the silent truncation this guard exists to prevent, for CJK
+    content. Fix: text whose non-ASCII character density crosses a threshold uses a
+    more conservative divisor. This remains a heuristic (Ollama has no local
+    tokenizer, so there is no way to match llama-cpp's real-tokenizer precision) --
+    it narrows the gap for dense scripts, it does not close it exactly."""
+
+    def test_dense_non_ascii_transcript_over_the_window_raises(self, httpserver):
+        config = SummarizationConfig(
+            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=4096
+        )
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        # Synthetic CJK-dense transcript (not real meeting content), same shape as
+        # the reviewer's repro: ~9000 chars, all non-ASCII. chars//4 estimates 2254
+        # tokens (well under 4096) and never raises; the fix must.
+        cjk_transcript = "会议记录：我们讨论了下一季度的产品计划和预算分配问题。" * 334  # noqa: RUF001 -- 9018 chars, real CJK punctuation
+
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize(cjk_transcript)
+
+        assert len(httpserver.log) == 0
+
+    def test_latin_transcript_under_the_window_still_does_not_raise(self, httpserver):
+        """Non-regression: our real usage is French/English meeting content -- the
+        density check must not false-positive on it. Accented characters (a, e, c
+        with diacritics) scattered through an otherwise-ASCII transcript must not
+        push its non-ASCII density over the threshold and shrink the divisor."""
+        response_body = {"message": {"role": "assistant", "content": "## Resume\nOK."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(
+            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=4096
+        )
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        french_transcript = (
+            "Alice: Bonjour à tous, on va parler du budget prévu pour le trimestre "
+            "prochain et des décisions à prendre concernant le recrutement. " * 20
+        )
+
+        result = summarizer.summarize(french_transcript)
+
+        assert "OK." in result
+
+
 class TestOpenAIGenerateTitle:
     """Test OpenAISummarizer.generate_title against a mock HTTP server."""
 

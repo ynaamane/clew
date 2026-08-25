@@ -9,14 +9,32 @@ from clew.summarization.base import SummarizationContextError, Summarizer
 from clew.summarization.prompts import clean_response
 
 # Ollama exposes no local tokenizer (unlike llama-cpp, which reads the GGUF's own
-# vocab in LlamaCppSummarizer._required_ctx) -- ~4 chars/token is the standard
-# rough estimate, and the output margin mirrors llama_cpp_summarizer.py's.
+# vocab in LlamaCppSummarizer._required_ctx), so this is a heuristic, not a real
+# token count. ~4 chars/token is the standard rough estimate for Latin scripts, but
+# CJK and other dense scripts pack far more tokens per character in every BPE
+# tokenizer -- reviewer finding D (2026-08-24, review of 7c39d2f) reproduced a
+# 9000-char Chinese transcript needing 19274 real BPE tokens (llama-cpp tokenizer)
+# while chars//4 estimated only 2254, 8.6x under, silently defeating the guard for
+# exactly the CJK content it exists to protect. A text whose non-ASCII density
+# crosses _NON_ASCII_DENSITY_THRESHOLD uses a far more conservative divisor. This
+# narrows the gap; it does not close it -- there is no way to match llama-cpp's
+# real-tokenizer precision without a real tokenizer.
 _CHARS_PER_TOKEN_ESTIMATE = 4
+_CHARS_PER_TOKEN_ESTIMATE_DENSE = 1.5
+_NON_ASCII_DENSITY_THRESHOLD = 0.3
 _OUTPUT_MARGIN_TOKENS = 1024
 
 
 def _estimate_tokens(text: str) -> int:
-    return len(text) // _CHARS_PER_TOKEN_ESTIMATE
+    if not text:
+        return 0
+    non_ascii = sum(1 for ch in text if ord(ch) > 127)
+    divisor = (
+        _CHARS_PER_TOKEN_ESTIMATE_DENSE
+        if non_ascii / len(text) > _NON_ASCII_DENSITY_THRESHOLD
+        else _CHARS_PER_TOKEN_ESTIMATE
+    )
+    return int(len(text) / divisor)
 
 
 class OllamaSummarizer(Summarizer):
