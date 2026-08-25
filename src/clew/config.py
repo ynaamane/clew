@@ -223,6 +223,15 @@ def _validate_cpu_threads(value: int | str) -> int:
     return threads
 
 
+_VALID_DIARIZATION_DEVICES = ("auto", "cpu", "mps")
+
+
+def _validate_diarization_device(value: str) -> str:
+    if value not in _VALID_DIARIZATION_DEVICES:
+        raise ValueError(f"diarization.device must be one of {_VALID_DIARIZATION_DEVICES}, got {value!r}")
+    return value
+
+
 def _merge_toml(config: Config, data: dict) -> Config:
     """Merge TOML data into config dataclass."""
     if "audio" in data:
@@ -245,6 +254,8 @@ def _merge_toml(config: Config, data: dict) -> Config:
     if "diarization" in data:
         for k, v in data["diarization"].items():
             if hasattr(config.diarization, k):
+                if k == "device":
+                    v = _validate_diarization_device(v)
                 setattr(config.diarization, k, v)
 
     if "correction" in data:

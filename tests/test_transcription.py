@@ -493,6 +493,21 @@ class TestResolveDiarizationDevice:
         with mock.patch("torch.backends.mps.is_available", return_value=False):
             assert _resolve_diarization_device("auto") == "cpu"
 
+    def test_auto_falls_back_to_cpu_silently_no_warning(self, caplog):
+        # "auto" degrading to CPU is normal, expected behavior on a machine without
+        # MPS -- not an anomaly. Only an explicit "mps" that can't be honored gets
+        # a warning (test_explicit_mps_falls_back_to_cpu_and_logs_a_warning_when_unavailable).
+        from clew.transcription.whisperx_transcriber import _resolve_diarization_device
+
+        with (
+            mock.patch("torch.backends.mps.is_available", return_value=False),
+            caplog.at_level(logging.WARNING),
+        ):
+            result = _resolve_diarization_device("auto")
+
+        assert result == "cpu"
+        assert caplog.text == ""
+
     def test_explicit_cpu_wins_even_when_mps_is_available(self):
         from clew.transcription.whisperx_transcriber import _resolve_diarization_device
 
@@ -520,7 +535,12 @@ class TestResolveDiarizationDevice:
         assert "mps" in caplog.text.lower()
 
     def test_unrecognized_value_is_treated_as_auto(self):
-        # A typo'd or stale config value must never crash the pipeline.
+        # Defense in depth, not the primary gate: config.py's _validate_diarization_device
+        # is what actually rejects a bad TOML value (ValueError at load time, same
+        # convention as _validate_cpu_threads -- see tests/test_config.py). This is
+        # a belt-and-suspenders check for any caller that bypasses that validator
+        # (e.g. a DiarizationConfig built directly in code) -- it must still never
+        # crash the pipeline.
         from clew.transcription.whisperx_transcriber import _resolve_diarization_device
 
         with mock.patch("torch.backends.mps.is_available", return_value=True):

@@ -204,6 +204,20 @@ class TestMergeToml:
         merged = _merge_toml(cfg, data)
         assert merged.diarization.device == "cpu"
 
+    def test_diarization_device_auto_and_mps_also_accepted(self):
+        cfg = Config()
+        assert _merge_toml(cfg, {"diarization": {"device": "auto"}}).diarization.device == "auto"
+        assert _merge_toml(cfg, {"diarization": {"device": "mps"}}).diarization.device == "mps"
+
+    def test_diarization_device_invalid_value_raises_error(self):
+        # Same convention as cpu_threads: a config typo is a clear load-time error,
+        # never a silent reinterpretation -- the failure mode this project avoids
+        # is a recorded meeting nobody can transcribe.
+        cfg = Config()
+        data = {"diarization": {"device": "gpu"}}
+        with pytest.raises(ValueError, match=r"diarization\.device must be one of"):
+            _merge_toml(cfg, data)
+
     def test_template_from_toml(self):
         cfg = Config()
         data = {"summarization": {"template": "lecture"}}
