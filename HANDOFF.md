@@ -18,8 +18,9 @@ Résumé (détail + chiffres audités : `TODO.md § 2026-08-25`) :
   `native_context_length()` (`8d48cd9`) · garde de contexte Ollama + fix densité CJK
   (`7c39d2f`+`30111b8`) · mic.wav +7,07 dBFS **clos pas-un-bug** (transient physique unique, mix
   ASR déjà clampé — vérifié en relisant le WAV brut).
-- **Process** : 12 commits, chacun TDD+mutation par sa lane puis review indépendante ré-exécutant
-  les preuves AVANT push ; TODO.md audité contre les artefacts disque avant son propre push.
+- **Process** : 12 commits — 9 de code (chacun TDD+mutation par sa lane puis review indépendante
+  ré-exécutant les preuves AVANT push) et 3 de docs (0c49d33 revu par le reviewer indépendant en
+  delta docs-only ; 37adcaa/1da5045 = TODO.md audité contre les artefacts disque avant push).
   Leçons nouvelles (patch.dict/sys.modules, .pyc périmé, côté vérificateur de « valeur ≠
   construction ») : `LESSONS_LEARNED.md § 2026-08-25`.
 
