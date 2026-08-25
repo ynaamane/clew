@@ -90,7 +90,7 @@ class TestOllamaCustomPrompts:
         summarizer = OllamaSummarizer(config, templates)
         summarizer.summarize("Alice: Hello")
 
-        request = httpserver.log[0][0]
+        request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
         body = json.loads(request.data)
         assert body["messages"][0]["content"] == "You are a pirate."
         assert body["messages"][1]["content"] == "Arr! Summarize: Alice: Hello"
@@ -164,7 +164,7 @@ class TestOllamaTemplatePassthrough:
         summarizer = OllamaSummarizer(config)
         summarizer.summarize("Today we discuss photosynthesis.")
 
-        request = httpserver.log[0][0]
+        request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
         body = json.loads(request.data)
         assert body["messages"][0]["content"] == LECTURE_SUMMARY_SYSTEM
         assert "Today we discuss photosynthesis." in body["messages"][1]["content"]
@@ -231,7 +231,7 @@ class TestOllamaGenerateTitle:
 
         assert result == "Q3 Budget Review"
 
-        request = httpserver.log[0][0]
+        request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
         body = json.loads(request.data)
         assert body["messages"][0]["content"] == "You generate short meeting titles."
         assert "Q3 budget" in body["messages"][1]["content"]
@@ -293,6 +293,129 @@ class TestOllamaSummarizer:
 
         summarizer = OllamaSummarizer(config)
         assert summarizer.is_available() is False
+
+
+class TestOllamaContextGuard:
+    """MED item 5 (2026-08-24): Ollama has no local tokenizer, so a long transcript
+    was silently truncated by Ollama's own (usually small) default num_ctx with no
+    warning, unlike llama-cpp's SummarizationContextError. This pins num_ctx to a
+    known context budget and raises before any request when the estimate exceeds it,
+    the same pre-inference guarantee llama_cpp_summarizer.py gives."""
+
+    def test_explicit_context_size_pins_num_ctx_on_the_request(self, httpserver):
+        import json
+
+        response_body = {"message": {"role": "assistant", "content": "## Summary\nOK."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(
+            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=5000
+        )
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        summarizer.summarize("Alice: Hello\nBob: Hi")
+
+        request = httpserver.log[0][0]
+        body = json.loads(request.data)
+        assert body["options"]["num_ctx"] == 5000
+
+    def test_explicit_context_size_too_small_raises_before_any_request(self, httpserver):
+        config = SummarizationConfig(
+            host=httpserver.url_for(""), backend="ollama", model="test-model", context_size=10
+        )
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        long_transcript = "Alice: " + ("hello world " * 200)
+
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize(long_transcript)
+
+        assert len(httpserver.log) == 0
+
+    def test_auto_context_size_queries_show_endpoint_and_pins_num_ctx(self, httpserver):
+        import json
+
+        httpserver.expect_request("/api/show", method="POST").respond_with_json(
+            {"model_info": {"llama.context_length": 4096}}
+        )
+        response_body = {"message": {"role": "assistant", "content": "## Summary\nOK."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        summarizer.summarize("Alice: Hello\nBob: Hi")
+
+        chat_request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
+        body = json.loads(chat_request.data)
+        assert body["options"]["num_ctx"] == 4096
+
+    def test_auto_context_size_prompt_exceeds_model_context_raises_before_chat_request(self, httpserver):
+        httpserver.expect_request("/api/show", method="POST").respond_with_json(
+            {"model_info": {"llama.context_length": 50}}
+        )
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        long_transcript = "Alice: " + ("hello world " * 200)
+
+        with pytest.raises(SummarizationContextError):
+            summarizer.summarize(long_transcript)
+
+        assert not any(r.path == "/api/chat" for r, _ in httpserver.log)
+
+    def test_auto_context_size_show_unavailable_skips_check_and_proceeds(self, httpserver):
+        """No /api/show route registered -- mirrors every pre-existing Ollama test in
+        this file, which never mocked /api/show. The guard must degrade to prior
+        behavior (no pre-flight check, no num_ctx pinned) rather than break them."""
+        import json
+
+        response_body = {"message": {"role": "assistant", "content": "## Summary\nOK."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        result = summarizer.summarize("Alice: Hello\nBob: Hi")
+
+        assert "OK." in result
+        chat_request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
+        body = json.loads(chat_request.data)
+        assert "options" not in body or "num_ctx" not in body.get("options", {})
+
+    def test_auto_context_size_only_queries_show_once_across_multiple_calls(self, httpserver):
+        """The auto-detected context length is memoized per summarizer instance --
+        a model's context window cannot change mid-session, so every summarize/
+        chat/generate_title call re-querying /api/show would be a real added
+        network round-trip for no new information."""
+        httpserver.expect_request("/api/show", method="POST").respond_with_json(
+            {"model_info": {"llama.context_length": 4096}}
+        )
+        response_body = {"message": {"role": "assistant", "content": "## Summary\nOK."}, "done": True}
+        httpserver.expect_request("/api/chat", method="POST").respond_with_json(response_body)
+
+        config = SummarizationConfig(host=httpserver.url_for(""), backend="ollama", model="test-model")
+
+        from clew.summarization.ollama_summarizer import OllamaSummarizer
+
+        summarizer = OllamaSummarizer(config)
+        summarizer.summarize("Alice: Hello")
+        summarizer.chat("system", "user")
+        summarizer.generate_title("A summary.")
+
+        show_requests = [r for r, _ in httpserver.log if r.path == "/api/show"]
+        assert len(show_requests) == 1
 
 
 class TestOpenAIGenerateTitle:
@@ -672,7 +795,7 @@ class TestOllamaLanguageInstruction:
         summarizer = OllamaSummarizer(config)
         summarizer.summarize("Bonjour tout le monde", language="fr")
 
-        request = httpserver.log[0][0]
+        request = next(r for r, _ in httpserver.log if r.path == "/api/chat")
         body = json.loads(request.data)
         assert body["messages"][0]["content"].startswith(MEETING_SUMMARY_SYSTEM)
         assert "French" in body["messages"][0]["content"]

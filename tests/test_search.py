@@ -561,6 +561,10 @@ class TestAskIntegration:
         }
         httpserver.expect_ordered_request("/api/tags", method="GET").respond_with_json({"models": []})
         httpserver.expect_ordered_request("/api/show", method="POST").respond_with_json(show_response)
+        # OllamaSummarizer's own pre-inference context guard (item 5, 2026-08-24) queries
+        # /api/show once more, lazily, on its first chat() call -- search.py's own lookup
+        # above is a separate client/call, not shared with the summarizer's internal cache.
+        httpserver.expect_ordered_request("/api/show", method="POST").respond_with_json(show_response)
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(find_response)
         httpserver.expect_ordered_request("/api/chat", method="POST").respond_with_json(answer_response)
 
