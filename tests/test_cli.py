@@ -904,3 +904,91 @@ class TestSummarizationLogging:
             runner.invoke(cli, ["devices", "--help"])
 
         assert len(logging.getLogger("clew.summarization").handlers) == 1
+
+
+class TestSuggestEnrollmentCommand:
+    """BUILD NEXT #1 tranche 1: a CLI-facing view of the evidence-gated LLM
+    arbiter -- never auto-enrolls. pipeline.py stays untouched (another lane's
+    scope), so this command loads/builds/arbitrates directly rather than
+    delegating to a run_X() there."""
+
+    def test_requires_existing_directory(self):
+        # Must be Click's own clean path validation (exit 2, a usage message) --
+        # not an unhandled FileNotFoundError from inside the command body
+        # bubbling up as a bare traceback (exit 1, empty output).
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(cli, ["suggest-enrollment", "/no/such/directory"])
+        assert result.exit_code == 2
+        assert "does not exist" in result.output
+
+    def test_no_suggestions_reports_clearly(self, tmp_path):
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "No enrollment suggestions" in result.output
+
+    def test_confirmed_suggestion_is_echoed(self, tmp_path):
+        from clew.speakers.enrollment_suggest import Suggestion
+
+        suggestion = Suggestion(
+            cluster="SPEAKER_00", name="Devon", evidence=[mock.Mock(), mock.Mock()], confidence="high"
+        )
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[suggestion]),
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "SPEAKER_00" in result.output
+        assert "Devon" in result.output
+        assert "high" in result.output
+
+    def test_roster_from_config_is_passed_to_build_and_arbiter(self, tmp_path):
+        config = Config()
+        config.speakers.known = ["Kamal", "Yanis"]
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]) as mock_suggest,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert mock_build.call_args[1]["roster"] == ["Kamal", "Yanis"]
+        assert mock_suggest.call_args[1]["roster"] == ["Kamal", "Yanis"]
+
+    def test_never_calls_any_enroll_or_unenroll_function(self, tmp_path):
+        # Never-auto-enroll invariant, verified structurally rather than trusted:
+        # patch the real enrollment write paths and assert they are untouched.
+        from clew.speakers.enrollment_suggest import Suggestion
+
+        suggestion = Suggestion(cluster="SPEAKER_00", name="Devon", evidence=[], confidence="high")
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[suggestion]),
+            mock.patch("clew.pipeline.run_enroll") as mock_enroll,
+        ):
+            runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        mock_enroll.assert_not_called()

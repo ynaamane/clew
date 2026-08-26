@@ -503,6 +503,35 @@ def list_speakers() -> None:
     run_list_enrolled()
 
 
+@cli.command("suggest-enrollment")
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.pass_context
+def suggest_enrollment_cmd(ctx: click.Context, directory: str) -> None:
+    """Suggest speaker-name enrollments for a meeting, from deterministic evidence
+    arbitrated by the local LLM -- gated at >=2 independent evidences, never
+    auto-enrolls. Confirm any suggestion with `clew enroll`."""
+    config = ctx.obj["config"]
+    from pathlib import Path
+
+    from clew.speakers.enrollment_suggest import build_evidence_table, load_transcript_result, suggest_enrollments
+    from clew.summarization import create_summarizer
+
+    transcript = load_transcript_result(Path(directory))
+    table = build_evidence_table(transcript, roster=config.speakers.known)
+    with create_summarizer(config) as summarizer:
+        suggestions = suggest_enrollments(table, summarizer, roster=config.speakers.known)
+
+    if not suggestions:
+        click.echo("No enrollment suggestions (insufficient independent evidence).")
+        return
+
+    for suggestion in suggestions:
+        click.echo(
+            f"{suggestion.cluster} -> {suggestion.name}  "
+            f"(confidence: {suggestion.confidence}, evidence: {len(suggestion.evidence)})"
+        )
+
+
 @cli.command()
 def apps() -> None:
     """List running apps with PIDs for use with --pid."""
