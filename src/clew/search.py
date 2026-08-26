@@ -96,9 +96,6 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
                 answer, skipped_transcripts = _answer_from_transcripts(summarizer, question, relevant, context_size)
                 answer = _verify_quotes(answer, _load_transcripts(relevant))
         except SummarizationContextError as exc:
-            # The exception's own message already states the estimated size vs the
-            # configured limit and suggests raising context_size -- same pattern as
-            # pipeline.py's run_summarize()/run_pipeline() for this exact exception.
             click.echo(f"Error: {exc}", err=True)
             raise SystemExit(1) from None
 
