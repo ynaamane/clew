@@ -15,7 +15,7 @@ boundary downweighting (first/last segments) is applied here.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 from clew.transcription.models import TranscriptResult
@@ -35,12 +35,14 @@ class Evidence:
     speaker_cluster: the cluster this evidence supports as BEING `name` (positive).
     excluded_cluster: the cluster this evidence proves is NOT `name` (negative --
     a vocative's own speaker can't be who they're addressing).
+    name is None for evidence that has no resolved name (mic_presence in this
+    tranche) -- never a fabricated placeholder string, absence must stay absence.
     location is (start, end) in seconds, never transcript text -- the table is not
     a place to retain quoted content.
     """
 
     kind: EvidenceKind
-    name: str
+    name: str | None
     speaker_cluster: str | None
     excluded_cluster: str | None
     start: float
@@ -163,3 +165,116 @@ def extract_vocative_evidence(transcript: TranscriptResult) -> list[Evidence]:
                 )
             )
     return evidence
+
+
+def _mentions_name(text: str, name: str) -> bool:
+    return re.search(rf"\b{re.escape(name)}\b", text, re.IGNORECASE) is not None
+
+
+def extract_third_person_absent_evidence(
+    transcript: TranscriptResult,
+    roster: list[str],
+    self_intro_evidence: list[Evidence] | None = None,
+    vocative_evidence: list[Evidence] | None = None,
+) -> list[Evidence]:
+    """A roster name that is only ever talked ABOUT -- never self-identified, never
+    addressed directly -- is evidence that person is not in the room. Scoped to the
+    roster on purpose: without a candidate name to look for, "is this capitalized
+    word a name" has no structural answer (tranche-1 simplification).
+
+    self_intro_evidence/vocative_evidence let a caller building the full table
+    (build_evidence_table) reuse its own extraction pass instead of re-running it,
+    so third-person-absence stays consistent with the self-intro/vocative view of
+    the SAME transcript rather than silently drifting from it.
+    """
+    if self_intro_evidence is None:
+        self_intro_evidence = extract_self_intro_evidence(transcript)
+    if vocative_evidence is None:
+        vocative_evidence = extract_vocative_evidence(transcript)
+
+    self_intro_names = {e.name.lower() for e in self_intro_evidence if e.name is not None}
+    vocative_names = {e.name.lower() for e in vocative_evidence if e.name is not None}
+
+    evidence: list[Evidence] = []
+    for name in roster:
+        key = name.lower()
+        if key in self_intro_names or key in vocative_names:
+            continue
+        for seg in transcript.segments:
+            if _mentions_name(seg.text, name):
+                evidence.append(
+                    Evidence(
+                        kind=EvidenceKind.THIRD_PERSON_ABSENT,
+                        name=name,
+                        speaker_cluster=None,
+                        excluded_cluster=None,
+                        start=seg.start,
+                        end=seg.end,
+                        weight=_BASE_WEIGHT,
+                    )
+                )
+    return evidence
+
+
+_MIC_TRACK_SPEAKER = "Owner"
+
+
+def extract_mic_presence_evidence(transcript: TranscriptResult) -> list[Evidence]:
+    """Structural-only for this tranche: the dual-track pipeline already tags the
+    mic track's speaker as "Owner" (pipeline.py:_tag_speaker) whenever it carries
+    real content, which is a free physical-presence signal. It resolves no NAME --
+    config has no Owner-to-name mapping today, and the real cosine mic<->cluster
+    signal belongs to matching.py (tranche 2, after VoiceprintDB multi-sample
+    lands there). Never fabricate a name binding this tranche can't support."""
+    evidence: list[Evidence] = []
+    for seg in transcript.segments:
+        if seg.speaker == _MIC_TRACK_SPEAKER and seg.text.strip():
+            evidence.append(
+                Evidence(
+                    kind=EvidenceKind.MIC_PRESENCE,
+                    name=None,
+                    speaker_cluster=_MIC_TRACK_SPEAKER,
+                    excluded_cluster=None,
+                    start=seg.start,
+                    end=seg.end,
+                    weight=_BASE_WEIGHT,
+                )
+            )
+    return evidence
+
+
+# Both empirically-motivated by the design's own finding (TODO.md, 2026-08-03 call):
+# the two contradictory identity clues in that meeting were the literal first and
+# last lines of the recording, where diarization mis-attributes most. N=1-calibrated
+# like the hallucination list/RMS threshold elsewhere in this repo -- revisit as more
+# meetings accumulate. Overlap-ZONE downweighting is separate and NOT implemented
+# here; see the module docstring.
+_BOUNDARY_FRACTION = 0.05
+_BOUNDARY_DOWNWEIGHT = 0.5
+
+
+def _boundary_weight(start: float, end: float, duration: float, base_weight: float) -> float:
+    if duration <= 0:
+        return base_weight
+    midpoint = (start + end) / 2
+    if midpoint <= duration * _BOUNDARY_FRACTION or midpoint >= duration * (1 - _BOUNDARY_FRACTION):
+        return base_weight * _BOUNDARY_DOWNWEIGHT
+    return base_weight
+
+
+def build_evidence_table(transcript: TranscriptResult, roster: list[str]) -> EvidenceTable:
+    """Run every deterministic extractor over one transcript and combine the
+    results into a single, boundary-downweighted table -- the only input the LLM
+    arbiter (tranche 1's next commit) ever sees."""
+    self_intro = extract_self_intro_evidence(transcript)
+    vocative = extract_vocative_evidence(transcript)
+    third_person_absent = extract_third_person_absent_evidence(
+        transcript, roster, self_intro_evidence=self_intro, vocative_evidence=vocative
+    )
+    mic_presence = extract_mic_presence_evidence(transcript)
+
+    all_evidence = [
+        replace(e, weight=_boundary_weight(e.start, e.end, transcript.duration, e.weight))
+        for e in (*self_intro, *vocative, *third_person_absent, *mic_presence)
+    ]
+    return EvidenceTable(evidence=all_evidence)

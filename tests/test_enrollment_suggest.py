@@ -10,7 +10,10 @@ from clew.speakers.enrollment_suggest import (
     Evidence,
     EvidenceKind,
     EvidenceTable,
+    build_evidence_table,
+    extract_mic_presence_evidence,
     extract_self_intro_evidence,
+    extract_third_person_absent_evidence,
     extract_vocative_evidence,
 )
 from clew.transcription.models import Segment, TranscriptResult
@@ -148,3 +151,161 @@ class TestExtractVocativeEvidence:
         result = TranscriptResult(segments=[_segment("Merci Kamal pour la review.", "SPEAKER_00")])
         evidence = extract_vocative_evidence(result)
         assert all(e.speaker_cluster is None for e in evidence)
+
+
+class TestExtractThirdPersonAbsentEvidence:
+    def test_roster_name_mentioned_only_in_third_person_is_absent(self):
+        result = TranscriptResult(
+            segments=[_segment("Kamal a dit qu'il fallait revoir le design la semaine derniere.", "SPEAKER_00")]
+        )
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert len(evidence) == 1
+        assert evidence[0].kind == EvidenceKind.THIRD_PERSON_ABSENT
+        assert evidence[0].name == "Kamal"
+        assert evidence[0].speaker_cluster is None
+        assert evidence[0].excluded_cluster is None
+
+    def test_roster_name_with_self_intro_is_not_absent(self):
+        result = TranscriptResult(
+            segments=[
+                _segment("Moi c'est Kamal.", "SPEAKER_00", start=0.0, end=1.0),
+                _segment("Kamal a dit qu'on devrait reessayer.", "SPEAKER_01", start=1.0, end=2.0),
+            ]
+        )
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert evidence == []
+
+    def test_roster_name_addressed_vocatively_is_not_absent(self):
+        result = TranscriptResult(
+            segments=[
+                _segment("Merci Kamal pour la review.", "SPEAKER_00", start=0.0, end=1.0),
+                _segment("Kamal a dit qu'on devrait reessayer.", "SPEAKER_01", start=1.0, end=2.0),
+            ]
+        )
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert evidence == []
+
+    def test_name_never_mentioned_produces_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("We should ship this by Friday.", "SPEAKER_00")])
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert evidence == []
+
+    def test_only_roster_names_are_evaluated(self):
+        result = TranscriptResult(segments=[_segment("Jean a dit qu'il serait en retard.", "SPEAKER_00")])
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert evidence == []
+
+    def test_word_boundary_prevents_partial_name_match(self):
+        result = TranscriptResult(segments=[_segment("Samuel a valide le design hier.", "SPEAKER_00")])
+        evidence = extract_third_person_absent_evidence(result, roster=["Sam"])
+        assert evidence == []
+
+    def test_each_bare_mention_is_its_own_evidence_row(self):
+        result = TranscriptResult(
+            segments=[
+                _segment("Kamal a valide le design.", "SPEAKER_00", start=0.0, end=1.0),
+                _segment("Ouais Kamal etait d'accord.", "SPEAKER_01", start=1.0, end=2.0),
+            ]
+        )
+        evidence = extract_third_person_absent_evidence(result, roster=["Kamal"])
+        assert len(evidence) == 2
+
+    def test_can_reuse_precomputed_self_intro_and_vocative_evidence(self):
+        result = TranscriptResult(
+            segments=[
+                _segment("Moi c'est Kamal.", "SPEAKER_00", start=0.0, end=1.0),
+                _segment("Kamal a dit qu'on devrait reessayer.", "SPEAKER_01", start=1.0, end=2.0),
+            ]
+        )
+        self_intro = extract_self_intro_evidence(result)
+        vocative = extract_vocative_evidence(result)
+        evidence = extract_third_person_absent_evidence(
+            result, roster=["Kamal"], self_intro_evidence=self_intro, vocative_evidence=vocative
+        )
+        assert evidence == []
+
+
+class TestExtractMicPresenceEvidence:
+    def test_owner_segment_with_content_yields_presence_evidence(self):
+        result = TranscriptResult(segments=[_segment("On peut commencer.", "Owner", start=0.0, end=2.0)])
+        evidence = extract_mic_presence_evidence(result)
+        assert len(evidence) == 1
+        assert evidence[0].kind == EvidenceKind.MIC_PRESENCE
+        assert evidence[0].speaker_cluster == "Owner"
+
+    def test_mic_presence_never_resolves_a_name(self):
+        result = TranscriptResult(segments=[_segment("On peut commencer.", "Owner")])
+        evidence = extract_mic_presence_evidence(result)
+        assert all(e.name is None for e in evidence)
+
+    def test_owner_segment_with_blank_text_yields_nothing(self):
+        result = TranscriptResult(segments=[_segment("   ", "Owner")])
+        assert extract_mic_presence_evidence(result) == []
+
+    def test_non_owner_segment_yields_nothing(self):
+        result = TranscriptResult(segments=[_segment("On peut commencer.", "SPEAKER_00")])
+        assert extract_mic_presence_evidence(result) == []
+
+
+class TestBuildEvidenceTable:
+    def test_combines_all_evidence_kinds(self):
+        result = TranscriptResult(
+            segments=[
+                _segment("Moi c'est Devon.", "SPEAKER_00", start=10.0, end=12.0),
+                _segment("Merci Kamal pour la review.", "SPEAKER_01", start=12.0, end=14.0),
+                _segment("Marcus a dit qu'il validait.", "SPEAKER_00", start=14.0, end=16.0),
+                _segment("On y va.", "Owner", start=16.0, end=17.0),
+            ],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=["Marcus"])
+        kinds = {e.kind for e in table.evidence}
+        assert kinds == {
+            EvidenceKind.SELF_INTRO,
+            EvidenceKind.VOCATIVE,
+            EvidenceKind.THIRD_PERSON_ABSENT,
+            EvidenceKind.MIC_PRESENCE,
+        }
+
+    def test_third_person_absence_reflects_the_same_build(self):
+        # Marcus self-intros AND is mentioned in third person in the same transcript --
+        # the orchestrator must wire the same extraction results together, not run
+        # third-person-absence independently against a fresh (inconsistent) view.
+        result = TranscriptResult(
+            segments=[
+                _segment("Moi c'est Marcus.", "SPEAKER_00", start=10.0, end=12.0),
+                _segment("Marcus a valide le design.", "SPEAKER_01", start=12.0, end=14.0),
+            ],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=["Marcus"])
+        assert not any(e.kind == EvidenceKind.THIRD_PERSON_ABSENT for e in table.evidence)
+
+    def test_evidence_near_recording_start_is_downweighted(self):
+        result = TranscriptResult(
+            segments=[_segment("Moi c'est Devon.", "SPEAKER_00", start=0.0, end=1.0)],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=[])
+        assert table.evidence[0].weight < 1.0
+
+    def test_evidence_near_recording_end_is_downweighted(self):
+        result = TranscriptResult(
+            segments=[_segment("Moi c'est Devon.", "SPEAKER_00", start=98.0, end=99.0)],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=[])
+        assert table.evidence[0].weight < 1.0
+
+    def test_evidence_mid_recording_is_not_downweighted(self):
+        result = TranscriptResult(
+            segments=[_segment("Moi c'est Devon.", "SPEAKER_00", start=49.0, end=51.0)],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=[])
+        assert table.evidence[0].weight == 1.0
+
+    def test_zero_duration_transcript_skips_downweighting(self):
+        result = TranscriptResult(segments=[_segment("Moi c'est Devon.", "SPEAKER_00", start=0.0, end=1.0)])
+        table = build_evidence_table(result, roster=[])
+        assert table.evidence[0].weight == 1.0
