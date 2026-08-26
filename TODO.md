@@ -1,5 +1,31 @@
 # TODO — meeting-scribe
 
+## 2026-08-26 — session team : BUILD NEXT #1 (tranche 1) + #2 livrés, lot finitions, doute SIGTRAP tranché
+
+**Livré et poussé** (`3c25062..c8f28ca`, 15 commits — chaque livraison : TDD+mutation par sa lane,
+review indépendante ré-exécutant les preuves AVANT push ; 2 findings de review corrigés en route) :
+- **Multi-sample VoiceprintDB** (`1c6244c` + sim `48f3680`) : `upsert` AJOUTE un échantillon au lieu
+  d'écraser, matching au CENTROÏDE — choix mesuré par simulation calibrée sur le croisement réel
+  0,637 (MAX : 40,5 % de faux positifs avec 1 échantillon contaminé ; centroïde : 0 %), seeds fixés,
+  script persisté dans `scripts/`. Rétro-compat : ancien format lu, réécrit au save ; côté Swift
+  insensible (décodeur name-only, vérifié). **Ré-enrôler les 3 voix atterrit maintenant dans le
+  store robuste.** Follow-up tracké : re-check de la calibration sur vraies empreintes.
+- **Auto-suggest enrollment, tranche 1** (`8cc19d6`→`7a74942` + fix `c8f28ca`) : module
+  `speakers/enrollment_suggest.py` — extraction structurelle FR/EN (self-intro, vocatif-EXCLUSION,
+  3e-personne-absent, présence-mic), table d'évidences SANS texte de transcript, hard gate ≥2
+  évidences indépendantes en Python pur, arbitre LLM sur la table seule + re-vérification
+  anti-hallucination, roster `[speakers] known`, CLI `clew suggest-enrollment` (n'enrôle jamais).
+  Review : un défaut regex confirmé et fixé (`re.IGNORECASE` global désactivait la garde de
+  capitalisation — « Merci pour » capturait "pour" ; + stopwords Moi/Bonjour/Sorry). RESTE pour la
+  tranche 2 : cosine mic↔cluster via le store multi-sample, confirmation un-clic DANS L'APP,
+  downweight overlap (lié à BUILD NEXT #5).
+- **Lot finitions** (`c29e316`, `0a0e38d`, `43925d6`, `2195597`, `f0bd53e`) : `clew ask` rend une
+  erreur propre + exit non-zéro sur dépassement de contexte (les autres exceptions non avalées) ·
+  le n_ctx choisi est visible en CLI (logger scopé, propagate=False) · min/max_speakers documentés ·
+  **doute SIGTRAP TRANCHÉ : bug réel mais dans le code de TEST** (XCTAssertEqual non-fatal + index
+  non gardé → crash process-killing ; production tracée saine ; fixé par XCTUnwrap, vérifié dans
+  les deux directions).
+
 ## 2026-08-25 — session team : plan BMAD exécuté, diarisation 29,5× via MPS, 5 bugs de la liste traités
 
 **Livré et poussé** (chaque commit : TDD, mutation-check, review indépendante qui ré-exécute les
@@ -42,13 +68,12 @@ item (4) sweep threads : idem, ne vaut que si un jour MPS régresse.
   ré-enrôlées par Yanis (multi-sample store livré `1c6244c`).
 
 **Nouveaux items de triage (2026-08-25) :**
-- **INFO** — `clew ask` : `SummarizationContextError` remonte en traceback brute (aucun
-  `try/except` dans search.py/cli.py) — la troncature est bien empêchée, le message d'échec est
-  inélégant. Pré-existant.
+- ~~**INFO** — `clew ask` : traceback brute sur `SummarizationContextError`~~ **DONE 2026-08-26**
+  (`c29e316` — message propre + exit non-zéro, autres exceptions non avalées).
 - **INFO** — garde Ollama : l'estimation reste une heuristique (chars/4, chars/1.5 si >30 %
   non-ASCII) — resserre le trou CJK sans le fermer exactement (pas de tokenizer local Ollama).
-- **INFO** — docs/configuration.md : `min_speakers`/`max_speakers` non documentés (dérive
-  pré-existante signalée par la lane).
+- ~~**INFO** — docs/configuration.md : `min_speakers`/`max_speakers` non documentés~~
+  **DONE 2026-08-26** (`43925d6`).
 - **INFO** — piège pytest : `mock.patch.dict("sys.modules", ...)` snapshot/restore TOUT le dict —
   un module importé pour la 1ʳᵉ fois DANS le bloc est effacé après, et casse des tests torch
   plusieurs crans plus loin. Parade : importer le module au-dessus du patch (corrigé dans
@@ -108,9 +133,9 @@ tient ; étendre le gate de cellules centroïdes avant de le lancer ; (2) spike 
 5. ~~**MED** — backend Ollama : même trou de contexte~~ **DONE 2026-08-25** (`7c39d2f` + `30111b8`,
    reviewed+pushed — garde pré-requête heuristique + densité non-ASCII, `num_ctx` épinglé ;
    reste heuristique, voir INFO du 25/08).
-6. **DOUTE** — SIGTRAP 3/3 (`ContiguousArrayBuffer Index out of range`) sous mutation extrême
-   « tout bullet est placeholder », 0/5 ailleurs — possible bug latent de bornes dans la suite Swift,
-   repro exacte dans le rapport swift-fix du 24/08.
+6. ~~**DOUTE** — SIGTRAP 3/3 sous mutation extrême~~ **TRANCHÉ 2026-08-26** (`2195597` — bug réel
+   mais TEST-only : index non gardé après un XCTAssertEqual non-fatal ; production saine, fixé
+   par XCTUnwrap, repro rejouée par la review contre le parent).
 7. **LOW** — `SummaryDocument.init(json:)` n'applique pas le filtre none-family (chemin non alimenté
    aujourd'hui — latent si branché).
 8. **LOW** — `actionItemsPlaceholder` retombe sur la première ligne non-bulletée si tous les bullets
@@ -121,7 +146,7 @@ tient ; étendre le gate de cellules centroïdes avant de le lancer ; (2) spike 
     étendre sur repros réels.
 11. **LOW** — la génération de TITRE ne reçoit pas d'instruction de langue (hérite implicitement de la
     langue du résumé) — question de périmètre produit.
-12. **INFO** — le n_ctx choisi n'est pas observable en sortie CLI (logger sans handler) — le journaliser.
+12. ~~**INFO** — le n_ctx choisi n'est pas observable en sortie CLI~~ **DONE 2026-08-26** (`0a0e38d`).
 13. **INFO** — fait d'environnement : les tâches Bash de fond du harness Claude meurent à ~60 min
     (groupe de processus entier, sans marqueur) — tout job >1 h passe par nohup+disown détaché,
     marqueurs DONE/FAILED sur disque.
@@ -156,16 +181,20 @@ design being rejected again on sight.
 Ordered by value; items share no files except 1↔2 (both touch the speakers path). Full designs
 for 1, 2, 5 live in the enrollment/overlap paragraphs below — read them before building.
 
-1. **Wire "Enrôler…" → the auto-suggest enrollment flow** (today it is a placeholder filter:
-   `LibraryFilter.apply` treats `.enroll` like `.all`). Design is user-validated: deterministic
-   vocative/self-intro extraction → hard rules (vocative EXCLUDES its speaker; boundary +
-   overlap downweight; 3rd-person-only = absent; mic-presence signal) → local-LLM arbiter over
-   the evidence TABLE (shipped llama.cpp first, Qwen-32B via Ollama only if the eval demands) →
-   gate ≥2 independent evidences → one-click user confirmation IN THE APP, never auto. Roster
-   `[speakers] known = [...]` in config doubles as ASR-name-correction vocabulary.
-2. **Multi-sample `VoiceprintDB`** — `upsert` currently overwrites; store N samples per name,
-   match against max/centroid. Empirical driver: Kamal-print vs a Devon segment = 0.637, only
-   0.013 under the 0.65 threshold (argmax saves it today; one contaminated sample could not).
+1. **Wire "Enrôler…" → the auto-suggest enrollment flow** — **TRANCHE 1 DONE 2026-08-26**
+   (`8cc19d6`→`7a74942`+`c8f28ca`, reviewed+pushed): the whole suggestion BACKEND + CLI
+   `clew suggest-enrollment` ships (extraction → evidence table → hard gate ≥2 → LLM arbiter,
+   never auto-enrolls). **Still open (tranche 2)**: the one-click confirmation IN THE APP
+   (`LibraryFilter.apply` still treats `.enroll` like `.all`), mic↔cluster cosine via the
+   multi-sample store, overlap downweight (needs #5). Original design (user-validated):
+   deterministic vocative/self-intro extraction → hard rules (vocative EXCLUDES its speaker;
+   boundary + overlap downweight; 3rd-person-only = absent; mic-presence signal) → local-LLM
+   arbiter over the evidence TABLE → gate ≥2 independent evidences → one-click confirmation,
+   never auto. Roster `[speakers] known = [...]` doubles as ASR-name-correction vocabulary.
+2. ~~**Multi-sample `VoiceprintDB`**~~ **DONE 2026-08-26** (`1c6244c`+`48f3680`, reviewed+pushed —
+   append semantics, CENTROID matching chosen by calibrated simulation: MAX = 40.5% false
+   positives with one contaminated sample, centroid = 0%; the empirical driver was Kamal-print
+   vs a Devon segment = 0.637, 0.013 under the 0.65 threshold. Real-data recheck tracked above).
 3. ~~**Action-badge lie**~~ **DONE 2026-08-24** (`0e839b9`, reviewed+pushed — exact-match
    none-family filter in `SummaryDocument.bullets()`, both directions tested at parser AND
    `MeetingCounts.compute()` level; bonus `stripBulletMarker` fix on the placeholder display).
