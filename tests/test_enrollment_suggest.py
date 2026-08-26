@@ -209,6 +209,51 @@ class TestExtractVocativeEvidence:
         evidence = extract_vocative_evidence(result)
         assert all(e.speaker_cluster is None for e in evidence)
 
+    # Reviewer's 6 adversarial entries (review-bm2): the anchor pattern's compiled
+    # re.IGNORECASE flag is global to the WHOLE pattern, so it also case-folds
+    # _NAME_TOKEN's [A-ZÀ-Ý] requirement, the group's only structural guard -- any
+    # lowercase word right after "merci"/"thanks"/"thank you" was captured as a
+    # name. Separately, the leading-comma structural pattern has no lexicon for
+    # common capitalized sentence-openers other than the anchor words themselves.
+    def test_merci_pour_without_a_name_yields_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("Merci pour votre aide.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_merci_beaucoup_yields_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("Merci beaucoup.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_merci_comma_cest_note_yields_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("Merci, c'est noté.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_sorry_at_segment_start_yields_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("Sorry, I am late.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_moi_cest_yields_no_vocative_evidence(self):
+        # The self-intro canonical phrasing ("Moi, c'est Priya") must never ALSO
+        # register as a vocative addressing "Moi".
+        result = TranscriptResult(segments=[_segment("Moi, c'est Priya.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_bonjour_at_segment_start_yields_no_evidence(self):
+        result = TranscriptResult(segments=[_segment("Bonjour, tout le monde.", "SPEAKER_00")])
+        assert extract_vocative_evidence(result) == []
+
+    def test_merci_kamal_still_captured_after_the_ignorecase_fix(self):
+        # Regression guard for the fix above: the real positive case must still work.
+        result = TranscriptResult(segments=[_segment("Merci Kamal pour la review.", "SPEAKER_00")])
+        evidence = extract_vocative_evidence(result)
+        assert [e.name for e in evidence] == ["Kamal"]
+
+    def test_lowercase_anchor_word_still_matches(self):
+        # The anchor-case-insensitivity itself must survive the IGNORECASE removal
+        # -- only the NAME group's case-sensitivity was the bug.
+        result = TranscriptResult(segments=[_segment("merci Kamal pour la review.", "SPEAKER_00")])
+        evidence = extract_vocative_evidence(result)
+        assert [e.name for e in evidence] == ["Kamal"]
+
 
 class TestExtractThirdPersonAbsentEvidence:
     def test_roster_name_mentioned_only_in_third_person_is_absent(self):

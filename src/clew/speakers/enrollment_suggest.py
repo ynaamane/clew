@@ -5,11 +5,22 @@ extracts self-introductions and vocatives from a diarized TranscriptResult into 
 structured, inspectable Evidence table, then arbitrates cluster<->name suggestions
 over that table (never over raw transcript text). Never auto-enrolls.
 
-Known limitation, deliberate for this tranche: downweighting evidence inside
-pyannote overlap zones is NOT implemented -- Segment carries no overlap data today.
-That is BUILD NEXT #5 (surface pyannote overlap as "chevauchement"); revisit this
-module once overlap regions are threaded into TranscriptResult. Only recording-
-boundary downweighting (first/last segments) is applied here.
+Three things this tranche deliberately does NOT do, each with its own reason:
+(1) downweighting evidence inside pyannote overlap zones is NOT implemented --
+Segment carries no overlap data today; that is BUILD NEXT #5 (surface pyannote
+overlap as "chevauchement"), revisit once overlap regions are threaded into
+TranscriptResult -- only recording-boundary downweighting (first/last segments)
+is applied here. (2) mic_presence resolves no NAME -- the real cosine
+mic<->cluster identity signal belongs to matching.py (tranche 2, after
+VoiceprintDB multi-sample lands there), see extract_mic_presence_evidence.
+(3) a vocative's addressee is never promoted to POSITIVE evidence from a
+turn-taking "who responds next" heuristic, even though it is a real, weaker
+signal the design names ("responses only SUGGEST") -- deferred because it is
+fragile without corroboration (the design's own caution: the obvious first read
+of who answers a vocative was wrong in the one labeled real case so far) and the
+itemized spec for this tranche only requires vocative-as-exclusion, not
+vocative-as-suggestion. If it comes back, it needs its own measurement, not a
+guess.
 """
 
 from __future__ import annotations
@@ -123,17 +134,41 @@ def extract_self_intro_evidence(transcript: TranscriptResult) -> list[Evidence]:
 
 
 _VOCATIVE_ANCHOR_PATTERNS = [
-    re.compile(rf"\b(?:merci|thanks|thank\s+you),?\s+(?P<name>{_NAME_TOKEN})\b", re.IGNORECASE),
+    # Case-insensitivity is spelled out per-letter in the alternation rather than
+    # via re.IGNORECASE (review-bm2 finding, medium): that flag is global to the
+    # WHOLE compiled pattern, so it also case-folded _NAME_TOKEN's [A-ZÀ-Ý] --
+    # the name group's only structural guard -- letting "Merci pour"/"Merci
+    # beaucoup"/"Merci, c'est noté" capture "pour"/"beaucoup"/"c'est" as names.
+    re.compile(rf"\b(?:[Mm]erci|[Tt]hanks|[Tt]hank\s+[Yy]ou),?\s+(?P<name>{_NAME_TOKEN})\b"),
 ]
 _VOCATIVE_LEADING_PATTERN = re.compile(rf"^(?P<name>{_NAME_TOKEN}),\s")
 _VOCATIVE_TRAILING_PATTERN = re.compile(rf",\s+(?P<name>{_NAME_TOKEN})[.!?]?\s*$")
 
 # The leading/trailing structural patterns key off "capitalized token next to a
-# comma" alone, so the anchor interjections themselves (sentence-initial "Thanks,"
-# or "Merci,") get caught as false name candidates -- excluded here rather than
-# relying on the anchor patterns to consume them first, since match order isn't set.
+# comma" alone, so common capitalized sentence-openers -- the anchor interjections
+# themselves ("Thanks,", "Merci,") and other frequent ones (greetings, the
+# self-intro subject "Moi,") -- get caught as false name candidates. Excluded
+# here rather than relying on the anchor patterns to consume them first, since
+# match order isn't set.
 _VOCATIVE_STOPWORDS = frozenset(
-    {"merci", "thanks", "thank", "ok", "okay", "so", "well", "alors", "donc", "bref", "voila", "voilà", "bon"}
+    {
+        "merci",
+        "thanks",
+        "thank",
+        "ok",
+        "okay",
+        "so",
+        "well",
+        "alors",
+        "donc",
+        "bref",
+        "voila",
+        "voilà",
+        "bon",
+        "moi",
+        "bonjour",
+        "sorry",
+    }
 )
 
 
