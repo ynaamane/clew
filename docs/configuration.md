@@ -133,6 +133,8 @@ max_tokens_per_segment = 200
 [diarization]
 enabled = false
 hf_token = ""             # HuggingFace token for pyannote
+min_speakers = 0          # 0 = auto-detect; only passed to pyannote when > 0
+max_speakers = 0          # 0 = auto-detect; only passed to pyannote when > 0
 telemetry = false         # allow HuggingFace Hub + pyannote metrics telemetry
 device = "auto"           # "auto" (MPS if available, else CPU), "cpu", or "mps"
 
