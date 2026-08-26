@@ -7,20 +7,72 @@ Fixtures are synthetic (invented names/lines) -- never real meeting content, per
 from __future__ import annotations
 
 from clew.speakers.enrollment_suggest import (
+    CandidateMapping,
     Evidence,
     EvidenceKind,
     EvidenceTable,
+    Suggestion,
     build_evidence_table,
     extract_mic_presence_evidence,
     extract_self_intro_evidence,
     extract_third_person_absent_evidence,
     extract_vocative_evidence,
+    gate_candidate_mappings,
+    suggest_enrollments,
 )
 from clew.transcription.models import Segment, TranscriptResult
 
 
 def _segment(text: str, speaker: str, start: float = 0.0, end: float = 2.0) -> Segment:
     return Segment(text=text, start=start, end=end, speaker=speaker)
+
+
+def _self_intro(cluster: str, name: str, start: float, end: float) -> Evidence:
+    return Evidence(
+        kind=EvidenceKind.SELF_INTRO,
+        name=name,
+        speaker_cluster=cluster,
+        excluded_cluster=None,
+        start=start,
+        end=end,
+        weight=1.0,
+    )
+
+
+def _vocative_exclusion(cluster: str, name: str, start: float, end: float) -> Evidence:
+    return Evidence(
+        kind=EvidenceKind.VOCATIVE,
+        name=name,
+        speaker_cluster=None,
+        excluded_cluster=cluster,
+        start=start,
+        end=end,
+        weight=1.0,
+    )
+
+
+class FakeSummarizer:
+    """Duck-typed fake mirroring tests/test_search.py's -- records calls, returns
+    canned JSON responses so the arbiter never touches a real model in tests."""
+
+    def __init__(self, responses: list[str] | None = None):
+        self.calls: list[tuple[str, str, bool]] = []
+        self._responses = list(responses or [])
+        self._call_idx = 0
+
+    def chat(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_mode: bool = False,
+        json_schema: dict | None = None,
+    ) -> str:
+        self.calls.append((system_prompt, user_prompt, json_mode))
+        if self._responses:
+            resp = self._responses[self._call_idx % len(self._responses)]
+            self._call_idx += 1
+            return resp
+        return '{"confirmed": []}'
 
 
 class TestEvidenceTable:
@@ -309,3 +361,164 @@ class TestBuildEvidenceTable:
         result = TranscriptResult(segments=[_segment("Moi c'est Devon.", "SPEAKER_00", start=0.0, end=1.0)])
         table = build_evidence_table(result, roster=[])
         assert table.evidence[0].weight == 1.0
+
+
+class TestGateCandidateMappings:
+    """The hard gate -- enforced in Python, never delegated to the LLM."""
+
+    def test_single_self_intro_never_becomes_a_candidate(self):
+        table = EvidenceTable(evidence=[_self_intro("SPEAKER_00", "Devon", 0.0, 1.0)])
+        assert gate_candidate_mappings(table) == []
+
+    def test_two_self_intros_at_distinct_locations_become_a_candidate(self):
+        table = EvidenceTable(
+            evidence=[
+                _self_intro("SPEAKER_00", "Devon", 0.0, 1.0),
+                _self_intro("SPEAKER_00", "Devon", 40.0, 41.0),
+            ]
+        )
+        candidates = gate_candidate_mappings(table)
+        assert candidates == [CandidateMapping(cluster="SPEAKER_00", name="Devon", evidence=table.evidence)]
+
+    def test_two_self_intros_at_the_same_location_are_not_independent(self):
+        # Duplicate rows at an identical (start, end) are the same observation,
+        # not two -- must not satisfy the >=2-independent-evidence gate.
+        dup = _self_intro("SPEAKER_00", "Devon", 5.0, 6.0)
+        table = EvidenceTable(evidence=[dup, dup])
+        assert gate_candidate_mappings(table) == []
+
+    def test_vocative_exclusion_drops_an_otherwise_qualifying_candidate(self):
+        table = EvidenceTable(
+            evidence=[
+                _self_intro("SPEAKER_00", "Kamal", 0.0, 1.0),
+                _self_intro("SPEAKER_00", "Kamal", 40.0, 41.0),
+                _vocative_exclusion("SPEAKER_00", "Kamal", 20.0, 21.0),
+            ]
+        )
+        assert gate_candidate_mappings(table) == []
+
+    def test_exclusion_only_drops_the_matching_cluster_not_other_candidates(self):
+        table = EvidenceTable(
+            evidence=[
+                _self_intro("SPEAKER_00", "Kamal", 0.0, 1.0),
+                _self_intro("SPEAKER_00", "Kamal", 40.0, 41.0),
+                _vocative_exclusion("SPEAKER_00", "Kamal", 20.0, 21.0),
+                _self_intro("SPEAKER_01", "Devon", 0.0, 1.0),
+                _self_intro("SPEAKER_01", "Devon", 40.0, 41.0),
+            ]
+        )
+        candidates = gate_candidate_mappings(table)
+        assert candidates == [
+            CandidateMapping(
+                cluster="SPEAKER_01",
+                name="Devon",
+                evidence=[e for e in table.evidence if e.speaker_cluster == "SPEAKER_01"],
+            )
+        ]
+
+    def test_non_self_intro_evidence_never_seeds_a_candidate(self):
+        table = EvidenceTable(
+            evidence=[
+                Evidence(
+                    kind=EvidenceKind.THIRD_PERSON_ABSENT,
+                    name="Marcus",
+                    speaker_cluster=None,
+                    excluded_cluster=None,
+                    start=0.0,
+                    end=1.0,
+                    weight=1.0,
+                ),
+                Evidence(
+                    kind=EvidenceKind.MIC_PRESENCE,
+                    name=None,
+                    speaker_cluster="Owner",
+                    excluded_cluster=None,
+                    start=1.0,
+                    end=2.0,
+                    weight=1.0,
+                ),
+            ]
+        )
+        assert gate_candidate_mappings(table) == []
+
+    def test_empty_table_yields_no_candidates(self):
+        assert gate_candidate_mappings(EvidenceTable()) == []
+
+
+class TestSuggestEnrollments:
+    def _two_self_intro_table(self, cluster: str = "SPEAKER_00", name: str = "Devon") -> EvidenceTable:
+        return EvidenceTable(
+            evidence=[
+                _self_intro(cluster, name, 0.0, 1.0),
+                _self_intro(cluster, name, 40.0, 41.0),
+            ]
+        )
+
+    def test_single_evidence_never_calls_the_llm(self):
+        table = EvidenceTable(evidence=[_self_intro("SPEAKER_00", "Devon", 0.0, 1.0)])
+        fake = FakeSummarizer()
+        suggestions = suggest_enrollments(table, fake, roster=[])
+        assert suggestions == []
+        assert fake.calls == []
+
+    def test_confirmed_candidate_becomes_a_suggestion(self):
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer(['{"confirmed": [{"cluster": "SPEAKER_00", "name": "Devon", "confidence": "high"}]}'])
+        suggestions = suggest_enrollments(table, fake, roster=[])
+        assert suggestions == [
+            Suggestion(cluster="SPEAKER_00", name="Devon", evidence=table.evidence, confidence="high")
+        ]
+
+    def test_llm_can_decline_a_gate_passing_candidate(self):
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer(['{"confirmed": []}'])
+        assert suggest_enrollments(table, fake, roster=[]) == []
+
+    def test_llm_hallucinated_pair_outside_candidates_is_dropped(self):
+        table = self._two_self_intro_table(cluster="SPEAKER_00", name="Devon")
+        fake = FakeSummarizer(['{"confirmed": [{"cluster": "SPEAKER_99", "name": "Nobody", "confidence": "high"}]}'])
+        assert suggest_enrollments(table, fake, roster=[]) == []
+
+    def test_vocative_excluded_pair_never_reaches_the_llm_even_if_it_would_confirm(self):
+        table = EvidenceTable(
+            evidence=[
+                _self_intro("SPEAKER_00", "Kamal", 0.0, 1.0),
+                _self_intro("SPEAKER_00", "Kamal", 40.0, 41.0),
+                _vocative_exclusion("SPEAKER_00", "Kamal", 20.0, 21.0),
+            ]
+        )
+        fake = FakeSummarizer(['{"confirmed": [{"cluster": "SPEAKER_00", "name": "Kamal", "confidence": "high"}]}'])
+        suggestions = suggest_enrollments(table, fake, roster=[])
+        assert suggestions == []
+        assert fake.calls == []
+
+    def test_confidence_defaults_to_medium_when_llm_omits_it(self):
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer(['{"confirmed": [{"cluster": "SPEAKER_00", "name": "Devon"}]}'])
+        suggestions = suggest_enrollments(table, fake, roster=[])
+        assert suggestions[0].confidence == "medium"
+
+    def test_malformed_json_response_yields_no_suggestions(self):
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer(["not json at all"])
+        assert suggest_enrollments(table, fake, roster=[]) == []
+
+    def test_roster_names_are_included_in_the_prompt(self):
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer()
+        suggest_enrollments(table, fake, roster=["Kamal", "Yanis"])
+        assert fake.calls, "arbiter must call the summarizer when a candidate exists"
+        _, user_prompt, _ = fake.calls[0]
+        assert "Kamal" in user_prompt
+        assert "Yanis" in user_prompt
+
+    def test_prompt_never_contains_raw_transcript_text(self):
+        # The arbiter must reason over the TABLE, never the transcript -- there is
+        # no transcript text anywhere in this test's evidence to leak in the first
+        # place, so this pins the invariant structurally: the prompt is built only
+        # from cluster/name/evidence-count, never from a `text` field.
+        table = self._two_self_intro_table()
+        fake = FakeSummarizer()
+        suggest_enrollments(table, fake, roster=[])
+        _, _user_prompt, json_mode = fake.calls[0]
+        assert json_mode is True

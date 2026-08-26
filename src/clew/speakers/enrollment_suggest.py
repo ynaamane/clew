@@ -14,10 +14,12 @@ boundary downweighting (first/last segments) is applied here.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
+from clew.summarization.base import Summarizer
 from clew.transcription.models import TranscriptResult
 
 
@@ -278,3 +280,162 @@ def build_evidence_table(transcript: TranscriptResult, roster: list[str]) -> Evi
         for e in (*self_intro, *vocative, *third_person_absent, *mic_presence)
     ]
     return EvidenceTable(evidence=all_evidence)
+
+
+@dataclass(frozen=True)
+class CandidateMapping:
+    """A (cluster, name) pair that has already passed the hard gate below --
+    the only shape suggest_enrollments is allowed to hand the LLM."""
+
+    cluster: str
+    name: str
+    evidence: list[Evidence]
+
+
+_MIN_INDEPENDENT_EVIDENCE = 2
+
+
+def _is_excluded(table: EvidenceTable, cluster: str, name: str) -> bool:
+    key = name.lower()
+    return any(
+        e.kind == EvidenceKind.VOCATIVE
+        and e.name is not None
+        and e.name.lower() == key
+        and e.excluded_cluster == cluster
+        for e in table.evidence
+    )
+
+
+def gate_candidate_mappings(table: EvidenceTable) -> list[CandidateMapping]:
+    """The hard gate: enforced in Python, never delegated to the LLM. Self-intro
+    is the only positive-evidence kind in this tranche, so candidates are built by
+    grouping it by (cluster, name); a pair a vocative excludes is dropped before
+    it ever becomes a candidate; a pair needs >=2 self-intro rows at DISTINCT
+    (start, end) locations -- duplicate rows at the same timestamp are one
+    observation, not independent corroboration ("jamais de proposition a
+    evidence unique")."""
+    grouped: dict[tuple[str, str], list[Evidence]] = {}
+    for e in table.evidence:
+        if e.kind != EvidenceKind.SELF_INTRO or e.name is None or e.speaker_cluster is None:
+            continue
+        grouped.setdefault((e.speaker_cluster, e.name), []).append(e)
+
+    candidates: list[CandidateMapping] = []
+    for (cluster, name), rows in grouped.items():
+        if _is_excluded(table, cluster, name):
+            continue
+        distinct_locations = {(r.start, r.end) for r in rows}
+        if len(distinct_locations) < _MIN_INDEPENDENT_EVIDENCE:
+            continue
+        candidates.append(CandidateMapping(cluster=cluster, name=name, evidence=rows))
+    return candidates
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    cluster: str
+    name: str
+    evidence: list[Evidence]
+    confidence: str
+
+
+_DEFAULT_CONFIDENCE = "medium"
+
+_ARBITER_SYSTEM = (
+    "You arbitrate speaker-name suggestions for a meeting transcript using ONLY the "
+    "candidate list given to you -- never invent a candidate, never reason from anything "
+    "outside this list. Each candidate already passed a hard rule (at least two "
+    "independent self-introductions, no contradicting address-evidence), so your job is "
+    "only to confirm or reject it and give a confidence level. Reject a candidate if the "
+    "name looks like a joke, a nickname unlikely to be a real enrollment name, or is "
+    "otherwise implausible. You MUST only reference cluster/name pairs from the candidate "
+    "list -- never propose a pair that isn't listed."
+)
+
+_ARBITER_PROMPT = """Known roster: {roster}
+
+Candidates:
+{candidates}
+
+Return ONLY valid JSON: {{"confirmed": [{{"cluster": "...", "name": "...", "confidence": "high"|"medium"}}]}}"""
+
+_ARBITER_SCHEMA = {
+    "name": "enrollment_suggestions",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "confirmed": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cluster": {"type": "string"},
+                        "name": {"type": "string"},
+                        "confidence": {"type": "string"},
+                    },
+                    "required": ["cluster", "name"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["confirmed"],
+        "additionalProperties": False,
+    },
+}
+
+
+def _format_candidates_for_prompt(candidates: list[CandidateMapping]) -> str:
+    lines = []
+    for c in candidates:
+        count = len({(e.start, e.end) for e in c.evidence})
+        lines.append(f"- cluster={c.cluster} name={c.name} independent_evidence_count={count}")
+    return "\n".join(lines)
+
+
+def _parse_arbiter_response(response: str) -> list[dict]:
+    try:
+        data = json.loads(response)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    confirmed = data.get("confirmed")
+    if not isinstance(confirmed, list):
+        return []
+    return [item for item in confirmed if isinstance(item, dict) and "cluster" in item and "name" in item]
+
+
+def suggest_enrollments(table: EvidenceTable, summarizer: Summarizer, roster: list[str]) -> list[Suggestion]:
+    """LLM arbiter over the GATED evidence table -- never the raw transcript, never
+    auto-enrolls. gate_candidate_mappings() enforces the hard >=2-independent-
+    evidence rule and the vocative-exclusion constraint BEFORE the LLM ever runs;
+    the LLM's response is cross-checked against that same candidate list
+    afterward -- at neither end can the model manufacture a suggestion the gate
+    didn't already allow."""
+    candidates = gate_candidate_mappings(table)
+    if not candidates:
+        return []
+
+    prompt = _ARBITER_PROMPT.format(
+        roster=", ".join(roster) if roster else "(none enrolled yet)",
+        candidates=_format_candidates_for_prompt(candidates),
+    )
+    response = summarizer.chat(_ARBITER_SYSTEM, prompt, json_mode=True, json_schema=_ARBITER_SCHEMA)
+    confirmed = _parse_arbiter_response(response)
+
+    candidate_by_key = {(c.cluster, c.name): c for c in candidates}
+    suggestions: list[Suggestion] = []
+    for item in confirmed:
+        candidate = candidate_by_key.get((item.get("cluster"), item.get("name")))
+        if candidate is None:
+            continue  # not in the gated candidate list -- never trust the LLM's echo
+        suggestions.append(
+            Suggestion(
+                cluster=candidate.cluster,
+                name=candidate.name,
+                evidence=candidate.evidence,
+                confidence=item.get("confidence") or _DEFAULT_CONFIDENCE,
+            )
+        )
+    return suggestions
