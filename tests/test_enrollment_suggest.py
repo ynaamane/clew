@@ -6,6 +6,10 @@ Fixtures are synthetic (invented names/lines) -- never real meeting content, per
 
 from __future__ import annotations
 
+import pytest
+
+from clew.output.json_output import format_transcript_json
+from clew.output.markdown import format_transcript
 from clew.speakers.enrollment_suggest import (
     CandidateMapping,
     Evidence,
@@ -18,9 +22,10 @@ from clew.speakers.enrollment_suggest import (
     extract_third_person_absent_evidence,
     extract_vocative_evidence,
     gate_candidate_mappings,
+    load_transcript_result,
     suggest_enrollments,
 )
-from clew.transcription.models import Segment, TranscriptResult
+from clew.transcription.models import Segment, TranscriptResult, Word
 
 
 def _segment(text: str, speaker: str, start: float = 0.0, end: float = 2.0) -> Segment:
@@ -522,3 +527,124 @@ class TestSuggestEnrollments:
         suggest_enrollments(table, fake, roster=[])
         _, _user_prompt, json_mode = fake.calls[0]
         assert json_mode is True
+
+
+class TestLoadTranscriptResult:
+    def test_loads_json_transcript_full_fidelity(self, tmp_path):
+        original = TranscriptResult(
+            segments=[
+                Segment(
+                    text="Moi c'est Devon.",
+                    start=1.5,
+                    end=3.25,
+                    speaker="SPEAKER_00",
+                    words=[Word(text="Moi", start=1.5, end=1.7, speaker="SPEAKER_00", score=0.9)],
+                )
+            ],
+            language="fr",
+            duration=100.0,
+        )
+        (tmp_path / "transcript.json").write_text(format_transcript_json(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded == original
+
+    def test_loads_markdown_transcript_with_diarization(self, tmp_path):
+        original = TranscriptResult(
+            segments=[
+                Segment(text="Moi c'est Devon.", start=0.0, end=2.0, speaker="SPEAKER_00"),
+                Segment(text="Merci Kamal.", start=10.0, end=12.0, speaker="SPEAKER_01"),
+            ],
+            language="fr",
+            duration=100.0,
+        )
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert [(s.text, s.speaker) for s in loaded.segments] == [
+            ("Moi c'est Devon.", "SPEAKER_00"),
+            ("Merci Kamal.", "SPEAKER_01"),
+        ]
+        assert loaded.language == "fr"
+
+    def test_markdown_fallback_never_recovers_word_level_or_segment_end(self, tmp_path):
+        # Known, documented limitation: format_transcript never writes end times or
+        # per-word data, so the markdown fallback cannot fabricate them -- end==start
+        # rather than a guessed duration.
+        original = TranscriptResult(
+            segments=[Segment(text="Moi c'est Devon.", start=5.0, end=9.0, speaker="SPEAKER_00")],
+            duration=100.0,
+        )
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded.segments[0].start == 5.0
+        assert loaded.segments[0].end == 5.0
+        assert loaded.segments[0].words == []
+
+    def test_markdown_without_diarization_parses_speaker_none(self, tmp_path):
+        original = TranscriptResult(
+            segments=[
+                Segment(text="First line.", start=0.0, end=2.0, speaker=None),
+                Segment(text="Second line.", start=2.0, end=4.0, speaker=None),
+            ]
+        )
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert all(s.speaker is None for s in loaded.segments)
+        assert [s.text for s in loaded.segments] == ["First line.", "Second line."]
+
+    def test_markdown_mixed_none_and_named_speaker_round_trips(self, tmp_path):
+        # format_transcript prints a bare "Unknown" header for a None speaker that
+        # follows a named one -- the loader must invert that sentinel back to None,
+        # not the literal string "Unknown" (matching.py's real unmatched-cluster
+        # label is "Unknown-1", never bare "Unknown").
+        original = TranscriptResult(
+            segments=[
+                Segment(text="Named speaks.", start=0.0, end=2.0, speaker="SPEAKER_00"),
+                Segment(text="Backchannel.", start=2.0, end=3.0, speaker=None),
+            ]
+        )
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded.segments[0].speaker == "SPEAKER_00"
+        assert loaded.segments[1].speaker is None
+
+    def test_language_and_duration_recovered_from_markdown(self, tmp_path):
+        original = TranscriptResult(segments=[Segment(text="Hi.", start=0.0, end=1.0)], language="en", duration=65.0)
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded.language == "en"
+        assert loaded.duration == 65.0
+
+    def test_missing_language_and_duration_default_to_unset(self, tmp_path):
+        original = TranscriptResult(segments=[Segment(text="Hi.", start=0.0, end=1.0)])
+        (tmp_path / "transcript.md").write_text(format_transcript(original))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded.language == ""
+        assert loaded.duration == 0.0
+
+    def test_prefers_json_over_markdown_when_both_exist(self, tmp_path):
+        json_version = TranscriptResult(segments=[Segment(text="From JSON.", start=0.0, end=1.0)])
+        md_version = TranscriptResult(segments=[Segment(text="From markdown.", start=0.0, end=1.0)])
+        (tmp_path / "transcript.json").write_text(format_transcript_json(json_version))
+        (tmp_path / "transcript.md").write_text(format_transcript(md_version))
+
+        loaded = load_transcript_result(tmp_path)
+
+        assert loaded.segments[0].text == "From JSON."
+
+    def test_missing_transcript_raises_clear_error(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="transcript"):
+            load_transcript_result(tmp_path)

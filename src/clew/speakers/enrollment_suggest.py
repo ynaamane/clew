@@ -18,9 +18,10 @@ import json
 import re
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from pathlib import Path
 
 from clew.summarization.base import Summarizer
-from clew.transcription.models import TranscriptResult
+from clew.transcription.models import Segment, TranscriptResult, Word
 
 
 class EvidenceKind(StrEnum):
@@ -439,3 +440,111 @@ def suggest_enrollments(table: EvidenceTable, summarizer: Summarizer, roster: li
             )
         )
     return suggestions
+
+
+def _find_transcript_file(directory: Path) -> Path | None:
+    """Prefers transcript.json over transcript.md, for full-fidelity data (word-level
+    timestamps, exact segment end/duration/language). pipeline.py's own private
+    _find_transcript() checks .md first -- that ordering optimizes for human-readable
+    display, not evidence fidelity -- but the two never coexist in real usage (one
+    config.output.format writes exactly one of them per meeting), so this only
+    changes behavior on the synthetic both-exist case."""
+    for ext in ("json", "md"):
+        path = directory / f"transcript.{ext}"
+        if path.exists():
+            return path
+    return None
+
+
+def _load_transcript_result_from_json(text: str) -> TranscriptResult:
+    # Deliberately not imported from pipeline.py (private, out of this module's
+    # write scope) -- a small, self-contained duplicate of the same reconstruction.
+    data = json.loads(text)
+    segments = [
+        Segment(
+            text=seg["text"],
+            start=seg["start"],
+            end=seg["end"],
+            speaker=seg.get("speaker"),
+            words=[
+                Word(
+                    text=w["text"],
+                    start=w["start"],
+                    end=w["end"],
+                    speaker=w.get("speaker"),
+                    score=w.get("score", 0.0),
+                )
+                for w in seg.get("words", [])
+            ],
+        )
+        for seg in data.get("segments", [])
+    ]
+    return TranscriptResult(segments=segments, language=data.get("language", ""), duration=data.get("duration", 0.0))
+
+
+_MD_TIMESTAMP = r"\[(?P<ts>(?:\d{2}:){1,2}\d{2})\]"
+_MD_SPEAKER_HEADER_RE = re.compile(rf"^\*\*(?P<speaker>.+?)\*\*\s+{_MD_TIMESTAMP}\s*$")
+_MD_SEGMENT_LINE_RE = re.compile(rf"^{_MD_TIMESTAMP}\s(?P<text>.*)$")
+_MD_LANGUAGE_RE = re.compile(r"^\*\*Language:\*\*\s*(?P<language>\S+)")
+# Unlike segment/header timestamps, format_transcript writes the Duration value
+# UNBRACKETED (f"**Duration:** {_format_time(result.duration)}  ") -- a bracketed
+# pattern here silently never matches.
+_MD_BARE_TIME = r"(?P<ts>(?:\d{2}:){1,2}\d{2})"
+_MD_DURATION_RE = re.compile(rf"^\*\*Duration:\*\*\s*{_MD_BARE_TIME}")
+
+# format_transcript's own sentinel for a None speaker ("speaker_label = seg.speaker
+# or 'Unknown'") -- matching.py's real unmatched-cluster label is always
+# "Unknown-N", so a bare "Unknown" header can only ever be this sentinel.
+_MD_UNKNOWN_SPEAKER_LABEL = "Unknown"
+
+
+def _parse_md_timestamp(ts: str) -> float:
+    parts = [int(p) for p in ts.split(":")]
+    h, m, s = (0, *parts) if len(parts) == 2 else parts
+    return float(h * 3600 + m * 60 + s)
+
+
+def _parse_markdown_transcript(text: str) -> TranscriptResult:
+    """Inverts output/markdown.py's format_transcript(). SEGMENT-LEVEL ONLY: the
+    markdown never carries segment end times or per-word data, so end==start here
+    (never a fabricated duration) and words is always empty. _format_time's own
+    int(seconds) truncation on write also means sub-second start precision is
+    lost -- both are known, deliberate limitations of this fallback path, not
+    bugs; JSON transcripts (_load_transcript_result_from_json) don't have them."""
+    language = ""
+    duration = 0.0
+    current_speaker: str | None = None
+    segments: list[Segment] = []
+
+    for line in text.splitlines():
+        if lang_match := _MD_LANGUAGE_RE.match(line):
+            language = lang_match.group("language")
+            continue
+        if dur_match := _MD_DURATION_RE.match(line):
+            duration = _parse_md_timestamp(dur_match.group("ts"))
+            continue
+        if header_match := _MD_SPEAKER_HEADER_RE.match(line):
+            label = header_match.group("speaker")
+            current_speaker = None if label == _MD_UNKNOWN_SPEAKER_LABEL else label
+            continue
+        if seg_match := _MD_SEGMENT_LINE_RE.match(line):
+            start = _parse_md_timestamp(seg_match.group("ts"))
+            segments.append(
+                Segment(text=seg_match.group("text"), start=start, end=start, speaker=current_speaker, words=[])
+            )
+
+    return TranscriptResult(segments=segments, language=language, duration=duration)
+
+
+def load_transcript_result(directory: Path) -> TranscriptResult:
+    """Reconstruct a TranscriptResult from a meeting directory's on-disk transcript,
+    for CLI use. JSON = full fidelity. Markdown fallback = segment-level only, see
+    _parse_markdown_transcript's docstring for exactly what it cannot recover."""
+    path = _find_transcript_file(directory)
+    if path is None:
+        raise FileNotFoundError(f"No transcript.json or transcript.md found in {directory}")
+
+    text = path.read_text()
+    if path.suffix == ".json":
+        return _load_transcript_result_from_json(text)
+    return _parse_markdown_transcript(text)
