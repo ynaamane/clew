@@ -13,7 +13,7 @@ import click
 from clew.config import Config
 from clew.progress import Spinner
 from clew.summarization import create_summarizer
-from clew.summarization.base import Summarizer
+from clew.summarization.base import SummarizationContextError, Summarizer
 from clew.summarization.prompts import (
     SEARCH_ANSWER_PROMPT,
     SEARCH_ANSWER_SYSTEM,
@@ -70,30 +70,37 @@ def ask(config: Config, question: str, since: str | None, limit: int | None) -> 
 
         context_size = _resolve_context_size(config, summarizer)
 
-        # Stage 1
-        label = f"Searching {len(meetings)} meetings"
-        with Spinner(label) as spinner:
-            relevant = _find_relevant_meetings(
-                summarizer,
-                question,
-                meetings,
-                context_size,
-                spinner=spinner,
-            )
-            spinner.update(label)  # restore label so exit message is clean
+        try:
+            # Stage 1
+            label = f"Searching {len(meetings)} meetings"
+            with Spinner(label) as spinner:
+                relevant = _find_relevant_meetings(
+                    summarizer,
+                    question,
+                    meetings,
+                    context_size,
+                    spinner=spinner,
+                )
+                spinner.update(label)  # restore label so exit message is clean
 
-        if not relevant:
-            click.echo("No relevant meetings found for your question.")
-            return
+            if not relevant:
+                click.echo("No relevant meetings found for your question.")
+                return
 
-        click.echo(f"Found {len(relevant)} relevant meetings:")
-        for m in relevant:
-            click.echo(f"  - {m.display_name}")
+            click.echo(f"Found {len(relevant)} relevant meetings:")
+            for m in relevant:
+                click.echo(f"  - {m.display_name}")
 
-        # Stage 2
-        with Spinner("Analyzing transcripts"):
-            answer, skipped_transcripts = _answer_from_transcripts(summarizer, question, relevant, context_size)
-            answer = _verify_quotes(answer, _load_transcripts(relevant))
+            # Stage 2
+            with Spinner("Analyzing transcripts"):
+                answer, skipped_transcripts = _answer_from_transcripts(summarizer, question, relevant, context_size)
+                answer = _verify_quotes(answer, _load_transcripts(relevant))
+        except SummarizationContextError as exc:
+            # The exception's own message already states the estimated size vs the
+            # configured limit and suggests raising context_size -- same pattern as
+            # pipeline.py's run_summarize()/run_pipeline() for this exact exception.
+            click.echo(f"Error: {exc}", err=True)
+            raise SystemExit(1) from None
 
         if skipped_transcripts:
             click.echo(f"({skipped_transcripts} transcripts did not fit within context budget, they were skipped)")

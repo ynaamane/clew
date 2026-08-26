@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
+import pytest
 
 from clew.search import (
     _DEFAULT_CONTEXT_SIZE,
@@ -646,6 +647,97 @@ class TestAskIntegration:
         assert "Found 1 relevant" in output
         assert "Quarterly Planning" in output
         assert "March 15th" in output
+
+
+class _FaultInjectingSummarizer:
+    """Minimal Summarizer double whose chat() raises a configured exception -- used
+    to prove ask()'s error handling without a real backend. Implements the context
+    manager protocol explicitly (unlike a bare MagicMock, whose default truthy
+    __exit__ return value would silently SUPPRESS the very exception these tests
+    need to observe)."""
+
+    def __init__(self, exc: Exception):
+        self._exc = exc
+
+    def is_available(self) -> bool:
+        return True
+
+    def native_context_length(self) -> int | None:
+        return None
+
+    def chat(self, *args, **kwargs) -> str:
+        raise self._exc
+
+    def close(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info) -> bool:
+        return False
+
+
+class TestAskContextErrorHandling:
+    """Reviewer INFO (2026-08-24 review of 7c39d2f/8d48cd9): `clew ask` had no
+    try/except around SummarizationContextError anywhere in search.py/cli.py, so a
+    transcript too large for the context window crashed with a raw Python traceback
+    instead of the clean, actionable message the exception itself already carries.
+    Convention (CLAUDE.md): helpers return data, the orchestrator (ask()) does
+    click.echo -- same pattern pipeline.py's run_summarize()/run_pipeline() already
+    use for this exact exception."""
+
+    def _setup(self, tmp_path, monkeypatch, exc: Exception):
+        from clew.config import Config
+
+        _make_meeting_dir(
+            tmp_path,
+            "2026-02-13_1501_quarterly-planning",
+            "Discussed Q1 deadlines.",
+            "[00:01:00] Anna: The deadline is March 15th.",
+        )
+        config = Config()
+        config.output.dir = str(tmp_path)
+        config.summarization.backend = "ollama"
+        config.summarization.model = "test-model"
+
+        monkeypatch.setattr("clew.search.create_summarizer", lambda cfg: _FaultInjectingSummarizer(exc))
+
+        output_lines: list[str] = []
+        monkeypatch.setattr(click, "echo", lambda msg="", **kwargs: output_lines.append(str(msg)))
+        return config, output_lines
+
+    def test_context_error_prints_a_clean_actionable_message_and_exits_nonzero(self, tmp_path, monkeypatch):
+        from clew.search import ask
+        from clew.summarization.base import SummarizationContextError
+
+        exc = SummarizationContextError(
+            "This transcript needs an estimated 9000 tokens of context (~8000 prompt + "
+            "1024 output margin), but model 'test-model' is configured for 4096 tokens. "
+            "Increase [summarization] context_size in your config, or summarize a "
+            "shorter transcript."
+        )
+        config, output_lines = self._setup(tmp_path, monkeypatch, exc)
+
+        with pytest.raises(SystemExit) as exc_info:
+            ask(config, "What did Anna say?", since=None, limit=None)
+
+        assert exc_info.value.code != 0
+        output = "\n".join(output_lines)
+        assert "Error:" in output
+        assert "tokens" in output
+        assert "context_size" in output
+
+    def test_other_exceptions_are_not_swallowed(self, tmp_path, monkeypatch):
+        from clew.search import ask
+
+        config, output_lines = self._setup(tmp_path, monkeypatch, RuntimeError("unrelated backend failure"))
+
+        with pytest.raises(RuntimeError, match="unrelated backend failure"):
+            ask(config, "What did Anna say?", since=None, limit=None)
+
+        # Must not have been reinterpreted as a clean context-size error message.
+        assert not any("context_size" in line for line in output_lines)
 
 
 # -- OpenAI json_mode fallback tests --
