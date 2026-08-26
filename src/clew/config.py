@@ -76,6 +76,10 @@ audio_dir = ""            # directory for audio recordings; empty = same as dir
 format = "markdown"       # "markdown" or "json"
 keep_recording = true     # keep WAV files after transcription; false = auto-delete
 retention_days = 0        # days before `clew purge` may remove audio; 0 = keep forever (manual purge only)
+
+[speakers]
+known = []                # names to expect in transcripts; doubles as ASR-correction vocabulary
+                           # and as the candidate pool for auto-suggest enrollment
 """.replace("__BILINGUAL_INITIAL_PROMPT__", BILINGUAL_INITIAL_PROMPT)
 
 
@@ -141,6 +145,11 @@ class TemplateConfig:
     prompt: str = ""
 
 
+@dataclass
+class SpeakersConfig:
+    known: list[str] = field(default_factory=list)
+
+
 # Legacy default from the ownscribe/meeting-scribe era, compared against verbatim by
 # clew.cli.main()'s output-dir migration -- never touched otherwise.
 LEGACY_OUTPUT_DEFAULT = "~/ownscribe"
@@ -177,6 +186,7 @@ class Config:
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     templates: dict[str, TemplateConfig] = field(default_factory=dict)
+    speakers: SpeakersConfig = field(default_factory=SpeakersConfig)
     progress_mode: str = "tui"
 
     @classmethod
@@ -279,6 +289,11 @@ def _merge_toml(config: Config, data: dict) -> Config:
                 system_prompt=t_data.get("system_prompt", ""),
                 prompt=t_data.get("prompt", ""),
             )
+
+    if "speakers" in data:
+        for k, v in data["speakers"].items():
+            if hasattr(config.speakers, k):
+                setattr(config.speakers, k, v)
 
     return config
 

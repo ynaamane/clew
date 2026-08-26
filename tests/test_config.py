@@ -62,6 +62,10 @@ class TestDefaults:
         cfg = Config()
         assert cfg.templates == {}
 
+    def test_default_speakers_known_empty(self):
+        cfg = Config()
+        assert cfg.speakers.known == []
+
     def test_default_silence_timeout(self):
         cfg = Config()
         assert cfg.audio.silence_timeout == 300
@@ -260,6 +264,17 @@ class TestMergeToml:
         merged = _merge_toml(cfg, data)
         assert merged.templates["quick"].system_prompt == ""
         assert merged.templates["quick"].prompt == "Summarize briefly: {transcript}"
+
+    def test_speakers_known_from_toml(self):
+        cfg = Config()
+        data = {"speakers": {"known": ["Alice", "Bob"]}}
+        merged = _merge_toml(cfg, data)
+        assert merged.speakers.known == ["Alice", "Bob"]
+
+    def test_speakers_known_absent_from_toml_stays_empty(self):
+        cfg = Config()
+        merged = _merge_toml(cfg, {})
+        assert merged.speakers.known == []
 
     def test_unknown_keys_ignored(self):
         cfg = Config()
