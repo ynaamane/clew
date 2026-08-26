@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -11,6 +12,30 @@ import click
 
 from clew.config import CONFIG_DIR, LEGACY_CONFIG_DIR, LEGACY_OUTPUT_DEFAULT, Config, ensure_config_file
 from clew.speakers.base import LEGACY_VOICEPRINT_DIR, VOICEPRINT_DIR
+
+_SUMMARIZATION_LOGGER_NAME = "clew.summarization"
+
+
+def configure_summarization_logging() -> None:
+    """Give clew.summarization's own INFO-level diagnostics (e.g. the local
+    model's chosen n_ctx, llama_cpp_summarizer.py) a handler.
+
+    Python's logging module attaches none by default, so that logger.info() call
+    was silently dropped -- invisible in CLI output (INFO #12, 2026-08-24 session).
+    Scoped to the clew.summarization namespace only (propagate=False stops it there,
+    never reaching the root logger): no unrelated module -- root, third-party deps,
+    other clew modules -- suddenly gains new stderr output. Idempotent: safe to call
+    on every cli() invocation.
+    """
+    logger = logging.getLogger(_SUMMARIZATION_LOGGER_NAME)
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
 
 # Canonical paths for cleanup
 _CACHE_DIR = os.path.expanduser("~/.local/share/ownscribe")
@@ -163,6 +188,7 @@ def cli(
 
     Run without a subcommand to record, transcribe, and summarize a meeting.
     """
+    configure_summarization_logging()
     ctx.ensure_object(dict)
     try:
         config = Config.load()

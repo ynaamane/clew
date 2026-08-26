@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from unittest import mock
 
+import pytest
 from click.testing import CliRunner
 
 import clew.cli as cli_module
@@ -826,3 +828,79 @@ class TestInvalidConfigReporting:
 
         assert "ValueError" not in result.output
         assert result.exception is None or not isinstance(result.exception, ValueError)
+
+
+class TestSummarizationLogging:
+    """INFO #12 (2026-08-24 session): the local summarizer's chosen n_ctx was
+    invisible in CLI output -- llama_cpp_summarizer.py's logger.info() call had no
+    handler attached anywhere (Python's logging module attaches none by default),
+    so the message was silently dropped. configure_summarization_logging() gives
+    clew.summarization's own diagnostics a handler, scoped narrowly so no unrelated
+    logger (root, third-party deps, other clew modules) gains new output."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_logger(self):
+        logger = logging.getLogger("clew.summarization")
+        handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
+        logger.handlers.clear()
+        logger.setLevel(logging.NOTSET)
+        yield logger
+        logger.handlers.clear()
+        logger.handlers.extend(handlers)
+        logger.setLevel(level)
+        logger.propagate = propagate
+
+    def test_attaches_exactly_one_handler_at_info_level(self, _reset_logger):
+        from clew.cli import configure_summarization_logging
+
+        configure_summarization_logging()
+
+        assert len(_reset_logger.handlers) == 1
+        assert _reset_logger.level == logging.INFO
+        assert _reset_logger.propagate is False
+
+    def test_is_idempotent_across_repeated_calls(self, _reset_logger):
+        from clew.cli import configure_summarization_logging
+
+        configure_summarization_logging()
+        configure_summarization_logging()
+        configure_summarization_logging()
+
+        assert len(_reset_logger.handlers) == 1
+
+    def test_chosen_n_ctx_reaches_stderr_once_configured(self, _reset_logger, capsys):
+        from clew.cli import configure_summarization_logging
+
+        configure_summarization_logging()
+
+        logging.getLogger("clew.summarization.llama_cpp_summarizer").info(
+            "Loading model from %s (n_ctx=%d)", "/fake/model.gguf", 131072
+        )
+
+        captured = capsys.readouterr()
+        assert "n_ctx=131072" in captured.err
+
+    def test_does_not_alter_the_root_logger(self):
+        """'sans spam': scoped to clew.summarization only, never the root logger --
+        an unrelated module's logger must not suddenly gain output."""
+        root = logging.getLogger()
+        root_handlers_before = list(root.handlers)
+
+        from clew.cli import configure_summarization_logging
+
+        configure_summarization_logging()
+
+        assert list(root.handlers) == root_handlers_before
+
+    def test_cli_invocation_wires_it_up(self):
+        """The real entry point: any cli() dispatch (not just a dedicated setup call)
+        configures the logger, so a real `clew ask`/`clew summarize` run surfaces it.
+        Uses `devices --help`, which still runs the group's own cli() callback (the
+        subcommand's eager --help exits before touching real audio hardware --
+        confirmed: Config.load() is called even though the subcommand body never
+        runs)."""
+        runner = CliRunner()
+        with _mock_config():
+            runner.invoke(cli, ["devices", "--help"])
+
+        assert len(logging.getLogger("clew.summarization").handlers) == 1
