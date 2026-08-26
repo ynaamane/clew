@@ -21,7 +21,14 @@ final class SummaryDocumentTests: XCTestCase {
 
         XCTAssertEqual(doc.prose, "The meeting focused on technical aspects of a project.")
         XCTAssertEqual(doc.keyPoints.count, 2)
-        XCTAssertTrue(doc.keyPoints[1].contains("JWT"))
+        // XCTAssertEqual above is non-fatal: execution continues even when it fails, so a
+        // direct doc.keyPoints[1] traps the whole xctest process (Fatal error: Index out of
+        // range) on any regression that shrinks the array, instead of reporting one clean
+        // failure -- XCTUnwrap throws, which a `throws` test function turns into a normal
+        // failure. Reproduced live: mutating bullets(in:) to always filter every bullet
+        // crashed the process here and silently dropped every other test's result in the run.
+        let secondKeyPoint = try XCTUnwrap(doc.keyPoints.dropFirst().first)
+        XCTAssertTrue(secondKeyPoint.contains("JWT"))
     }
 
     func testNoneMentionedIsPreservedRatherThanTurnedIntoAnEmptyList() throws {
@@ -44,7 +51,8 @@ final class SummaryDocumentTests: XCTestCase {
         """)
 
         XCTAssertEqual(doc.actionItems.count, 2)
-        XCTAssertTrue(doc.actionItems[0].hasPrefix("Sam"))
+        let firstItem = try XCTUnwrap(doc.actionItems.first)
+        XCTAssertTrue(firstItem.hasPrefix("Sam"))
     }
 
     func testMissingSectionsDoNotThrow() throws {
