@@ -36,6 +36,11 @@ maintenant que la diarisation n'est plus le goulot. Artefacts : scratchpad `bmad
 Item (3) stride du plan BMAD : SANS OBJET pour la vitesse (levier CPU 2,67× éclipsé par MPS) ;
 item (4) sweep threads : idem, ne vaut que si un jour MPS régresse.
 
+**Item de triage (2026-08-26) :**
+- **FOLLOW-UP** — re-vérifier la calibration CENTROID-vs-MAX (`scripts/voiceprint_strategy_sim.py`,
+  chiffres 40,5 %/0 % sur calibration SYNTHÉTIQUE) contre les vraies empreintes une fois les 3 voix
+  ré-enrôlées par Yanis (multi-sample store livré `1c6244c`).
+
 **Nouveaux items de triage (2026-08-25) :**
 - **INFO** — `clew ask` : `SummarizationContextError` remonte en traceback brute (aucun
   `try/except` dans search.py/cli.py) — la troncature est bien empêchée, le message d'échec est
