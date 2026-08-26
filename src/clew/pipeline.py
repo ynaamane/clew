@@ -1089,7 +1089,9 @@ def run_enroll(config: Config, name: str, audio_file: str) -> None:
     db.upsert(name, embedding)
     db.save()
 
-    click.echo(f"Enrolled '{name}' from {audio_path}")
+    sample_count = next((len(vp.embeddings) for vp in db.voiceprints if vp.name == name), 1)
+    plural = "" if sample_count == 1 else "s"
+    click.echo(f"Enrolled '{name}' from {audio_path} ({sample_count} sample{plural} now)")
 
 
 def run_unenroll(name: str) -> None:

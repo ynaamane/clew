@@ -3017,7 +3017,7 @@ class TestRunEnroll:
             run_enroll(config, "Alice", str(clip))
 
         db = VoiceprintDB.load(db_path)
-        assert db.voiceprints == [Voiceprint(name="Alice", embedding=[0.1, 0.2, 0.3])]
+        assert db.voiceprints == [Voiceprint(name="Alice", embeddings=[[0.1, 0.2, 0.3]])]
 
     def test_embedding_failure_exits_with_error(self, tmp_path):
         from clew.pipeline import run_enroll
@@ -3036,7 +3036,10 @@ class TestRunEnroll:
         ):
             run_enroll(config, "Alice", str(clip))
 
-    def test_reenrolling_same_name_overwrites(self, tmp_path):
+    def test_reenrolling_same_name_appends_a_new_sample(self, tmp_path):
+        # Multi-sample VoiceprintDB: re-enrolling must ADD a sample under the
+        # same name, never replace what's already there -- this test used to
+        # lock in the opposite (overwrite) contract.
         from clew.pipeline import run_enroll
         from clew.speakers.base import VoiceprintDB
 
@@ -3064,7 +3067,33 @@ class TestRunEnroll:
 
         db = VoiceprintDB.load(db_path)
         assert len(db.voiceprints) == 1
-        assert db.voiceprints[0].embedding == [0.0, 1.0]
+        assert db.voiceprints[0].embeddings == [[1.0, 0.0], [0.0, 1.0]]
+
+    def test_enroll_message_reports_the_current_sample_count(self, tmp_path, capsys):
+        from clew.pipeline import run_enroll
+
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        clip = tmp_path / "clip.wav"
+        clip.touch()
+        db_path = tmp_path / "voiceprints.json"
+
+        mock_embedder = mock.MagicMock()
+        mock_embedder.embed_file.return_value = [1.0, 0.0]
+
+        with (
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=mock_embedder),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
+        ):
+            run_enroll(config, "Alice", str(clip))
+            first_output = capsys.readouterr().out
+
+            mock_embedder.embed_file.return_value = [0.0, 1.0]
+            run_enroll(config, "Alice", str(clip))
+            second_output = capsys.readouterr().out
+
+        assert "1 sample" in first_output
+        assert "2 samples" in second_output
 
 
 class TestRunUnenroll:
