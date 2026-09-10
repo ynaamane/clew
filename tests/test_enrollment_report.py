@@ -82,6 +82,21 @@ class TestBuildEnrollmentReportClusters:
         assert cluster["speech_seconds"] == pytest.approx(8.0)
         assert cluster["turns"] == 1
 
+    def test_a_segment_starting_after_the_recording_ends_never_yields_negative_speech_seconds(self, tmp_path):
+        # Review finding N2: this exact input (a segment at 1100-1200s in a
+        # 1000s transcript) summed to speech_seconds == -100.0 before the
+        # _effective_end clamp in cluster_audio.py.
+        (tmp_path / "system.wav").touch()
+        transcript = TranscriptResult(
+            segments=[Segment(text="late", start=1100.0, end=1200.0, speaker="SPEAKER_00")],
+            duration=1000.0,
+        )
+
+        report = build_enrollment_report(transcript, tmp_path, [], None, now=_FIXED_NOW)
+
+        cluster = next(c for c in report["clusters"] if c["label"] == "SPEAKER_00")
+        assert cluster["speech_seconds"] >= 0.0
+
     def test_owner_included_when_owner_segments_exist(self, tmp_path):
         (tmp_path / "mic.wav").touch()
         transcript = TranscriptResult(

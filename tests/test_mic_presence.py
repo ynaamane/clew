@@ -250,6 +250,38 @@ class TestResolveMicPresenceBorderlineStatus:
         assert presence.name == "Kamal"
 
 
+class TestResolveMicPresenceDefaultMargin:
+    """Pins _DEFAULT_BORDERLINE_MARGIN (0.05) through the production default.
+    Every TestResolveMicPresenceBorderlineStatus test above passes margin=0.05
+    explicitly, so none of them would notice the constant itself drifting --
+    measured (review finding N1): 0.0, 0.049 and 0.20 all leave the whole
+    suite green. Neither edge alone pins 0.05: the lower edge alone can't
+    distinguish 0.05 from a wider margin (0.20 also reports "borderline"
+    there), and the upper edge alone can't distinguish it from a narrower one
+    (0.0 or 0.049 also report "matched" there) -- both together do."""
+
+    def test_default_margin_lower_edge_is_borderline_not_below(self):
+        # threshold - _DEFAULT_BORDERLINE_MARGIN == 0.65 - 0.05 == 0.6 exactly
+        # (bit-identical, verified). A margin of 0.0 or 0.049 narrows the band
+        # past this score, reporting "below" instead.
+        db = VoiceprintDB()
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.60):
+            presence = resolve_mic_presence([1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, start=0.0, end=1.0)
+
+        assert presence.status == "borderline"
+
+    def test_default_margin_upper_edge_is_matched_not_borderline(self):
+        # threshold + _DEFAULT_BORDERLINE_MARGIN, computed the same way
+        # production computes it internally (a separately-typed 0.70 literal
+        # is not bit-identical to 0.65 + 0.05). A margin of 0.20 widens the
+        # band past this score, reporting "borderline" instead.
+        db = VoiceprintDB()
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.65 + 0.05):
+            presence = resolve_mic_presence([1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, start=0.0, end=1.0)
+
+        assert presence.status == "matched"
+
+
 class TestClusterEmbeddingsFor:
     def test_prefers_persisted_embeddings_and_never_calls_the_factory(self, tmp_path):
         (tmp_path / SPEAKER_EMBEDDINGS_FILENAME).write_text(

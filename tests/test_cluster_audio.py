@@ -121,6 +121,19 @@ class TestClusterTurns:
         )
         assert cluster_turns(transcript, "SPEAKER_00") == [(1.0, 31.0)]
 
+    def test_a_segment_starting_after_the_recording_ends_never_yields_a_negative_turn(self):
+        # Review finding N2: a segment at 1100-1200s in a 1000s transcript had
+        # its real end clamped to duration (1000.0) while start (1100.0) stayed
+        # unclamped, inverting the turn to (1100.0, 1000.0) -- a negative
+        # duration. Malformed input (a segment starting past the recording),
+        # no known trigger today, but the clamp is one line.
+        transcript = TranscriptResult(
+            segments=[Segment(text="late", start=1100.0, end=1200.0, speaker="SPEAKER_00")],
+            duration=1000.0,
+        )
+        start, end = cluster_turns(transcript, "SPEAKER_00")[0]
+        assert end >= start
+
     def test_dense_transcript_with_small_gaps_is_unaffected_by_the_gap_condition(self):
         # Regression guard: R2's gap-split must never fire on ordinary speech.
         transcript = TranscriptResult(

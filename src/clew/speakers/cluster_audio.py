@@ -37,16 +37,20 @@ def _effective_end(segments: list, index: int, duration: float) -> float:
     """A segment's end. A real, non-degenerate end (JSON-shape, end > start)
     is trusted as-is and never extended -- only bounded by transcript.duration
     when that duration is actually known (duration > 0), so it can never claim
-    to run past the recording. Reconstruction only ever applies to a degenerate
-    segment (markdown-shape transcripts have end == start on every segment):
-    the next segment's start (any speaker) is the reconstruction target,
-    capped at start + _WHISPER_MAX_SEGMENT_SECONDS (a Whisper segment never
-    decodes past that window) so a silent gap or recording tail can never
-    inflate a turn far enough to escape the boundary-exclusion rule.
+    to run past the recording. That bound is itself clamped to never fall
+    below the segment's own start (review finding N2): malformed input where
+    the segment starts after the recording ends would otherwise invert the
+    turn (end < start), propagating into a negative speech_seconds downstream.
+    Reconstruction only ever applies to a degenerate segment (markdown-shape
+    transcripts have end == start on every segment): the next segment's start
+    (any speaker) is the reconstruction target, capped at
+    start + _WHISPER_MAX_SEGMENT_SECONDS (a Whisper segment never decodes past
+    that window) so a silent gap or recording tail can never inflate a turn
+    far enough to escape the boundary-exclusion rule.
     """
     seg = segments[index]
     if seg.end > seg.start:
-        return min(seg.end, duration) if duration > 0 else seg.end
+        return max(seg.start, min(seg.end, duration)) if duration > 0 else seg.end
     next_start = segments[index + 1].start if index + 1 < len(segments) else duration
     return min(next_start, seg.start + _WHISPER_MAX_SEGMENT_SECONDS)
 
