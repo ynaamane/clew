@@ -1899,7 +1899,7 @@ class TestTranscribeDualTrack:
 
 class TestRelabelSpeakersWithVoiceprints:
     def test_relabels_matching_cluster(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
         from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
@@ -1910,12 +1910,14 @@ class TestRelabelSpeakersWithVoiceprints:
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
+            relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
 
         assert relabeled.segments[0].speaker == "Alice"
 
     def test_unmatched_cluster_gets_unknown_label(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
         from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
@@ -1926,42 +1928,46 @@ class TestRelabelSpeakersWithVoiceprints:
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.0, 0.0, 1.0]})
+            relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.0, 0.0, 1.0]}
+            )
 
         assert relabeled.segments[0].speaker == "Unknown-1"
 
     def test_no_embeddings_returns_result_unchanged(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
-        relabeled = _relabel_speakers_with_voiceprints(result, {})
+        relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(result, {})
 
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_no_enrolled_voiceprints_returns_result_unchanged(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
 
         db_path = tmp_path / "voiceprints.json"
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
+            relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
 
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_non_dict_embeddings_returns_result_unchanged(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
 
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
 
-        relabeled = _relabel_speakers_with_voiceprints(result, mock.MagicMock())
+        relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(result, mock.MagicMock())
 
         assert relabeled.segments[0].speaker == "SPEAKER_00"
 
     def test_segments_without_speaker_are_untouched(self, tmp_path):
-        from clew.pipeline import _relabel_speakers_with_voiceprints
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
         from clew.speakers.base import VoiceprintDB
 
         db_path = tmp_path / "voiceprints.json"
@@ -1972,15 +1978,17 @@ class TestRelabelSpeakersWithVoiceprints:
         result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker=None)])
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            relabeled = _relabel_speakers_with_voiceprints(result, {"SPEAKER_00": [0.99, 0.01, 0.0]})
+            relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
 
         assert relabeled.segments[0].speaker is None
 
 
 class TestRelabelSpeakersWithVoiceprintsAndAssignments:
-    """The refactored helper _relabel_speakers_with_voiceprints returns -- it
-    keeps the existing relabeling behaviour and additionally reports which
-    (cluster, name) pairs were actually matched, for speaker_embeddings.json."""
+    """Renames diarized cluster labels to enrolled names where matched, and
+    additionally reports which (cluster, name) pairs were actually matched,
+    for speaker_embeddings.json."""
 
     def test_matched_cluster_is_reported_unmatched_is_not(self, tmp_path):
         from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments

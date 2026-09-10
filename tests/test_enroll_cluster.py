@@ -248,10 +248,19 @@ class TestRunEnrollClusterFallbackPath:
 
 
 class TestRunEnrollClusterValidation:
-    def test_errors_when_directory_does_not_exist(self, tmp_path):
+    def test_errors_when_directory_does_not_exist(self, tmp_path, capsys):
+        # A bare SystemExit assertion here does not discriminate: removing the
+        # is_dir() guard still raises SystemExit(1), just later, when
+        # load_transcript_result hits the same missing directory and its
+        # FileNotFoundError is caught. Assert the guard's own message text,
+        # which the FileNotFoundError path never produces.
         config = Config()
+        missing = tmp_path / "does-not-exist"
         with pytest.raises(SystemExit):
-            run_enroll_cluster(config, str(tmp_path / "does-not-exist"), "SPEAKER_00", "Alice")
+            run_enroll_cluster(config, str(missing), "SPEAKER_00", "Alice")
+
+        captured = capsys.readouterr()
+        assert f"{missing.resolve()} is not a directory" in captured.err
 
     def test_empty_name_exits_with_error(self, tmp_path):
         # A persisted embedding is deliberately present so the run would otherwise

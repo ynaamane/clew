@@ -204,10 +204,6 @@ def _create_transcriber(config: Config, progress=None):
 
 _OWNER_SPEAKER_LABEL = "Owner"
 
-# Persisted next to the meeting's retained audio at transcription time (ADD-only, see
-# _write_speaker_embeddings) -- `run_enroll_cluster` reads this before ever falling
-# back to re-embedding a cut clip. Public (no leading underscore): the filename a
-# reprocess also needs to know to clear stale data.
 SPEAKER_EMBEDDINGS_FILENAME = "speaker_embeddings.json"
 
 
@@ -395,12 +391,6 @@ def _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embedding
     matched_assignments = {cluster: name for cluster, name in assignments.items() if not name.startswith("Unknown-")}
     relabeled_segments = [replace(seg, speaker=assignments.get(seg.speaker, seg.speaker)) for seg in result.segments]
     return replace(result, segments=relabeled_segments), matched_assignments
-
-
-def _relabel_speakers_with_voiceprints(result, cluster_embeddings: dict[str, list[float]]):
-    """Rename diarized cluster labels (e.g. SPEAKER_00) to enrolled names where matched."""
-    relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embeddings)
-    return relabeled
 
 
 def _write_speaker_embeddings(
