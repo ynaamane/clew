@@ -1313,6 +1313,51 @@ class TestDoTranscribeAndSummarize:
         assert not audio_path.exists()
         assert not audio_dir.exists()
 
+    def test_keep_recording_false_also_deletes_speaker_embeddings(self, tmp_path):
+        # Review finding F2: the per-meeting biometric vectors must be deleted
+        # along with the recording, not survive keep_recording=False forever.
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.output.keep_recording = False
+        audio_path = tmp_path / "recording.wav"
+        audio_path.write_bytes(b"fake audio data")
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, tmp_path, summarize=False)
+
+        assert not (tmp_path / SPEAKER_EMBEDDINGS_FILENAME).exists()
+
+    def test_keep_recording_false_deletes_speaker_embeddings_with_separate_audio_dir(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _do_transcribe_and_summarize
+
+        config = Config()
+        config.output.format = "markdown"
+        config.output.keep_recording = False
+        config.output.dir = str(tmp_path / "notes")
+        config.output.audio_dir = str(tmp_path / "audio-cache")
+
+        out_dir = tmp_path / "notes" / "2026-01-01_1200"
+        out_dir.mkdir(parents=True)
+        audio_dir = tmp_path / "audio-cache" / "2026-01-01_1200"
+        audio_dir.mkdir(parents=True)
+        audio_path = audio_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio data")
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = self._make_transcript()
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=False)
+
+        assert not (out_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+
     def test_colocated_audio_follows_rename_despite_separate_audio_dir(self, tmp_path):
         """Resuming a directory that holds its own recording (made before
         audio_dir was configured) must follow out_dir's rename, not try to
@@ -1826,7 +1871,7 @@ class TestTranscribeDualTrack:
             TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
         ]
 
-        _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0)
+        _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0, out_dir=tmp_path)
 
         calls = mock_transcriber.transcribe.call_args_list
         assert calls[0].args[0] == system_path
@@ -1846,7 +1891,7 @@ class TestTranscribeDualTrack:
             TranscriptResult(segments=[Segment(text="owner", start=0.0, end=1.0)]),
         ]
 
-        result = _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0)
+        result = _transcribe_dual_track(mock_transcriber, system_path, mic_path, mic_offset=0.0, out_dir=tmp_path)
 
         assert len(result.segments) == 2
         assert {seg.speaker for seg in result.segments} == {"SPEAKER_00", "Owner"}
@@ -2006,7 +2051,7 @@ class TestTranscribeAndIdentify:
         mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.99, 0.01, 0.0]}
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            result = _transcribe_and_identify(mock_transcriber, audio_path)
+            result = _transcribe_and_identify(mock_transcriber, audio_path, tmp_path)
 
         mock_transcriber.transcribe.assert_called_once_with(audio_path)
         assert result.segments[0].speaker == "Alice"
@@ -2024,7 +2069,7 @@ class TestTranscribeAndIdentify:
 
         db_path = tmp_path / "voiceprints.json"
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            result = _transcribe_and_identify(mock_transcriber, audio_path)
+            result = _transcribe_and_identify(mock_transcriber, audio_path, tmp_path)
 
         assert result.segments[0].speaker == "SPEAKER_00"
 
@@ -2051,7 +2096,7 @@ class TestTranscribeAndIdentify:
         }
 
         with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
-            _transcribe_and_identify(mock_transcriber, audio_path)
+            _transcribe_and_identify(mock_transcriber, audio_path, meeting_dir)
 
         out_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
         assert out_path.exists()
@@ -2073,7 +2118,7 @@ class TestTranscribeAndIdentify:
         mock_transcriber.transcribe.return_value = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0)])
         mock_transcriber.last_speaker_embeddings = {}
 
-        _transcribe_and_identify(mock_transcriber, audio_path)
+        _transcribe_and_identify(mock_transcriber, audio_path, meeting_dir)
 
         assert not (meeting_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
 
@@ -2093,7 +2138,7 @@ class TestTranscribeAndIdentify:
             segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
         )
 
-        _transcribe_and_identify(mock_transcriber, audio_path)
+        _transcribe_and_identify(mock_transcriber, audio_path, meeting_dir)
 
         assert not (meeting_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
 
@@ -2113,9 +2158,74 @@ class TestTranscribeAndIdentify:
         )
         mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
 
-        _transcribe_and_identify(mock_transcriber, audio_path)
+        _transcribe_and_identify(mock_transcriber, audio_path, meeting_dir)
 
         assert out_path.read_text() == sentinel
+
+
+class TestSpeakerEmbeddingsWriteLocation:
+    """Review finding F1: the file must land where run_enroll_cluster and
+    run_reprocess actually look (out_dir / the meeting directory), not next to
+    the audio -- those differ whenever config.output.audio_dir is set."""
+
+    def _separate_dirs_config(self, tmp_path):
+        config = Config()
+        config.output.format = "markdown"
+        config.output.dir = str(tmp_path / "meetings")
+        config.output.audio_dir = str(tmp_path / "audio-cache")
+        out_dir = tmp_path / "meetings" / "2026-01-01_1200"
+        out_dir.mkdir(parents=True)
+        audio_dir = tmp_path / "audio-cache" / "2026-01-01_1200"
+        audio_dir.mkdir(parents=True)
+        audio_path = audio_dir / "recording.wav"
+        audio_path.touch()
+        return config, out_dir, audio_dir, audio_path
+
+    def test_writes_to_out_dir_not_audio_dir_when_they_differ(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _do_transcribe_and_summarize
+
+        config, out_dir, audio_dir, audio_path = self._separate_dirs_config(tmp_path)
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+        with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
+            _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=False)
+
+        assert (out_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+        assert not (audio_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+
+    def test_run_enroll_cluster_finds_the_persisted_embedding_after_a_real_transcribe(self, tmp_path):
+        # Production-invoking end-to-end: run _do_transcribe_and_summarize with a
+        # separate audio_dir, then confirm run_enroll_cluster (A3) actually finds
+        # the persisted vector through the SAME directory the writer used --
+        # proving the producer and the consumer agree on the handoff, not just a
+        # shared literal filename (the review's exact F1 seam).
+        from clew.pipeline import _do_transcribe_and_summarize, run_enroll_cluster
+        from clew.speakers.base import Voiceprint, VoiceprintDB
+
+        config, out_dir, _audio_dir, audio_path = self._separate_dirs_config(tmp_path)
+        config.diarization.hf_token = ""
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+        db_path = tmp_path / "voiceprints.json"
+        with (
+            mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
+        ):
+            _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=False)
+            run_enroll_cluster(config, str(out_dir), "SPEAKER_00", "Alice")
+
+        db = VoiceprintDB.load(db_path)
+        assert db.voiceprints == [Voiceprint(name="Alice", embeddings=[[0.1, 0.2, 0.3]])]
 
 
 class TestDoTranscribeAndSummarizeDualTrack:
@@ -3047,6 +3157,42 @@ class TestRunPurge:
         run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
 
         assert not audio_path.exists()
+
+    def test_all_also_deletes_speaker_embeddings(self, tmp_path):
+        # Review finding F2: purge must also remove the per-meeting biometric
+        # vectors, not just the audio -- otherwise they survive forever.
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+        embeddings_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+        embeddings_path.write_text('{"version": 1, "clusters": {"SPEAKER_00": [0.1]}, "assignments": {}}')
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=False)
+
+        assert not embeddings_path.exists()
+
+    def test_dry_run_never_deletes_speaker_embeddings(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, run_purge
+
+        meeting_dir = tmp_path / "2026-01-01_1200"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+        audio_path.write_bytes(b"fake audio")
+        embeddings_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+        embeddings_path.write_text('{"version": 1, "clusters": {"SPEAKER_00": [0.1]}, "assignments": {}}')
+
+        config = Config()
+        config.output.dir = str(tmp_path)
+
+        run_purge(config, older_than_days=None, purge_all=True, dry_run=True)
+
+        assert embeddings_path.exists()
 
     def test_all_also_deletes_dual_tracks(self, tmp_path):
         from clew.pipeline import run_purge

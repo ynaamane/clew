@@ -423,19 +423,22 @@ def _write_speaker_embeddings(
     out_path.write_text(json.dumps({"version": 1, "clusters": cluster_embeddings, "assignments": assignments}))
 
 
-def _transcribe_and_identify(transcriber, audio_path: Path):
+def _transcribe_and_identify(transcriber, audio_path: Path, out_dir: Path):
     """Transcribe a track, relabel any diarized clusters with enrolled speaker
-    names, and persist the cluster embeddings (ADD-only) next to the audio."""
+    names, and persist the cluster embeddings (ADD-only) to out_dir -- the same
+    meeting directory run_enroll_cluster and run_reprocess use, which is NOT
+    always audio_path.parent (config.output.audio_dir can point audio and text
+    output at different directories)."""
     result = transcriber.transcribe(audio_path)
     cluster_embeddings = transcriber.last_speaker_embeddings
     relabeled, assignments = _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embeddings)
-    _write_speaker_embeddings(audio_path.parent, cluster_embeddings, assignments)
+    _write_speaker_embeddings(out_dir, cluster_embeddings, assignments)
     return relabeled
 
 
-def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_offset: float):
+def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_offset: float, out_dir: Path):
     """Transcribe system.wav (diarized+identified per config) and mic.wav (owner, never diarized), merged."""
-    system_result = _transcribe_and_identify(transcriber, system_path)
+    system_result = _transcribe_and_identify(transcriber, system_path, out_dir)
     mic_result = transcriber.transcribe(mic_path, diarize=False)
     mic_result = gate_silent_mic_segments(mic_result, mic_path)
     return _merge_dual_track_results(system_result, mic_result, mic_offset)
@@ -886,9 +889,9 @@ def _do_transcribe_and_summarize(
         if dual_tracks:
             system_path, mic_path = dual_tracks
             mic_offset = _read_mic_start_offset(audio_path)
-            result = _transcribe_dual_track(transcriber, system_path, mic_path, mic_offset)
+            result = _transcribe_dual_track(transcriber, system_path, mic_path, mic_offset, out_dir)
         else:
-            result = _transcribe_and_identify(transcriber, audio_path)
+            result = _transcribe_and_identify(transcriber, audio_path, out_dir)
 
         summarizer = None
         if needs_llm:
@@ -1026,6 +1029,7 @@ def _do_transcribe_and_summarize(
     if not config.output.keep_recording and audio_path.exists():
         for retained_path in (audio_path, *_dual_track_paths(audio_path)):
             retained_path.unlink(missing_ok=True)
+        (out_dir / SPEAKER_EMBEDDINGS_FILENAME).unlink(missing_ok=True)
         # Also remove the parent directory if it is now empty, which is expected
         # when a separate audio_dir is configured.
         if not any(audio_path.parent.iterdir()):
@@ -1520,6 +1524,7 @@ def run_purge(config: Config, older_than_days: int | None, purge_all: bool, dry_
             continue
         for retained_path in (audio, *_dual_track_paths(audio)):
             retained_path.unlink(missing_ok=True)
+        (directory / SPEAKER_EMBEDDINGS_FILENAME).unlink(missing_ok=True)
         click.echo(f"Removed retained audio: {directory}")
 
     if dry_run:

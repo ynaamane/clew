@@ -28,21 +28,26 @@ _ALIGNMENT_FILENAME = "track_alignment.json"
 _DEFAULT_MAX_TOTAL_SECONDS = 30.0
 _DEFAULT_EDGE_TRIM_SECONDS = 1.0
 _DEFAULT_MIN_TURN_SECONDS = 3.0
-# Same 5% rule as enrollment_suggest._boundary_weight -- diarization mis-attributes
-# most at the literal first/last lines of a recording.
 _DEFAULT_BOUNDARY_FRACTION = 0.05
+
+_WHISPER_MAX_SEGMENT_SECONDS = 30.0
 
 
 def _effective_end(segments: list, index: int, duration: float) -> float:
     """A segment's end, reconstructed when it's degenerate (markdown-shape
     transcripts have end == start on every segment). The next segment's start
-    (any speaker) is the reconstruction; the last segment's is transcript.duration.
-    A real, non-degenerate end (JSON-shape) is never shrunk below this -- only
-    ever extended up to it when the real end sits before the next segment starts.
+    (any speaker) is the reconstruction target, capped at
+    start + _WHISPER_MAX_SEGMENT_SECONDS (a Whisper segment never decodes past
+    that window) so a real utterance followed by an arbitrarily long silent
+    gap or recording tail can never inflate a turn far enough to escape the
+    boundary-exclusion rule. A real, non-degenerate end (JSON-shape) is never
+    shrunk below itself -- only ever extended up to the capped reconstruction
+    when the real end sits before it.
     """
     seg = segments[index]
     next_start = segments[index + 1].start if index + 1 < len(segments) else duration
-    return max(seg.end, next_start)
+    reconstructed = min(next_start, seg.start + _WHISPER_MAX_SEGMENT_SECONDS)
+    return max(seg.end, reconstructed)
 
 
 def cluster_turns(transcript: TranscriptResult, cluster: str) -> list[tuple[float, float]]:

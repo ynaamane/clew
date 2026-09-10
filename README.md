@@ -92,7 +92,10 @@ you are the controller of it. Run `clew speakers` to list what is enrolled,
 them. `clew suggest-enrollment <meeting>` surfaces candidate name matches from a
 transcript, and `clew enroll-cluster <meeting> --cluster SPEAKER_00 --name "Alice"`
 confirms one -- both are read-only suggestions and an explicit name, never an
-automatic enrollment.
+automatic enrollment. A separate, per-meeting `speaker_embeddings.json` also holds a
+raw voice embedding for each diarized speaker in that meeting, named or not; it lives
+next to that meeting's own transcript and is deleted with the retained audio,
+whether by `--no-keep-recording` or `clew purge`.
 
 This notice is informational and is not legal advice. If you record conversations with
 clients, employees or patients, check your obligations with someone qualified in your

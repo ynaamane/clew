@@ -220,6 +220,32 @@ class TestRunEnrollClusterFallbackPath:
         db = VoiceprintDB.load(db_path)
         assert db.voiceprints == []
 
+    def test_sparse_boundary_utterance_is_refused_not_enrolled(self, tmp_path, capsys):
+        # Review finding F3, reproduced end to end: a single short utterance
+        # deep inside the boundary zone of a long transcript must be refused,
+        # not silently enrolled from a mostly-silent 30s clip (pre-fix, turn
+        # inflation moved its reconstructed turn's midpoint outside the
+        # boundary zone entirely).
+        meeting_dir = tmp_path / "meeting"
+        segments = [{"text": "hi there", "start": 1.0, "end": 4.0, "speaker": "SPEAKER_00", "words": []}]
+        _write_transcript_json(meeting_dir, segments, duration=1000.0)
+        _write_silence_wav(meeting_dir / "system.wav", seconds=1000.0, sample_rate=50)
+
+        db_path = tmp_path / "voiceprints.json"
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+
+        with (
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            pytest.raises(SystemExit),
+        ):
+            run_enroll_cluster(config, str(meeting_dir), "SPEAKER_00", "Ghost")
+
+        captured = capsys.readouterr()
+        assert "SPEAKER_00" in captured.err
+        db = VoiceprintDB.load(db_path)
+        assert db.voiceprints == []
+
 
 class TestRunEnrollClusterValidation:
     def test_errors_when_directory_does_not_exist(self, tmp_path):

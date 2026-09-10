@@ -76,6 +76,30 @@ class TestClusterTurns:
         transcript = TranscriptResult(segments=[_seg("A", 0.0)], duration=5.0)
         assert cluster_turns(transcript, "B") == []
 
+    def test_a_lone_utterance_far_from_the_next_segment_does_not_inflate_the_turn(self):
+        # Review finding F3: a real utterance's end must never absorb an
+        # arbitrarily large silent gap into the turn -- a Whisper segment
+        # never decodes past 30s, so reconstruction is capped at start + 30.0.
+        transcript = TranscriptResult(
+            segments=[Segment(text="hi", start=1.0, end=1.0, speaker="SPEAKER_00")],
+            duration=1000.0,
+        )
+        assert cluster_turns(transcript, "SPEAKER_00") == [(1.0, 31.0)]
+
+    def test_the_cap_does_not_shrink_a_normal_small_gap(self):
+        transcript = TranscriptResult(segments=[_seg("A", 0.0), _seg("B", 20.0)], duration=100.0)
+        assert cluster_turns(transcript, "A") == [(0.0, 20.0)]
+
+    def test_the_cap_does_not_shrink_a_real_end_even_past_30s(self):
+        # The cap only ever bounds the RECONSTRUCTION target; a genuinely
+        # observed real end is never shrunk below itself (existing invariant,
+        # unaffected by F3).
+        transcript = TranscriptResult(
+            segments=[Segment(text="a", start=0.0, end=45.0, speaker="A"), _seg("B", 50.0)],
+            duration=100.0,
+        )
+        assert cluster_turns(transcript, "A") == [(0.0, 45.0)]
+
 
 class TestSelectClusterSpans:
     def test_drops_turn_in_first_boundary_fraction(self):
@@ -138,6 +162,17 @@ class TestSelectClusterSpans:
             duration=0.0,
         )
         assert select_cluster_spans(transcript, "A") == [(1.0, 9.0)]
+
+    def test_a_sparse_boundary_utterance_is_correctly_excluded_after_the_turn_cap(self):
+        # Review finding F3, reproduced exactly (spec probe e): pre-fix,
+        # absorbing the whole 1000s tail moved the turn's midpoint outside the
+        # boundary zone even though the real speech sits at t=1 -- defeating
+        # the boundary-exclusion rule and letting a near-silent 30s clip enroll.
+        transcript = TranscriptResult(
+            segments=[Segment(text="hi there", start=1.0, end=4.0, speaker="SPEAKER_00")],
+            duration=1000.0,
+        )
+        assert select_cluster_spans(transcript, "SPEAKER_00") == []
 
 
 class TestTrackClockShift:
