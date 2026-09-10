@@ -2,6 +2,37 @@
 
 Contexte de construction (2026-07-23 → 08-03), écrit pour pouvoir reprendre le travail depuis ce dossier sans relire l'historique complet.
 
+## Session 2026-09-10, atelier : BUILD NEXT #1 tranche 2, lane A livrée (Python), lane B à faire (Swift)
+
+Résumé (détail, chiffres et décisions : `TODO.md § 2026-09-10`) :
+- **Ce qui existe maintenant côté CLI** : `clew enroll-cluster <dir> --cluster SPEAKER_NN --name X`
+  (confirme une suggestion ou nomme un cluster identifié par l'utilisateur ; embedding persisté
+  sinon re-embed d'un clip mid-run découpé dans `system.wav`/`mic.wav` ; store multi-sample) ·
+  `clew suggest-enrollment <dir> --write` (écrit `enrollment_suggestions.json`, schéma figé dans
+  le plan, avec `mic_presence.status` ∈ {matched, borderline, below}) · le pipeline persiste
+  `speaker_embeddings.json` dans le dossier meeting (ADD-only, supprimé avec l'audio par
+  `purge`/`keep_recording=false`/`reprocess`).
+- **Ce que la review a attrapé avant le push** (deux reviewers Opus indépendants, preuves
+  ré-exécutées dans leurs worktrees, arbre chargé prouvé à cause du `clew.pth` qui pointe sur le
+  checkout principal) : un crash TypeError qui tuait `suggest-enrollment` sur tout meeting avec
+  `mic.wav` (suite aveugle : chaque test CLI patchait la fonction fautive), le fichier
+  d'embeddings écrit à côté de l'audio et non du meeting (`output.audio_dir`), des vecteurs
+  biométriques qui survivaient à la purge, un segment isolé qui absorbait tout le silence suivant.
+  Leçon nouvelle : un faux survivant de mutation par `__pycache__` périmé entre deux mutants de
+  même taille dans la même seconde → mutations avec `PYTHONDONTWRITEBYTECODE=1` et
+  `-p no:cacheprovider`.
+- **Mesure réelle** : cosine(mic 6 s, SPEAKER_02) = 0,6659 sur le 03/08, déterministe sur trois
+  runs, à 0,016 du seuil 0,65 → état `borderline` (bande ±0,05). Le 0,777 historique n'est pas
+  reproductible, ne plus le citer.
+- **Décision Yanis 10/09** : le panneau d'enrôlement offre un champ de nom éditable par cluster
+  non nommé (pré-rempli quand une suggestion existe) ; le clic reste celui de Yanis.
+- **État de l'app** : INCHANGÉ (aucun fichier Swift touché ; `LibraryFilter.apply` traite encore
+  `.enroll` comme `.all`). La reprise = lane B dans `TODO.md § 2026-09-10`, schéma JSON dans
+  `/tmp/atelier/plan-build-next-1-t2.md` (copie du schéma dans TODO.md si /tmp a été nettoyé :
+  le rapport A5 est aussi la référence, `src/clew/speakers/enrollment_report.py`).
+- `check.sh` CHECK=0 après `bash swift/build.sh` (porte BUG5 sautée sur un `bin/` du 24/08, pas
+  une édition de cette session). 0 cycle PauseIO/ResumeIO.
+
 ## Session 2026-08-25 — team complète : plan BMAD exécuté, diarisation 29,5× via MPS, 5 bugs du triage traités
 
 Résumé (détail + chiffres audités : `TODO.md § 2026-08-25`) :

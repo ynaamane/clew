@@ -1,5 +1,71 @@
 # TODO — meeting-scribe
 
+## 2026-09-10, session atelier : BUILD NEXT #1 tranche 2, lane A (Python) livrée et revue, lane B (Swift) à suivre
+
+**Livré, commité, push tenu jusqu'au SHIP** (`0c46a44..5b6118c`, 10 commits sur `db983f8` ; chaque bloc :
+TDD avec RED prouvé sur le code non modifié, mutation sans cache bytecode, ruff, suite complète en
+dernier ; deux reviewers indépendants (Opus, agent `reviewer`) ré-exécutant les preuves dans leurs
+propres worktrees avec l'arbre chargé prouvé, avant tout push) :
+- **A1 `speakers/cluster_audio.py`** (`0c46a44`) : tours par cluster, sélection « mid-run, longs »
+  (hors 5 % de bordure, rognés de 1 s, tours ≥ 3 s, cumul ≤ 30 s, plus longs d'abord), reprojection
+  sur l'horloge de `system.wav`/`mic.wav` via `track_alignment.json`, découpe soundfile.
+- **A2 `speaker_embeddings.json`** (`cb8ad0a`) : le pipeline persiste les embeddings de cluster
+  pyannote + les assignments voiceprint dans le dossier meeting (ADD-only, jamais réécrit ;
+  `reprocess`, `purge` et `keep_recording=false` le suppriment avec l'audio).
+- **A3 `clew enroll-cluster <dir> --cluster SPEAKER_NN --name X`** (`80c3174`) : embedding persisté
+  sinon re-embed d'un clip découpé par A1 (même `SpeakerEmbedder` que `clew enroll`), `upsert` dans
+  le store multi-sample. Ne tourne jamais seul ; n'écrit rien dans le dossier meeting.
+- **A4 `speakers/mic_presence.py`** (`121494e`, `ef37e32`) : embedding des spans voisés de `mic.wav`,
+  cosine vs chaque cluster ET vs les centroïdes enrôlés, double saut (un nom seulement si le
+  cluster passe ET un centroïde passe), état `status` ∈ {matched, borderline, below}, une seule
+  ligne d'évidence `mic_presence` nommée et seulement en `matched` ; la porte ≥ 2 localisations
+  et l'exclusion vocative restent (mic seul ne propose jamais).
+- **A5 `clew suggest-enrollment <dir> --write`** (`9a933f5`) : écrit `enrollment_suggestions.json`
+  (clusters non nommés avec secondes/tours/enrollable/raison, suggestions, mic_presence avec
+  status). Premier `--write` = pur ADD, un second remplace uniquement ce fichier (prouvé par
+  `find -exec stat` sur le vrai dossier du 03/08, trois runs).
+- **Correctifs de review** (`27aba59`, `2f9bfa2`, `93171e6`, `7bec80c`, `c298f75`, `5b6118c`) : F1 le fichier
+  d'embeddings partait à côté de l'AUDIO alors que A3/reprocess lisent le dossier MEETING
+  (divergence avec `output.audio_dir`) · F2 les vecteurs biométriques survivaient à `purge` et à
+  `keep_recording=false` (README GDPR devenu faux) · P1 **crash TypeError** de
+  `suggest-enrollment` sur tout meeting avec `mic.wav` (str passé à un `/` de Path ; la suite
+  était aveugle, chaque test CLI patchait la fonction) · R2 un segment isolé absorbait tout le
+  silence qui suit (fin plafonnée à +30 s, fenêtre Whisper ; puis la vraie fin JSON est respectée,
+  la reconstruction ne vaut que pour le markdown) · 6 trous de tests fermés (nom de fichier figé
+  épinglé par un littéral, « n'écrit que son fichier » par snapshot de dossier, arguments
+  assertés, précédence des raisons, regex, rglob sur la racine temp, défaut de la bande borderline épinglé aux deux bords, clamp d'un segment qui commence après la fin de l'audio).
+
+**Mesures réelles (meeting du 03/08, seul cas étiqueté)** : `suggest-enrollment` rend 0 suggestion
+(aucune auto-présentation) ; **cosine(mic 6 s, SPEAKER_02) = 0,6658580442727938**, identique au
+dernier chiffre sur trois runs CLI et sur un driver indépendant (déterministe : un seul span mic,
+mêmes poids CPU) ; runner-up 0,1757, troisième -0,0789 ; paires croisées entre clusters ≤ 0,399.
+Le clip mic est de 6,0 s (mute système à 6 s) contre 30 s par cluster. **Le 0,777 du 03/08 n'est
+pas reproductible (clips témoins choisis à la main), ne plus le citer.** Décision du seuil :
+0,65 du store + bande borderline ±0,05 (calibrée N=1 : même voix bougée de 0,017 entre clip brut
+et clip sans silence ; pire paire croisée du 03/08 à 0,013 sous le seuil) → le 03/08 tombe en
+`borderline` (cluster affiché, name null, aucune évidence). Contrôle F4 : retirer le silence du
+clip SPEAKER_01 BAISSE l'ancre (0,6659 → 0,6492), donc pas de gating de silence côté cluster.
+
+**Gates** : `check.sh` CHECK=0 après `bash swift/build.sh` (la porte BUG5 avait sauté : `bin/`
+du 24/08 plus vieux qu'un source Swift du 26/08, aucune édition Swift dans cette lane) ; Python
+1022 passed / 1 skipped / 7 deselected sous check.sh, 1032 / 1 / 1 en `uv run pytest` ; Swift 518
+XCTest (9 skipped) + 48 swift-testing ; 0 cycle PauseIO/ResumeIO.
+
+**Décision Yanis (10/09, via taff-27)** : OUI, le panneau offre un champ de nom ÉDITABLE par
+cluster non nommé quand aucune suggestion ne passe la porte, pré-rempli quand une suggestion
+existe. Le clic « Enrôler » reste celui de Yanis, jamais d'un agent.
+
+**Suit (lane B, Swift)** : B1 `.enroll` cesse d'être `.all` + lecteur du JSON · B2 panneau
+d'enrôlement (champ éditable, borderline affiché tel quel, bouton « Enrôler » → `enroll-cluster`,
+« Analyser » → `suggest-enrollment --write`) · B3 section Personnes avec « N échantillons ».
+Preuve visuelle : fenêtre réelle capturée seule, verdict de goût à Yanis.
+
+**Follow-ups notés** : le seuil « voisé » du côté mic est le détecteur de zéro numérique
+(`_MIC_SEGMENT_SILENCE_THRESHOLD`, 1e-4) : juste sur le 03/08, mais un micro ouvert et silencieux
+compterait le bruit de pièce comme voix ; la bande quasi-silence (0,03) est le candidat mieux
+fondé, à évaluer sur un vrai enregistrement · une seule réunion réelle porte tous les chiffres
+ci-dessus · downweight/exclusion des zones de chevauchement → #5 (`Segment` sans overlap).
+
 ## 2026-08-26 — session team : BUILD NEXT #1 (tranche 1) + #2 livrés, lot finitions, doute SIGTRAP tranché
 
 **Livré et poussé** (`3c25062..c8f28ca`, 15 commits — chaque livraison : TDD+mutation par sa lane,
