@@ -992,3 +992,45 @@ class TestSuggestEnrollmentCommand:
             runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
 
         mock_enroll.assert_not_called()
+
+
+class TestEnrollClusterCommand:
+    """BUILD NEXT #1 tranche 2 block A3: the confirm step -- never runs on its own,
+    always an explicit `--cluster`/`--name` the user (or a suggest-enrollment
+    candidate they accepted) provided."""
+
+    def test_forwards_directory_cluster_and_name_to_run_enroll_cluster(self, tmp_path):
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.pipeline.run_enroll_cluster") as mock_run,
+        ):
+            result = runner.invoke(cli, ["enroll-cluster", str(tmp_path), "--cluster", "SPEAKER_00", "--name", "Alice"])
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once()
+        _config, directory, cluster, name = mock_run.call_args[0]
+        assert directory == str(tmp_path)
+        assert cluster == "SPEAKER_00"
+        assert name == "Alice"
+
+    def test_requires_existing_directory(self):
+        runner = CliRunner()
+        with _mock_config():
+            result = runner.invoke(
+                cli, ["enroll-cluster", "/no/such/directory", "--cluster", "SPEAKER_00", "--name", "Alice"]
+            )
+        assert result.exit_code == 2
+        assert "does not exist" in result.output
+
+    def test_requires_cluster_option(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("clew.pipeline.run_enroll_cluster"):
+            result = runner.invoke(cli, ["enroll-cluster", str(tmp_path), "--name", "Alice"])
+        assert result.exit_code != 0
+
+    def test_requires_name_option(self, tmp_path):
+        runner = CliRunner()
+        with _mock_config(), mock.patch("clew.pipeline.run_enroll_cluster"):
+            result = runner.invoke(cli, ["enroll-cluster", str(tmp_path), "--cluster", "SPEAKER_00"])
+        assert result.exit_code != 0

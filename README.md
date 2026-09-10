@@ -89,7 +89,10 @@ separate step: `clew enroll --name "Alice" clip.wav` stores a voice embedding in
 to recognise a specific person is special category data, and if you record work meetings
 you are the controller of it. Run `clew speakers` to list what is enrolled,
 `clew unenroll "Alice"` to remove one person, or delete that file to remove all of
-them.
+them. `clew suggest-enrollment <meeting>` surfaces candidate name matches from a
+transcript, and `clew enroll-cluster <meeting> --cluster SPEAKER_00 --name "Alice"`
+confirms one -- both are read-only suggestions and an explicit name, never an
+automatic enrollment.
 
 This notice is informational and is not legal advice. If you record conversations with
 clients, employees or patients, check your obligations with someone qualified in your

@@ -1133,6 +1133,117 @@ def run_enroll(config: Config, name: str, audio_file: str) -> None:
     click.echo(f"Enrolled '{name}' from {audio_path} ({sample_count} sample{plural} now)")
 
 
+def _load_persisted_cluster_embedding(meeting_dir: Path, cluster: str) -> list[float] | None:
+    """The vector speaker_embeddings.json already holds for `cluster`, if that file
+    exists and has it -- the no-re-embed, no-token path run_enroll_cluster prefers."""
+    import json
+
+    persisted_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+    if not persisted_path.exists():
+        return None
+    try:
+        data = json.loads(persisted_path.read_text())
+    except (OSError, ValueError):
+        return None
+    return data.get("clusters", {}).get(cluster)
+
+
+def _resolve_cluster_embedding(config: Config, meeting_dir: Path, transcript, cluster: str) -> tuple:
+    """Return (embedding, source_description) for `cluster`: a persisted vector
+    when speaker_embeddings.json already has one (no model load, no HF token),
+    otherwise cut and embed a clean reference clip via clew.speakers.cluster_audio
+    (block A1) in a temporary directory that's always cleaned up."""
+    persisted = _load_persisted_cluster_embedding(meeting_dir, cluster)
+    if persisted is not None:
+        return persisted, "persisted embedding"
+
+    if not config.diarization.hf_token:
+        click.echo(
+            "Error: Enrollment requires a HuggingFace token (same one diarization uses).\n"
+            "Set HF_TOKEN env var or hf_token in config.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    import tempfile
+
+    from clew.speakers.cluster_audio import write_cluster_clip
+    from clew.speakers.embedding import SpeakerEmbedder
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        clip_path = Path(tmp_dir) / "clip.wav"
+        try:
+            clip_duration = write_cluster_clip(meeting_dir, transcript, cluster, clip_path)
+        except FileNotFoundError:
+            click.echo(
+                "Error: retained audio is missing, run enroll from a clip instead.",
+                err=True,
+            )
+            raise SystemExit(1) from None
+        except ValueError:
+            click.echo(
+                f"Error: cluster '{cluster}' has no long mid-run turn to enroll from.",
+                err=True,
+            )
+            raise SystemExit(1) from None
+
+        embedder = SpeakerEmbedder(config.diarization.hf_token)
+        try:
+            embedding = embedder.embed_file(clip_path)
+        except Exception as exc:
+            click.echo(f"Error: Failed to compute voiceprint: {exc}", err=True)
+            raise SystemExit(1) from None
+
+    return embedding, f"re-embedded clip of {clip_duration:.1f}s"
+
+
+def run_enroll_cluster(config: Config, directory: str, cluster: str, name: str) -> None:
+    """Confirm an enrollment for one diarized cluster of an already-transcribed
+    meeting: either a suggest-enrollment candidate or a cluster the user
+    identified themselves. Reuses the meeting's persisted cluster embedding when
+    available; otherwise cuts and re-embeds a clean reference clip from the
+    retained audio (block A1). Never writes into the meeting directory."""
+    from clew.speakers.base import VoiceprintDB
+    from clew.speakers.enrollment_suggest import load_transcript_result
+
+    dir_path = Path(directory).resolve()
+    if not dir_path.is_dir():
+        click.echo(f"Error: {dir_path} is not a directory.", err=True)
+        raise SystemExit(1)
+
+    name = name.strip()
+    if not name:
+        click.echo("Error: --name cannot be empty.", err=True)
+        raise SystemExit(1)
+
+    try:
+        transcript = load_transcript_result(dir_path)
+    except FileNotFoundError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from None
+
+    speakers_present = sorted({seg.speaker for seg in transcript.segments if seg.speaker is not None})
+    if cluster not in speakers_present:
+        present = ", ".join(speakers_present) if speakers_present else "(none)"
+        click.echo(
+            f"Error: cluster '{cluster}' not found in {dir_path}. Speakers present: {present}",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    embedding, source_desc = _resolve_cluster_embedding(config, dir_path, transcript, cluster)
+
+    db = VoiceprintDB.load()
+    db.upsert(name, embedding)
+    db.save()
+
+    sample_count = next((len(vp.embeddings) for vp in db.voiceprints if vp.name == name), 1)
+    plural = "" if sample_count == 1 else "s"
+    click.echo(
+        f"Enrolled '{name}' from cluster {cluster} of {dir_path} ({sample_count} sample{plural} now, {source_desc})"
+    )
+
+
 def run_unenroll(name: str) -> None:
     """Remove an enrolled speaker's voiceprint."""
     from clew.speakers.base import VoiceprintDB

@@ -503,6 +503,22 @@ def list_speakers() -> None:
     run_list_enrolled()
 
 
+@cli.command("enroll-cluster")
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--cluster", required=True, help="Diarized cluster label to enroll (e.g. SPEAKER_00).")
+@click.option("--name", required=True, help="Name to enroll this cluster's voice as.")
+@click.pass_context
+def enroll_cluster_cmd(ctx: click.Context, directory: str, cluster: str, name: str) -> None:
+    """Confirm a speaker-name enrollment for one diarized cluster of a
+    transcribed meeting -- either a `suggest-enrollment` candidate or a cluster
+    you identified yourself. Never runs on its own; this is always an explicit,
+    separate confirmation step."""
+    config = ctx.obj["config"]
+    from clew.pipeline import run_enroll_cluster
+
+    run_enroll_cluster(config, directory, cluster, name)
+
+
 @cli.command("suggest-enrollment")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.pass_context
