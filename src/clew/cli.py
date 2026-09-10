@@ -610,7 +610,10 @@ def suggest_enrollment_cmd(ctx: click.Context, directory: str, write_report: boo
 
     if mic_presence is not None:
         name_desc = mic_presence.name if mic_presence.name is not None else "none"
-        click.echo(f"Mic presence: cluster={mic_presence.cluster} score={mic_presence.score:.3f} name={name_desc}")
+        click.echo(
+            f"Mic presence: cluster={mic_presence.cluster} score={mic_presence.score:.3f} "
+            f"name={name_desc} status={mic_presence.status}"
+        )
     else:
         click.echo(f"Mic presence: unavailable ({mic_reason})")
 

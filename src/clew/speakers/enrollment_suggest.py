@@ -38,7 +38,7 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
-from clew.speakers.mic_presence import MicPresence
+from clew.speakers.mic_presence import MIC_PRESENCE_STATUS_MATCHED, MicPresence
 from clew.summarization.base import Summarizer
 from clew.transcription.models import Segment, TranscriptResult, Word
 
@@ -316,10 +316,11 @@ def build_evidence_table(
     it carries a name, and combine everything into a single,
     boundary-downweighted table -- the only input the LLM arbiter ever sees.
 
-    mic_presence contributes at most ONE Evidence row, and only when it
-    resolved BOTH a cluster and a name (see clew.speakers.mic_presence.
-    resolve_mic_presence's two-hop gate) -- a cluster-only match adds nothing,
-    same as the structural per-Owner-segment rows extract_mic_presence_evidence
+    mic_presence contributes at most ONE Evidence row, and only when its
+    status is "matched" (score >= threshold + margin) and it resolved BOTH a
+    cluster and a name (see clew.speakers.mic_presence.resolve_mic_presence's
+    two-hop gate) -- a "borderline" or cluster-only match adds nothing, same
+    as the structural per-Owner-segment rows extract_mic_presence_evidence
     always produces.
     """
     self_intro = extract_self_intro_evidence(transcript)
@@ -330,7 +331,12 @@ def build_evidence_table(
     mic_presence_rows = extract_mic_presence_evidence(transcript)
 
     resolved_mic_presence: list[Evidence] = []
-    if mic_presence is not None and mic_presence.cluster is not None and mic_presence.name is not None:
+    if (
+        mic_presence is not None
+        and mic_presence.status == MIC_PRESENCE_STATUS_MATCHED
+        and mic_presence.cluster is not None
+        and mic_presence.name is not None
+    ):
         resolved_mic_presence.append(
             Evidence(
                 kind=EvidenceKind.MIC_PRESENCE,

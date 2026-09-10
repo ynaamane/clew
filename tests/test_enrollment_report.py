@@ -252,11 +252,26 @@ class TestBuildEnrollmentReportMicPresence:
 
     def test_populated_presence_preserves_nulls(self, tmp_path):
         transcript = TranscriptResult(segments=[], duration=100.0)
-        presence = MicPresence(cluster="SPEAKER_02", name=None, score=0.777, start=1.0, end=2.0)
+        presence = MicPresence(cluster="SPEAKER_02", name=None, score=0.777, status="matched", start=1.0, end=2.0)
 
         report = build_enrollment_report(transcript, tmp_path, [], presence, now=_FIXED_NOW)
 
-        assert report["mic_presence"] == {"cluster": "SPEAKER_02", "name": None, "score": 0.777}
+        assert report["mic_presence"] == {
+            "cluster": "SPEAKER_02",
+            "name": None,
+            "score": 0.777,
+            "status": "matched",
+        }
+
+    def test_borderline_status_is_preserved(self, tmp_path):
+        # Schema amendment: the report's mic_presence object gains "status".
+        transcript = TranscriptResult(segments=[], duration=100.0)
+        presence = MicPresence(cluster="SPEAKER_02", name=None, score=0.666, status="borderline", start=1.0, end=2.0)
+
+        report = build_enrollment_report(transcript, tmp_path, [], presence, now=_FIXED_NOW)
+
+        assert report["mic_presence"]["status"] == "borderline"
+        assert report["mic_presence"]["name"] is None
 
 
 class TestWriteEnrollmentReport:

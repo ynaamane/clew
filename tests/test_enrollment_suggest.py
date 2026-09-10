@@ -438,7 +438,7 @@ class TestBuildEvidenceTableMicPresence:
             segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
             duration=100.0,
         )
-        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, start=10.0, end=15.0)
+        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, status="matched", start=10.0, end=15.0)
 
         table = build_evidence_table(result, roster=[], mic_presence=presence)
 
@@ -457,7 +457,7 @@ class TestBuildEvidenceTableMicPresence:
             segments=[_segment("On y va.", "Owner", start=50.0, end=51.0)],
             duration=100.0,
         )
-        presence = MicPresence(cluster="Owner", name="Kamal", score=0.8, start=50.0, end=51.0)
+        presence = MicPresence(cluster="Owner", name="Kamal", score=0.8, status="matched", start=50.0, end=51.0)
 
         table = build_evidence_table(result, roster=[], mic_presence=presence)
 
@@ -477,11 +477,29 @@ class TestBuildEvidenceTableMicPresence:
             segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
             duration=100.0,
         )
-        presence = MicPresence(cluster="SPEAKER_00", name=None, score=0.3, start=10.0, end=15.0)
+        presence = MicPresence(cluster="SPEAKER_00", name=None, score=0.3, status="matched", start=10.0, end=15.0)
 
         table = build_evidence_table(result, roster=[], mic_presence=presence)
 
         assert [e for e in table.evidence if e.kind == EvidenceKind.MIC_PRESENCE] == []
+
+    def test_borderline_mic_presence_adds_no_row_even_with_a_name(self):
+        # Schema amendment: a "borderline" presence must never seed evidence,
+        # even if (by construction, defensively -- resolve_mic_presence itself
+        # never does this) it somehow carried a name.
+        from clew.speakers.mic_presence import MicPresence
+
+        result = TranscriptResult(
+            segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
+            duration=100.0,
+        )
+        presence = MicPresence(
+            cluster="SPEAKER_00", name="Kamal", score=0.63, status="borderline", start=10.0, end=15.0
+        )
+
+        table = build_evidence_table(result, roster=[], mic_presence=presence)
+
+        assert [e for e in table.evidence if e.kind == EvidenceKind.MIC_PRESENCE and e.name is not None] == []
 
     def test_mic_presence_defaults_to_none_and_adds_nothing(self):
         result = TranscriptResult(

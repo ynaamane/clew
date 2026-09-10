@@ -1039,7 +1039,7 @@ class TestSuggestEnrollmentCommand:
         db_path = tmp_path / "voiceprints.json"
         config = Config()
         config.diarization.hf_token = "hf_test_token"
-        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, start=1.0, end=5.0)
+        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, status="matched", start=1.0, end=5.0)
         runner = CliRunner()
         with (
             _mock_config(config),
@@ -1056,7 +1056,7 @@ class TestSuggestEnrollmentCommand:
             result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
 
         assert result.exit_code == 0
-        assert "Mic presence: cluster=SPEAKER_00 score=0.800 name=Kamal" in result.output
+        assert "Mic presence: cluster=SPEAKER_00 score=0.800 name=Kamal status=matched" in result.output
         assert mock_build.call_args[1]["mic_presence"] == presence
         mock_resolve.assert_called_once()
 
@@ -1067,7 +1067,7 @@ class TestSuggestEnrollmentCommand:
         db_path = tmp_path / "voiceprints.json"
         config = Config()
         config.diarization.hf_token = "hf_test_token"
-        presence = MicPresence(cluster=None, name=None, score=0.2, start=1.0, end=5.0)
+        presence = MicPresence(cluster=None, name=None, score=0.2, status="below", start=1.0, end=5.0)
         runner = CliRunner()
         with (
             _mock_config(config),
@@ -1084,7 +1084,7 @@ class TestSuggestEnrollmentCommand:
             result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
 
         assert result.exit_code == 0
-        assert "Mic presence: cluster=None score=0.200 name=none" in result.output
+        assert "Mic presence: cluster=None score=0.200 name=none status=below" in result.output
 
     def test_mic_presence_unavailable_when_no_cluster_embeddings(self, tmp_path):
         (tmp_path / "mic.wav").touch()
@@ -1177,6 +1177,7 @@ class TestSuggestEnrollmentCommand:
 
         assert result.exit_code == 0
         assert "Mic presence: cluster=SPEAKER_00" in result.output
+        assert "status=matched" in result.output
         assert f"Wrote {tmp_path / 'enrollment_suggestions.json'}" in result.output
 
     def test_write_flag_builds_and_writes_the_report_and_prints_the_path(self, tmp_path):
@@ -1188,7 +1189,7 @@ class TestSuggestEnrollmentCommand:
         from clew.speakers.mic_presence import MicPresence
 
         suggestion = Suggestion(cluster="SPEAKER_00", name="Devon", evidence=[], confidence="high")
-        presence = MicPresence(cluster="SPEAKER_01", name="Kamal", score=0.8, start=1.0, end=5.0)
+        presence = MicPresence(cluster="SPEAKER_01", name="Kamal", score=0.8, status="matched", start=1.0, end=5.0)
         transcript_stub = mock.Mock()
         report_stub = {"version": 1, "generated_at": "x", "clusters": [], "suggestions": [], "mic_presence": None}
         written_path = tmp_path / "enrollment_suggestions.json"

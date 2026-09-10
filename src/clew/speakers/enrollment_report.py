@@ -104,7 +104,12 @@ def build_enrollment_report(
     mic_presence_report = (
         None
         if mic_presence is None
-        else {"cluster": mic_presence.cluster, "name": mic_presence.name, "score": mic_presence.score}
+        else {
+            "cluster": mic_presence.cluster,
+            "name": mic_presence.name,
+            "score": mic_presence.score,
+            "status": mic_presence.status,
+        }
     )
 
     return {

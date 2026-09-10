@@ -112,7 +112,9 @@ class TestResolveMicPresence:
 
         presence = resolve_mic_presence([1.0, 0.0, 0.0], cluster_embeddings, db, start=1.0, end=2.0)
 
-        assert presence == MicPresence(cluster="SPEAKER_00", name="Kamal", score=pytest.approx(1.0), start=1.0, end=2.0)
+        assert presence == MicPresence(
+            cluster="SPEAKER_00", name="Kamal", score=pytest.approx(1.0), status="matched", start=1.0, end=2.0
+        )
 
     def test_empty_store_never_resolves_a_name_even_with_a_strong_cluster_match(self):
         db = VoiceprintDB()
@@ -151,6 +153,7 @@ class TestResolveMicPresence:
         assert presence.cluster is None
         assert presence.score is None
         assert presence.name is None
+        assert presence.status == "below"
 
     def test_hop_two_never_runs_when_hop_one_fails_even_if_the_store_would_match(self):
         # The store match would succeed if checked directly against mic_emb --
@@ -173,6 +176,78 @@ class TestResolveMicPresence:
         presence = resolve_mic_presence([0.9, 0.1, 0.0], cluster_embeddings, db, threshold=0.5, start=0.0, end=1.0)
 
         assert presence.cluster == "SPEAKER_01"
+
+
+class TestResolveMicPresenceBorderlineStatus:
+    """Schema amendment (2026-09-10, plan-build-next-1-t2.md "Amendement du
+    schema", after the A4/A5 review): a margin band around threshold that
+    never resolves a name, so a real-data score of 0.666 against a 0.65
+    threshold (0.016 of headroom) reports honestly instead of silently
+    passing or failing a coin-flip-close match. Each boundary test patches
+    cosine_similarity directly (not derived from vector geometry) so the
+    exact >= / < comparisons at the band edges are never blurred by
+    floating-point noise from the vectors themselves."""
+
+    def test_exactly_threshold_plus_margin_is_matched(self):
+        # The mocked score is the SAME expression (0.65 + 0.05) production
+        # computes internally -- a separately-typed 0.70 literal is NOT
+        # bit-identical to 0.65 + 0.05 (0.7000000000000001), which would
+        # blur exactly the boundary this test exists to pin.
+        db = VoiceprintDB()
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.65 + 0.05):
+            presence = resolve_mic_presence(
+                [1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, margin=0.05, start=0.0, end=1.0
+            )
+
+        assert presence.status == "matched"
+        assert presence.cluster == "SPEAKER_00"
+
+    def test_exactly_threshold_minus_margin_is_borderline(self):
+        db = VoiceprintDB()
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.60):
+            presence = resolve_mic_presence(
+                [1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, margin=0.05, start=0.0, end=1.0
+            )
+
+        assert presence.status == "borderline"
+        assert presence.cluster == "SPEAKER_00"
+        assert presence.name is None
+
+    def test_just_below_threshold_minus_margin_is_below(self):
+        db = VoiceprintDB()
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.599999):
+            presence = resolve_mic_presence(
+                [1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, margin=0.05, start=0.0, end=1.0
+            )
+
+        assert presence.status == "below"
+        assert presence.cluster is None
+        assert presence.name is None
+
+    def test_borderline_never_resolves_a_name_even_with_a_store_match(self):
+        # cosine_similarity is patched only for hop 1 (mic_presence's own
+        # reference); match_speaker (hop 2) uses matching.py's own real
+        # cosine_similarity, so this proves the status gate itself blocks
+        # hop 2 from ever running, not a coincidentally-mocked hop 2 too.
+        db = VoiceprintDB()
+        db.upsert("Kamal", [1.0])
+        with mock.patch("clew.speakers.mic_presence.cosine_similarity", return_value=0.63):
+            presence = resolve_mic_presence(
+                [1.0], {"SPEAKER_00": [1.0]}, db, threshold=0.65, margin=0.05, start=0.0, end=1.0
+            )
+
+        assert presence.status == "borderline"
+        assert presence.name is None
+
+    def test_matched_still_resolves_a_name_via_hop_two(self):
+        db = VoiceprintDB()
+        db.upsert("Kamal", [1.0, 0.0])
+        presence = resolve_mic_presence(
+            [1.0, 0.0], {"SPEAKER_00": [1.0, 0.0]}, db, threshold=0.65, margin=0.05, start=0.0, end=1.0
+        )
+
+        assert presence.status == "matched"
+        assert presence.name == "Kamal"
 
 
 class TestClusterEmbeddingsFor:

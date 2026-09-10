@@ -107,16 +107,27 @@ def mic_embedding(
         return embedder.embed_file(clip_path)
 
 
+MIC_PRESENCE_STATUS_MATCHED = "matched"
+MIC_PRESENCE_STATUS_BORDERLINE = "borderline"
+MIC_PRESENCE_STATUS_BELOW = "below"
+
+_DEFAULT_BORDERLINE_MARGIN = 0.05
+
+
 @dataclass(frozen=True)
 class MicPresence:
-    """cluster is set only when the hop-1 cosine score clears `threshold`; name
-    is set only when cluster is also set (a second, independent hop over the
-    voiceprint store). score is always the best hop-1 cosine value found, even
-    below threshold -- reported for transparency, never hidden."""
+    """status is one of "matched" (score >= threshold + margin: cluster set,
+    name resolved via hop 2), "borderline" (within the margin band around
+    threshold: cluster set to the argmax for display, name always None -- see
+    resolve_mic_presence's calibration note), or "below" (score < threshold -
+    margin, or no cluster embeddings at all: cluster and name both None).
+    score is always the best hop-1 cosine value found, even below threshold --
+    reported for transparency, never hidden."""
 
     cluster: str | None
     name: str | None
     score: float | None
+    status: str
     start: float
     end: float
 
@@ -127,14 +138,25 @@ def resolve_mic_presence(
     db: VoiceprintDB,
     *,
     threshold: float = DEFAULT_MATCH_THRESHOLD,
+    margin: float = _DEFAULT_BORDERLINE_MARGIN,
     start: float,
     end: float,
 ) -> MicPresence:
-    """Two-hop match: hop 1 picks the best-cosine diarized cluster for mic_emb
-    (score always reported); hop 2 resolves a voiceprint-store name ONLY when
-    hop 1 already cleared threshold -- a name is never resolved from hop 2 alone."""
+    """Two-hop match, now three-banded around threshold instead of a single
+    cliff: hop 1 picks the best-cosine diarized cluster for mic_emb (score
+    always reported); hop 2 resolves a voiceprint-store name ONLY when status
+    is "matched" -- a name is never resolved from hop 2 alone, and never at
+    all in the borderline band.
+
+    Margin calibration (N=1, 2026-08-03/09-10 real data, see
+    /tmp/atelier/plan-build-next-1-t2.md "Amendement du schema"): the SAME
+    voice's embedding moved 0.017 between a raw and a silence-gated clip of
+    itself, and the worst cross-speaker pair in the 2026-08-03 matrix sat
+    only 0.013 below the match threshold. A 0.05 margin comfortably covers
+    both observed sources of noise -- revisit as more real data accumulates.
+    """
     if not cluster_embeddings:
-        return MicPresence(cluster=None, name=None, score=None, start=start, end=end)
+        return MicPresence(cluster=None, name=None, score=None, status=MIC_PRESENCE_STATUS_BELOW, start=start, end=end)
 
     best_cluster: str | None = None
     best_score: float | None = None
@@ -144,13 +166,20 @@ def resolve_mic_presence(
             best_score = score
             best_cluster = cluster_label
 
-    cluster = best_cluster if best_score is not None and best_score >= threshold else None
+    if best_score >= threshold + margin:
+        status = MIC_PRESENCE_STATUS_MATCHED
+    elif best_score >= threshold - margin:
+        status = MIC_PRESENCE_STATUS_BORDERLINE
+    else:
+        status = MIC_PRESENCE_STATUS_BELOW
+
+    cluster = best_cluster if status != MIC_PRESENCE_STATUS_BELOW else None
 
     name = None
-    if cluster is not None:
+    if status == MIC_PRESENCE_STATUS_MATCHED:
         name = match_speaker(mic_emb, db, threshold=threshold)
 
-    return MicPresence(cluster=cluster, name=name, score=best_score, start=start, end=end)
+    return MicPresence(cluster=cluster, name=name, score=best_score, status=status, start=start, end=end)
 
 
 def cluster_embeddings_for(meeting_dir: Path, transcript, embedder_factory) -> dict[str, list[float]]:
