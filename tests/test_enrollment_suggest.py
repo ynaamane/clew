@@ -56,6 +56,18 @@ def _vocative_exclusion(cluster: str, name: str, start: float, end: float) -> Ev
     )
 
 
+def _mic_presence(cluster: str, name: str, start: float, end: float) -> Evidence:
+    return Evidence(
+        kind=EvidenceKind.MIC_PRESENCE,
+        name=name,
+        speaker_cluster=cluster,
+        excluded_cluster=None,
+        start=start,
+        end=end,
+        weight=0.8,
+    )
+
+
 class FakeSummarizer:
     """Duck-typed fake mirroring tests/test_search.py's -- records calls, returns
     canned JSON responses so the arbiter never touches a real model in tests."""
@@ -413,6 +425,73 @@ class TestBuildEvidenceTable:
         assert table.evidence[0].weight == 1.0
 
 
+class TestBuildEvidenceTableMicPresence:
+    """BUILD NEXT #1 tranche 2 block A4: build_evidence_table's mic_presence
+    parameter folds in the ONE resolved cosine mic<->cluster match, on top of
+    the always-present structural per-Owner-segment rows extract_mic_presence_evidence
+    already produces."""
+
+    def test_resolved_mic_presence_adds_exactly_one_named_evidence_row(self):
+        from clew.speakers.mic_presence import MicPresence
+
+        result = TranscriptResult(
+            segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
+            duration=100.0,
+        )
+        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, start=10.0, end=15.0)
+
+        table = build_evidence_table(result, roster=[], mic_presence=presence)
+
+        named_mic_rows = [e for e in table.evidence if e.kind == EvidenceKind.MIC_PRESENCE and e.name is not None]
+        assert len(named_mic_rows) == 1
+        assert named_mic_rows[0].name == "Kamal"
+        assert named_mic_rows[0].speaker_cluster == "SPEAKER_00"
+        assert named_mic_rows[0].excluded_cluster is None
+        assert named_mic_rows[0].start == 10.0
+        assert named_mic_rows[0].end == 15.0
+
+    def test_the_structural_unnamed_mic_presence_rows_are_unchanged(self):
+        from clew.speakers.mic_presence import MicPresence
+
+        result = TranscriptResult(
+            segments=[_segment("On y va.", "Owner", start=50.0, end=51.0)],
+            duration=100.0,
+        )
+        presence = MicPresence(cluster="Owner", name="Kamal", score=0.8, start=50.0, end=51.0)
+
+        table = build_evidence_table(result, roster=[], mic_presence=presence)
+
+        unnamed_mic_rows = [e for e in table.evidence if e.kind == EvidenceKind.MIC_PRESENCE and e.name is None]
+        assert len(unnamed_mic_rows) == 1
+        assert unnamed_mic_rows[0].speaker_cluster == "Owner"
+
+    def test_mic_presence_without_a_name_adds_nothing(self):
+        # Not an Owner segment, so extract_mic_presence_evidence's own structural
+        # pass contributes zero rows here -- ANY MIC_PRESENCE row in the table
+        # (named or not) would only be explained by mic_presence.cluster alone
+        # wrongly bypassing the name gate. Checking the total count, not just
+        # named rows, so a row added with name=None can't hide from this test.
+        from clew.speakers.mic_presence import MicPresence
+
+        result = TranscriptResult(
+            segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
+            duration=100.0,
+        )
+        presence = MicPresence(cluster="SPEAKER_00", name=None, score=0.3, start=10.0, end=15.0)
+
+        table = build_evidence_table(result, roster=[], mic_presence=presence)
+
+        assert [e for e in table.evidence if e.kind == EvidenceKind.MIC_PRESENCE] == []
+
+    def test_mic_presence_defaults_to_none_and_adds_nothing(self):
+        result = TranscriptResult(
+            segments=[_segment("Bonjour tout le monde.", "SPEAKER_00", start=50.0, end=52.0)],
+            duration=100.0,
+        )
+        table = build_evidence_table(result, roster=[])
+        assert not any(e.kind == EvidenceKind.MIC_PRESENCE and e.name is not None for e in table.evidence)
+
+
 class TestGateCandidateMappings:
     """The hard gate -- enforced in Python, never delegated to the LLM."""
 
@@ -493,6 +572,35 @@ class TestGateCandidateMappings:
 
     def test_empty_table_yields_no_candidates(self):
         assert gate_candidate_mappings(EvidenceTable()) == []
+
+    def test_mic_presence_alone_never_becomes_a_candidate(self):
+        # One location -- still fails the >=2-independent-evidence gate, exactly
+        # like a lone self-intro.
+        table = EvidenceTable(evidence=[_mic_presence("SPEAKER_00", "Kamal", 10.0, 15.0)])
+        assert gate_candidate_mappings(table) == []
+
+    def test_mic_presence_plus_one_self_intro_at_a_distinct_location_passes(self):
+        table = EvidenceTable(
+            evidence=[
+                _mic_presence("SPEAKER_00", "Kamal", 10.0, 15.0),
+                _self_intro("SPEAKER_00", "Kamal", 40.0, 41.0),
+            ]
+        )
+        candidates = gate_candidate_mappings(table)
+        assert len(candidates) == 1
+        assert candidates[0].cluster == "SPEAKER_00"
+        assert candidates[0].name == "Kamal"
+        assert {e.kind for e in candidates[0].evidence} == {EvidenceKind.MIC_PRESENCE, EvidenceKind.SELF_INTRO}
+
+    def test_vocative_exclusion_still_drops_the_pair_with_mic_and_self_intro(self):
+        table = EvidenceTable(
+            evidence=[
+                _mic_presence("SPEAKER_00", "Kamal", 10.0, 15.0),
+                _self_intro("SPEAKER_00", "Kamal", 40.0, 41.0),
+                _vocative_exclusion("SPEAKER_00", "Kamal", 20.0, 21.0),
+            ]
+        )
+        assert gate_candidate_mappings(table) == []
 
 
 class TestSuggestEnrollments:

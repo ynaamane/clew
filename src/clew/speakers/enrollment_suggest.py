@@ -21,6 +21,13 @@ of who answers a vocative was wrong in the one labeled real case so far) and the
 itemized spec for this tranche only requires vocative-as-exclusion, not
 vocative-as-suggestion. If it comes back, it needs its own measurement, not a
 guess.
+
+Tranche 2 update (BUILD NEXT #1, block A4): point (2) above is now partial --
+extract_mic_presence_evidence itself still resolves no NAME, it only marks
+WHICH segments are the mic track's own voice. The actual cosine mic<->cluster
+identity match now lives in clew.speakers.mic_presence (resolve_mic_presence),
+and its result is folded into the table as a single resolved Evidence row by
+build_evidence_table's mic_presence parameter -- never invented here.
 """
 
 from __future__ import annotations
@@ -31,6 +38,7 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
+from clew.speakers.mic_presence import MicPresence
 from clew.summarization.base import Summarizer
 from clew.transcription.models import Segment, TranscriptResult, Word
 
@@ -300,20 +308,44 @@ def _boundary_weight(start: float, end: float, duration: float, base_weight: flo
     return base_weight
 
 
-def build_evidence_table(transcript: TranscriptResult, roster: list[str]) -> EvidenceTable:
-    """Run every deterministic extractor over one transcript and combine the
-    results into a single, boundary-downweighted table -- the only input the LLM
-    arbiter (tranche 1's next commit) ever sees."""
+def build_evidence_table(
+    transcript: TranscriptResult, roster: list[str], mic_presence: MicPresence | None = None
+) -> EvidenceTable:
+    """Run every deterministic extractor over one transcript, fold in the
+    already-resolved cosine mic<->cluster match (mic_presence, block A4) when
+    it carries a name, and combine everything into a single,
+    boundary-downweighted table -- the only input the LLM arbiter ever sees.
+
+    mic_presence contributes at most ONE Evidence row, and only when it
+    resolved BOTH a cluster and a name (see clew.speakers.mic_presence.
+    resolve_mic_presence's two-hop gate) -- a cluster-only match adds nothing,
+    same as the structural per-Owner-segment rows extract_mic_presence_evidence
+    always produces.
+    """
     self_intro = extract_self_intro_evidence(transcript)
     vocative = extract_vocative_evidence(transcript)
     third_person_absent = extract_third_person_absent_evidence(
         transcript, roster, self_intro_evidence=self_intro, vocative_evidence=vocative
     )
-    mic_presence = extract_mic_presence_evidence(transcript)
+    mic_presence_rows = extract_mic_presence_evidence(transcript)
+
+    resolved_mic_presence: list[Evidence] = []
+    if mic_presence is not None and mic_presence.cluster is not None and mic_presence.name is not None:
+        resolved_mic_presence.append(
+            Evidence(
+                kind=EvidenceKind.MIC_PRESENCE,
+                name=mic_presence.name,
+                speaker_cluster=mic_presence.cluster,
+                excluded_cluster=None,
+                start=mic_presence.start,
+                end=mic_presence.end,
+                weight=mic_presence.score if mic_presence.score is not None else _BASE_WEIGHT,
+            )
+        )
 
     all_evidence = [
         replace(e, weight=_boundary_weight(e.start, e.end, transcript.duration, e.weight))
-        for e in (*self_intro, *vocative, *third_person_absent, *mic_presence)
+        for e in (*self_intro, *vocative, *third_person_absent, *mic_presence_rows, *resolved_mic_presence)
     ]
     return EvidenceTable(evidence=all_evidence)
 
@@ -342,17 +374,22 @@ def _is_excluded(table: EvidenceTable, cluster: str, name: str) -> bool:
     )
 
 
+_POSITIVE_EVIDENCE_KINDS = (EvidenceKind.SELF_INTRO, EvidenceKind.MIC_PRESENCE)
+
+
 def gate_candidate_mappings(table: EvidenceTable) -> list[CandidateMapping]:
-    """The hard gate: enforced in Python, never delegated to the LLM. Self-intro
-    is the only positive-evidence kind in this tranche, so candidates are built by
-    grouping it by (cluster, name); a pair a vocative excludes is dropped before
-    it ever becomes a candidate; a pair needs >=2 self-intro rows at DISTINCT
-    (start, end) locations -- duplicate rows at the same timestamp are one
-    observation, not independent corroboration ("jamais de proposition a
-    evidence unique")."""
+    """The hard gate: enforced in Python, never delegated to the LLM. Positive
+    evidence is SELF_INTRO rows plus MIC_PRESENCE rows that already carry a
+    resolved name (the structural per-Owner-segment presence rows never do --
+    see extract_mic_presence_evidence); candidates are built by grouping that
+    positive evidence by (cluster, name); a pair a vocative excludes is dropped
+    before it ever becomes a candidate; a pair needs >=2 positive rows at
+    DISTINCT (start, end) locations, of any positive kind -- duplicate rows at
+    the same timestamp are one observation, not independent corroboration
+    ("jamais de proposition a evidence unique")."""
     grouped: dict[tuple[str, str], list[Evidence]] = {}
     for e in table.evidence:
-        if e.kind != EvidenceKind.SELF_INTRO or e.name is None or e.speaker_cluster is None:
+        if e.kind not in _POSITIVE_EVIDENCE_KINDS or e.name is None or e.speaker_cluster is None:
             continue
         grouped.setdefault((e.speaker_cluster, e.name), []).append(e)
 

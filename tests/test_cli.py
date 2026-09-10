@@ -993,6 +993,140 @@ class TestSuggestEnrollmentCommand:
 
         mock_enroll.assert_not_called()
 
+    def test_mic_presence_unavailable_when_no_mic_wav(self, tmp_path):
+        # No mic.wav in tmp_path.
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: unavailable (no mic.wav)" in result.output
+        assert mock_build.call_args[1]["mic_presence"] is None
+
+    def test_mic_presence_unavailable_when_no_hf_token(self, tmp_path):
+        (tmp_path / "mic.wav").touch()
+        config = Config()
+        config.diarization.hf_token = ""
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.mic_presence.cluster_embeddings_for") as mock_cef,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: unavailable (no HuggingFace token configured)" in result.output
+        assert mock_build.call_args[1]["mic_presence"] is None
+        mock_cef.assert_not_called()
+
+    def test_mic_presence_line_reports_a_resolved_match(self, tmp_path):
+        from clew.speakers.mic_presence import MicPresence
+
+        (tmp_path / "mic.wav").touch()
+        db_path = tmp_path / "voiceprints.json"
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        presence = MicPresence(cluster="SPEAKER_00", name="Kamal", score=0.8, start=1.0, end=5.0)
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.mic_presence.cluster_embeddings_for", return_value={"SPEAKER_00": [0.1, 0.2]}),
+            mock.patch("clew.speakers.mic_presence.voiced_spans", return_value=[(1.0, 5.0)]),
+            mock.patch("clew.speakers.mic_presence.mic_embedding", return_value=[0.1, 0.2]),
+            mock.patch("clew.speakers.mic_presence.resolve_mic_presence", return_value=presence) as mock_resolve,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: cluster=SPEAKER_00 score=0.800 name=Kamal" in result.output
+        assert mock_build.call_args[1]["mic_presence"] == presence
+        mock_resolve.assert_called_once()
+
+    def test_mic_presence_line_shows_none_when_no_name_resolved(self, tmp_path):
+        from clew.speakers.mic_presence import MicPresence
+
+        (tmp_path / "mic.wav").touch()
+        db_path = tmp_path / "voiceprints.json"
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        presence = MicPresence(cluster=None, name=None, score=0.2, start=1.0, end=5.0)
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.mic_presence.cluster_embeddings_for", return_value={"SPEAKER_00": [0.1, 0.2]}),
+            mock.patch("clew.speakers.mic_presence.voiced_spans", return_value=[(1.0, 5.0)]),
+            mock.patch("clew.speakers.mic_presence.mic_embedding", return_value=[0.1, 0.2]),
+            mock.patch("clew.speakers.mic_presence.resolve_mic_presence", return_value=presence),
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: cluster=None score=0.200 name=none" in result.output
+
+    def test_mic_presence_unavailable_when_no_cluster_embeddings(self, tmp_path):
+        (tmp_path / "mic.wav").touch()
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.mic_presence.cluster_embeddings_for", return_value={}),
+            mock.patch("clew.speakers.mic_presence.mic_embedding") as mock_mic_emb,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: unavailable (no cluster embeddings available)" in result.output
+        assert mock_build.call_args[1]["mic_presence"] is None
+        mock_mic_emb.assert_not_called()
+
+    def test_mic_presence_unavailable_when_mic_embedding_is_none(self, tmp_path):
+        (tmp_path / "mic.wav").touch()
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()) as mock_build,
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.mic_presence.cluster_embeddings_for", return_value={"SPEAKER_00": [0.1, 0.2]}),
+            mock.patch("clew.speakers.mic_presence.voiced_spans", return_value=[(1.0, 5.0)]),
+            mock.patch("clew.speakers.mic_presence.mic_embedding", return_value=None),
+            mock.patch("clew.speakers.mic_presence.resolve_mic_presence") as mock_resolve,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Mic presence: unavailable (mic track has too little voiced audio)" in result.output
+        assert mock_build.call_args[1]["mic_presence"] is None
+        mock_resolve.assert_not_called()
+
 
 class TestEnrollClusterCommand:
     """BUILD NEXT #1 tranche 2 block A3: the confirm step -- never runs on its own,

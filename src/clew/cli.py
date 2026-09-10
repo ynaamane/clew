@@ -519,13 +519,68 @@ def enroll_cluster_cmd(ctx: click.Context, directory: str, cluster: str, name: s
     run_enroll_cluster(config, directory, cluster, name)
 
 
+_MIC_WAV_FILENAME = "mic.wav"
+
+
+def _compute_mic_presence(config, dir_path, transcript):
+    """Returns (MicPresence | None, reason). reason is only meaningful when
+    the first element is None -- the short, human-readable explanation for
+    the "Mic presence: unavailable (...)" line. The embedder is constructed
+    at most once (a memoizing factory), and only once mic.wav, a HuggingFace
+    token, and at least one cluster embedding are all confirmed available."""
+    from pathlib import Path
+
+    mic_path = Path(dir_path) / _MIC_WAV_FILENAME
+    if not mic_path.exists():
+        return None, "no mic.wav"
+
+    if not config.diarization.hf_token:
+        logging.getLogger(__name__).info("suggest-enrollment: skipping mic presence, no HuggingFace token configured")
+        return None, "no HuggingFace token configured"
+
+    from clew.speakers.base import DEFAULT_MATCH_THRESHOLD, VoiceprintDB
+    from clew.speakers.mic_presence import cluster_embeddings_for, mic_embedding, resolve_mic_presence, voiced_spans
+
+    embedder_holder: list = []
+
+    def embedder_factory():
+        if not embedder_holder:
+            from clew.speakers.embedding import SpeakerEmbedder
+
+            embedder_holder.append(SpeakerEmbedder(config.diarization.hf_token))
+        return embedder_holder[0]
+
+    cluster_embeddings = cluster_embeddings_for(dir_path, transcript, embedder_factory)
+    if not cluster_embeddings:
+        return None, "no cluster embeddings available"
+
+    spans = voiced_spans(mic_path)
+    if not spans:
+        return None, "mic track has no voiced audio"
+
+    emb = mic_embedding(mic_path, embedder_factory())
+    if emb is None:
+        return None, "mic track has too little voiced audio"
+
+    db = VoiceprintDB.load()
+    start = spans[0][0]
+    end = spans[-1][1]
+    presence = resolve_mic_presence(
+        emb, cluster_embeddings, db, threshold=DEFAULT_MATCH_THRESHOLD, start=start, end=end
+    )
+    return presence, None
+
+
 @cli.command("suggest-enrollment")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.pass_context
 def suggest_enrollment_cmd(ctx: click.Context, directory: str) -> None:
     """Suggest speaker-name enrollments for a meeting, from deterministic evidence
     arbitrated by the local LLM -- gated at >=2 independent evidences, never
-    auto-enrolls. Confirm any suggestion with `clew enroll`."""
+    auto-enrolls. Confirm any suggestion with `clew enroll-cluster`. When the
+    meeting retained mic.wav, also reports the cosine mic<->cluster match
+    (real cluster<->name confirmation still needs a HuggingFace token and an
+    enrolled voiceprint store)."""
     config = ctx.obj["config"]
     from pathlib import Path
 
@@ -533,19 +588,26 @@ def suggest_enrollment_cmd(ctx: click.Context, directory: str) -> None:
     from clew.summarization import create_summarizer
 
     transcript = load_transcript_result(Path(directory))
-    table = build_evidence_table(transcript, roster=config.speakers.known)
+    mic_presence, mic_reason = _compute_mic_presence(config, directory, transcript)
+
+    table = build_evidence_table(transcript, roster=config.speakers.known, mic_presence=mic_presence)
     with create_summarizer(config) as summarizer:
         suggestions = suggest_enrollments(table, summarizer, roster=config.speakers.known)
 
     if not suggestions:
         click.echo("No enrollment suggestions (insufficient independent evidence).")
-        return
+    else:
+        for suggestion in suggestions:
+            click.echo(
+                f"{suggestion.cluster} -> {suggestion.name}  "
+                f"(confidence: {suggestion.confidence}, evidence: {len(suggestion.evidence)})"
+            )
 
-    for suggestion in suggestions:
-        click.echo(
-            f"{suggestion.cluster} -> {suggestion.name}  "
-            f"(confidence: {suggestion.confidence}, evidence: {len(suggestion.evidence)})"
-        )
+    if mic_presence is not None:
+        name_desc = mic_presence.name if mic_presence.name is not None else "none"
+        click.echo(f"Mic presence: cluster={mic_presence.cluster} score={mic_presence.score:.3f} name={name_desc}")
+    else:
+        click.echo(f"Mic presence: unavailable ({mic_reason})")
 
 
 @cli.command()
