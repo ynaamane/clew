@@ -573,21 +573,24 @@ def _compute_mic_presence(config, dir_path, transcript):
 
 @cli.command("suggest-enrollment")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--write", "write_report", is_flag=True, help="Also write enrollment_suggestions.json to DIRECTORY.")
 @click.pass_context
-def suggest_enrollment_cmd(ctx: click.Context, directory: str) -> None:
+def suggest_enrollment_cmd(ctx: click.Context, directory: str, write_report: bool) -> None:
     """Suggest speaker-name enrollments for a meeting, from deterministic evidence
     arbitrated by the local LLM -- gated at >=2 independent evidences, never
     auto-enrolls. Confirm any suggestion with `clew enroll-cluster`. When the
     meeting retained mic.wav, also reports the cosine mic<->cluster match
     (real cluster<->name confirmation still needs a HuggingFace token and an
-    enrolled voiceprint store)."""
+    enrolled voiceprint store). --write also persists the same evidence as
+    enrollment_suggestions.json in DIRECTORY, for the app to read."""
     config = ctx.obj["config"]
     from pathlib import Path
 
     from clew.speakers.enrollment_suggest import build_evidence_table, load_transcript_result, suggest_enrollments
     from clew.summarization import create_summarizer
 
-    transcript = load_transcript_result(Path(directory))
+    dir_path = Path(directory)
+    transcript = load_transcript_result(dir_path)
     mic_presence, mic_reason = _compute_mic_presence(config, directory, transcript)
 
     table = build_evidence_table(transcript, roster=config.speakers.known, mic_presence=mic_presence)
@@ -608,6 +611,13 @@ def suggest_enrollment_cmd(ctx: click.Context, directory: str) -> None:
         click.echo(f"Mic presence: cluster={mic_presence.cluster} score={mic_presence.score:.3f} name={name_desc}")
     else:
         click.echo(f"Mic presence: unavailable ({mic_reason})")
+
+    if write_report:
+        from clew.speakers.enrollment_report import build_enrollment_report, write_enrollment_report
+
+        report = build_enrollment_report(transcript, dir_path, suggestions, mic_presence)
+        report_path = write_enrollment_report(report, dir_path)
+        click.echo(f"Wrote {report_path}")
 
 
 @cli.command()

@@ -1127,6 +1127,89 @@ class TestSuggestEnrollmentCommand:
         assert mock_build.call_args[1]["mic_presence"] is None
         mock_resolve.assert_not_called()
 
+    def test_write_flag_builds_and_writes_the_report_and_prints_the_path(self, tmp_path):
+        report_stub = {"version": 1, "generated_at": "x", "clusters": [], "suggestions": [], "mic_presence": None}
+        written_path = tmp_path / "enrollment_suggestions.json"
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch(
+                "clew.speakers.enrollment_report.build_enrollment_report", return_value=report_stub
+            ) as mock_build_report,
+            mock.patch(
+                "clew.speakers.enrollment_report.write_enrollment_report", return_value=written_path
+            ) as mock_write,
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path), "--write"])
+
+        assert result.exit_code == 0
+        assert f"Wrote {written_path}" in result.output
+        mock_build_report.assert_called_once()
+        mock_write.assert_called_once()
+
+    def test_without_write_flag_nothing_is_written(self, tmp_path):
+        runner = CliRunner()
+        with (
+            _mock_config(),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.enrollment_report.write_enrollment_report") as mock_write,
+        ):
+            before = sorted(p.name for p in tmp_path.iterdir())
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path)])
+            after = sorted(p.name for p in tmp_path.iterdir())
+
+        assert result.exit_code == 0
+        assert before == after
+        assert "Wrote" not in result.output
+        mock_write.assert_not_called()
+
+    def test_human_output_unchanged_by_the_write_flag(self, tmp_path):
+        # Same suggestion lines and "no suggestions" wording print whether or
+        # not --write is passed -- --write only adds the report + final line.
+        from clew.speakers.enrollment_suggest import Suggestion
+
+        suggestion = Suggestion(cluster="SPEAKER_00", name="Devon", evidence=[], confidence="high")
+        runner = CliRunner()
+
+        def _run(args):
+            with (
+                _mock_config(),
+                mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+                mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
+                mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+                mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[suggestion]),
+                mock.patch(
+                    "clew.speakers.enrollment_report.build_enrollment_report",
+                    return_value={
+                        "version": 1,
+                        "generated_at": "x",
+                        "clusters": [],
+                        "suggestions": [],
+                        "mic_presence": None,
+                    },
+                ),
+                mock.patch(
+                    "clew.speakers.enrollment_report.write_enrollment_report",
+                    return_value=tmp_path / "enrollment_suggestions.json",
+                ),
+            ):
+                return runner.invoke(cli, args)
+
+        without_write = _run(["suggest-enrollment", str(tmp_path)])
+        with_write = _run(["suggest-enrollment", str(tmp_path), "--write"])
+
+        assert "SPEAKER_00 -> Devon" in without_write.output
+        assert "SPEAKER_00 -> Devon" in with_write.output
+        assert "Wrote" not in without_write.output
+        assert "Wrote" in with_write.output
+
 
 class TestEnrollClusterCommand:
     """BUILD NEXT #1 tranche 2 block A3: the confirm step -- never runs on its own,
