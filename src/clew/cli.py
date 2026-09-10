@@ -522,15 +522,17 @@ def enroll_cluster_cmd(ctx: click.Context, directory: str, cluster: str, name: s
 _MIC_WAV_FILENAME = "mic.wav"
 
 
-def _compute_mic_presence(config, dir_path, transcript):
+def _compute_mic_presence(config, dir_path: Path, transcript):
     """Returns (MicPresence | None, reason). reason is only meaningful when
     the first element is None -- the short, human-readable explanation for
     the "Mic presence: unavailable (...)" line. The embedder is constructed
     at most once (a memoizing factory), and only once mic.wav, a HuggingFace
-    token, and at least one cluster embedding are all confirmed available."""
-    from pathlib import Path
+    token, and at least one cluster embedding are all confirmed available.
 
-    mic_path = Path(dir_path) / _MIC_WAV_FILENAME
+    dir_path must already be a Path -- every downstream helper (notably
+    cluster_embeddings_for) divides it by a filename, which raises TypeError
+    on a bare str."""
+    mic_path = dir_path / _MIC_WAV_FILENAME
     if not mic_path.exists():
         return None, "no mic.wav"
 
@@ -591,7 +593,7 @@ def suggest_enrollment_cmd(ctx: click.Context, directory: str, write_report: boo
 
     dir_path = Path(directory)
     transcript = load_transcript_result(dir_path)
-    mic_presence, mic_reason = _compute_mic_presence(config, directory, transcript)
+    mic_presence, mic_reason = _compute_mic_presence(config, dir_path, transcript)
 
     table = build_evidence_table(transcript, roster=config.speakers.known, mic_presence=mic_presence)
     with create_summarizer(config) as summarizer:

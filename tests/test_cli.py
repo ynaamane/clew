@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from unittest import mock
 
+import numpy as np
 import pytest
+import soundfile as sf
 from click.testing import CliRunner
 
 import clew.cli as cli_module
@@ -1127,16 +1130,76 @@ class TestSuggestEnrollmentCommand:
         assert mock_build.call_args[1]["mic_presence"] is None
         mock_resolve.assert_not_called()
 
+    def test_real_mic_presence_pipeline_does_not_crash_on_a_real_meeting_directory(self, tmp_path):
+        # Review finding P1 (CONFIRMED crash): suggest-enrollment --write raised
+        # TypeError("unsupported operand type(s) for /: 'str' and 'str'") on
+        # every meeting with mic.wav and an HF token configured, because the CLI
+        # forwarded Click's raw str `directory` into cluster_embeddings_for
+        # instead of the already-converted Path. Every prior CLI test patched
+        # cluster_embeddings_for itself, so the real str/Path mismatch was
+        # never exercised. This one lets cluster_embeddings_for, voiced_spans,
+        # mic_embedding and resolve_mic_presence all run for real against a
+        # real tmp meeting directory; only the embedder class is faked (it is
+        # never even constructed for cluster_embeddings_for's own lookup,
+        # since a persisted speaker_embeddings.json already covers it).
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME
+
+        (tmp_path / "transcript.json").write_text(
+            json.dumps(
+                {
+                    "segments": [{"text": "hi", "start": 0.0, "end": 1.0, "speaker": "SPEAKER_00", "words": []}],
+                    "language": "en",
+                    "duration": 100.0,
+                }
+            )
+        )
+        (tmp_path / SPEAKER_EMBEDDINGS_FILENAME).write_text(
+            json.dumps({"version": 1, "clusters": {"SPEAKER_00": [1.0, 0.0, 0.0]}, "assignments": {}})
+        )
+        sample_rate = 100
+        loud_signal = np.full(300, 0.5, dtype="float32")  # 3.0s of loud signal
+        sf.write(str(tmp_path / "mic.wav"), loud_signal, sample_rate, subtype="FLOAT")
+
+        config = Config()
+        config.diarization.hf_token = "hf_test_token"
+
+        fake_embedder = mock.MagicMock()
+        fake_embedder.embed_file.return_value = [1.0, 0.0, 0.0]  # exact cosine match to SPEAKER_00
+
+        runner = CliRunner()
+        with (
+            _mock_config(config),
+            mock.patch("clew.speakers.base.VoiceprintDB.load", return_value=mock.MagicMock(voiceprints=[])),
+            mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
+            mock.patch("clew.speakers.embedding.SpeakerEmbedder", return_value=fake_embedder),
+        ):
+            result = runner.invoke(cli, ["suggest-enrollment", str(tmp_path), "--write"])
+
+        assert result.exit_code == 0
+        assert "Mic presence: cluster=SPEAKER_00" in result.output
+        assert f"Wrote {tmp_path / 'enrollment_suggestions.json'}" in result.output
+
     def test_write_flag_builds_and_writes_the_report_and_prints_the_path(self, tmp_path):
+        # Review finding P4: a bare assert_called_once() does not catch the
+        # report being built from the WRONG suggestions/mic_presence, or being
+        # written to the WRONG directory -- three separate survivors (R-l, R-m,
+        # R-t). Assert the actual call arguments.
+        from clew.speakers.enrollment_suggest import Suggestion
+        from clew.speakers.mic_presence import MicPresence
+
+        suggestion = Suggestion(cluster="SPEAKER_00", name="Devon", evidence=[], confidence="high")
+        presence = MicPresence(cluster="SPEAKER_01", name="Kamal", score=0.8, start=1.0, end=5.0)
+        transcript_stub = mock.Mock()
         report_stub = {"version": 1, "generated_at": "x", "clusters": [], "suggestions": [], "mic_presence": None}
         written_path = tmp_path / "enrollment_suggestions.json"
         runner = CliRunner()
         with (
             _mock_config(),
-            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=mock.Mock()),
+            mock.patch("clew.speakers.enrollment_suggest.load_transcript_result", return_value=transcript_stub),
             mock.patch("clew.speakers.enrollment_suggest.build_evidence_table", return_value=mock.Mock()),
             mock.patch("clew.summarization.create_summarizer", return_value=mock.MagicMock()),
-            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[]),
+            mock.patch("clew.speakers.enrollment_suggest.suggest_enrollments", return_value=[suggestion]),
+            mock.patch("clew.cli._compute_mic_presence", return_value=(presence, None)),
             mock.patch(
                 "clew.speakers.enrollment_report.build_enrollment_report", return_value=report_stub
             ) as mock_build_report,
@@ -1148,8 +1211,11 @@ class TestSuggestEnrollmentCommand:
 
         assert result.exit_code == 0
         assert f"Wrote {written_path}" in result.output
-        mock_build_report.assert_called_once()
-        mock_write.assert_called_once()
+        # R-l: report must be built from the REAL suggestions, not [].
+        # R-m: report must be built with the REAL mic_presence, not None.
+        mock_build_report.assert_called_once_with(transcript_stub, tmp_path, [suggestion], presence)
+        # R-t: report must be written into the meeting directory, not its parent.
+        mock_write.assert_called_once_with(report_stub, tmp_path)
 
     def test_without_write_flag_nothing_is_written(self, tmp_path):
         runner = CliRunner()

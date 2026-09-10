@@ -119,6 +119,31 @@ class TestBuildEnrollmentReportClusters:
 
         assert {c["label"] for c in report["clusters"]} == {"SPEAKER_00"}
 
+    def test_regex_never_admits_owner_or_unknown_labels_and_owner_appears_once(self, tmp_path):
+        # Review finding P5/R-e1: loosening the SPEAKER_NN regex to also match
+        # Owner/Unknown-N would let the sorted regex set capture Owner too,
+        # duplicating it alongside the explicit Owner-append below -- the
+        # identical mutation on mic_presence.py's own regex is already killed
+        # there, so this pins the same boundary here.
+        (tmp_path / "system.wav").touch()
+        (tmp_path / "mic.wav").touch()
+        transcript = TranscriptResult(
+            segments=[
+                _seg("Owner", 0.0),
+                _seg("Unknown-1", 10.0),
+                _seg("SPEAKER_3", 20.0),
+                _seg("F", 30.0),
+            ],
+            duration=100.0,
+        )
+
+        report = build_enrollment_report(transcript, tmp_path, [], None, now=_FIXED_NOW)
+
+        labels = [c["label"] for c in report["clusters"]]
+        assert labels.count("Owner") == 1
+        assert "Unknown-1" not in labels
+        assert set(labels) == {"Owner", "SPEAKER_3"}
+
     def test_audio_purged_reason_when_track_missing_and_no_persisted_vector(self, tmp_path):
         transcript = TranscriptResult(segments=[_seg("SPEAKER_00", 0.0), _seg("F", 50.0)], duration=100.0)
 
@@ -139,6 +164,19 @@ class TestBuildEnrollmentReportClusters:
         cluster = next(c for c in report["clusters"] if c["label"] == "SPEAKER_00")
         assert cluster["enrollable"] is True
         assert cluster["reason"] is None
+
+    def test_audio_purged_takes_precedence_over_too_short(self, tmp_path):
+        # Review finding P5/R-c: a cluster that is BOTH audio-absent AND would
+        # also be too-short (if audio existed) must report "audio_purged" --
+        # the commit message states that precedence but nothing pinned it.
+        # No system.wav, no persisted speaker_embeddings.json in tmp_path.
+        transcript = TranscriptResult(segments=[_seg("SPEAKER_00", 40.0), _seg("F", 41.5)], duration=100.0)
+
+        report = build_enrollment_report(transcript, tmp_path, [], None, now=_FIXED_NOW)
+
+        cluster = next(c for c in report["clusters"] if c["label"] == "SPEAKER_00")
+        assert cluster["enrollable"] is False
+        assert cluster["reason"] == "audio_purged"
 
     def test_too_short_reason_when_selectable_total_below_minimum_and_no_persisted_vector(self, tmp_path):
         (tmp_path / "system.wav").touch()
@@ -233,9 +271,41 @@ class TestWriteEnrollmentReport:
 
         out_path = write_enrollment_report(report, tmp_path)
 
-        assert out_path == tmp_path / ENROLLMENT_REPORT_FILENAME
+        # Pinned as a literal, not the production constant: this filename is a
+        # cross-language contract with the Swift reader (B1/B2) -- importing
+        # ENROLLMENT_REPORT_FILENAME here would make a silent rename ship green.
+        assert out_path == tmp_path / "enrollment_suggestions.json"
+        assert ENROLLMENT_REPORT_FILENAME == "enrollment_suggestions.json"
         assert json.loads(out_path.read_text()) == report
         assert "\n" in out_path.read_text()
+
+    def test_writes_only_the_frozen_file_and_touches_nothing_else(self, tmp_path):
+        # Full directory snapshot (names, sizes, st_mtime_ns) rather than a
+        # single named sentinel -- a second file written alongside the report
+        # would be invisible to a sentinel-only check.
+        (tmp_path / "transcript.json").write_text('{"hello": "world"}')
+        (tmp_path / "summary.md").write_text("# Summary")
+        (tmp_path / "system.wav").write_bytes(b"fake")
+
+        def snapshot():
+            return {p.name: (p.stat().st_size, p.stat().st_mtime_ns) for p in sorted(tmp_path.iterdir())}
+
+        before = snapshot()
+
+        report = {
+            "version": 1,
+            "generated_at": "2026-09-10T12:34:56Z",
+            "clusters": [],
+            "suggestions": [],
+            "mic_presence": None,
+        }
+        write_enrollment_report(report, tmp_path)
+
+        after = snapshot()
+
+        assert set(after) - set(before) == {"enrollment_suggestions.json"}
+        for name in set(before) & set(after):
+            assert after[name] == before[name], f"{name} was modified by write_enrollment_report"
 
     def test_second_write_replaces_only_its_own_file(self, tmp_path):
         sentinel_path = tmp_path / "transcript.json"
