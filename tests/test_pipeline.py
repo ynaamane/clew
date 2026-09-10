@@ -1932,6 +1932,61 @@ class TestRelabelSpeakersWithVoiceprints:
         assert relabeled.segments[0].speaker is None
 
 
+class TestRelabelSpeakersWithVoiceprintsAndAssignments:
+    """The refactored helper _relabel_speakers_with_voiceprints returns -- it
+    keeps the existing relabeling behaviour and additionally reports which
+    (cluster, name) pairs were actually matched, for speaker_embeddings.json."""
+
+    def test_matched_cluster_is_reported_unmatched_is_not(self, tmp_path):
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
+        from clew.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        result = TranscriptResult(
+            segments=[
+                Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00"),
+                Segment(text="yo", start=1.0, end=2.0, speaker="SPEAKER_01"),
+            ]
+        )
+
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled, assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0], "SPEAKER_01": [0.0, 0.0, 1.0]}
+            )
+
+        assert relabeled.segments[0].speaker == "Alice"
+        assert relabeled.segments[1].speaker == "Unknown-1"
+        assert assignments == {"SPEAKER_00": "Alice"}
+
+    def test_no_enrolled_voiceprints_yields_empty_assignments(self, tmp_path):
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
+
+        db_path = tmp_path / "voiceprints.json"
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
+
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            relabeled, assignments = _relabel_speakers_with_voiceprints_and_assignments(
+                result, {"SPEAKER_00": [0.99, 0.01, 0.0]}
+            )
+
+        assert assignments == {}
+        assert relabeled.segments[0].speaker == "SPEAKER_00"
+
+    def test_empty_embeddings_yields_empty_assignments(self):
+        from clew.pipeline import _relabel_speakers_with_voiceprints_and_assignments
+
+        result = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")])
+
+        relabeled, assignments = _relabel_speakers_with_voiceprints_and_assignments(result, {})
+
+        assert assignments == {}
+        assert relabeled.segments[0].speaker == "SPEAKER_00"
+
+
 class TestTranscribeAndIdentify:
     def test_relabels_using_transcriber_captured_embeddings(self, tmp_path):
         from clew.pipeline import _transcribe_and_identify
@@ -1972,6 +2027,95 @@ class TestTranscribeAndIdentify:
             result = _transcribe_and_identify(mock_transcriber, audio_path)
 
         assert result.segments[0].speaker == "SPEAKER_00"
+
+    def test_persists_speaker_embeddings_json_next_to_audio(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _transcribe_and_identify
+        from clew.speakers.base import VoiceprintDB
+
+        db_path = tmp_path / "voiceprints.json"
+        db = VoiceprintDB()
+        db.upsert("Alice", [1.0, 0.0, 0.0])
+        db.save(db_path)
+
+        meeting_dir = tmp_path / "meeting"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "system.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {
+            "SPEAKER_00": [0.99, 0.01, 0.0],
+            "SPEAKER_01": [0.0, 0.0, 1.0],
+        }
+
+        with mock.patch("clew.speakers.base.VOICEPRINT_DB_PATH", db_path):
+            _transcribe_and_identify(mock_transcriber, audio_path)
+
+        out_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+        assert out_path.exists()
+        data = json.loads(out_path.read_text())
+        assert data == {
+            "version": 1,
+            "clusters": {"SPEAKER_00": [0.99, 0.01, 0.0], "SPEAKER_01": [0.0, 0.0, 1.0]},
+            "assignments": {"SPEAKER_00": "Alice"},
+        }
+
+    def test_writes_nothing_when_no_speaker_embeddings(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _transcribe_and_identify
+
+        meeting_dir = tmp_path / "meeting"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "recording.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(segments=[Segment(text="hi", start=0.0, end=1.0)])
+        mock_transcriber.last_speaker_embeddings = {}
+
+        _transcribe_and_identify(mock_transcriber, audio_path)
+
+        assert not (meeting_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+
+    def test_non_dict_last_speaker_embeddings_never_crashes_or_writes(self, tmp_path):
+        # A loosely mocked transcriber (last_speaker_embeddings never set) hands back
+        # an auto-generated MagicMock attribute, not a dict -- the same shape
+        # TestDoTranscribeAndSummarizeDualTrack's mock_transcriber has. Must never
+        # crash json.dumps and must never write a file from non-dict data.
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _transcribe_and_identify
+
+        meeting_dir = tmp_path / "meeting"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "system.wav"
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+
+        _transcribe_and_identify(mock_transcriber, audio_path)
+
+        assert not (meeting_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+
+    def test_never_overwrites_an_existing_speaker_embeddings_file(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, _transcribe_and_identify
+
+        meeting_dir = tmp_path / "meeting"
+        meeting_dir.mkdir()
+        audio_path = meeting_dir / "system.wav"
+        out_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+        sentinel = '{"version": 1, "clusters": {"SENTINEL": [9.9]}, "assignments": {}}'
+        out_path.write_text(sentinel)
+
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.transcribe.return_value = TranscriptResult(
+            segments=[Segment(text="hi", start=0.0, end=1.0, speaker="SPEAKER_00")]
+        )
+        mock_transcriber.last_speaker_embeddings = {"SPEAKER_00": [0.1, 0.2, 0.3]}
+
+        _transcribe_and_identify(mock_transcriber, audio_path)
+
+        assert out_path.read_text() == sentinel
 
 
 class TestDoTranscribeAndSummarizeDualTrack:
@@ -2814,6 +2958,21 @@ class TestReprocess:
 
         assert not transcript_path.exists()
         assert not summary_path.exists()
+
+    def test_removes_stale_speaker_embeddings_before_reprocessing(self, tmp_path):
+        from clew.pipeline import SPEAKER_EMBEDDINGS_FILENAME, run_reprocess
+
+        audio_path = tmp_path / "recording.wav"
+        audio_path.touch()
+        embeddings_path = tmp_path / SPEAKER_EMBEDDINGS_FILENAME
+        embeddings_path.write_text('{"version": 1, "clusters": {}, "assignments": {}}')
+
+        config = Config()
+
+        with mock.patch("clew.pipeline._do_transcribe_and_summarize"):
+            run_reprocess(config, str(tmp_path))
+
+        assert not embeddings_path.exists()
 
     def test_finds_dual_track_audio_in_separate_audio_dir(self, tmp_path):
         from clew.pipeline import run_reprocess

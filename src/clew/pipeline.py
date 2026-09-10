@@ -204,6 +204,12 @@ def _create_transcriber(config: Config, progress=None):
 
 _OWNER_SPEAKER_LABEL = "Owner"
 
+# Persisted next to the meeting's retained audio at transcription time (ADD-only, see
+# _write_speaker_embeddings) -- `run_enroll_cluster` reads this before ever falling
+# back to re-embedding a cut clip. Public (no leading underscore): the filename a
+# reprocess also needs to know to clear stale data.
+SPEAKER_EMBEDDINGS_FILENAME = "speaker_embeddings.json"
+
 
 def _find_dual_tracks(audio_path: Path) -> tuple[Path, Path] | None:
     """Return (system_path, mic_path) next to audio_path if both were retained, else None."""
@@ -369,29 +375,62 @@ def _merge_dual_track_results(system_result, mic_result, mic_offset: float):
     return replace(system_result, segments=all_segments, duration=duration)
 
 
-def _relabel_speakers_with_voiceprints(result, cluster_embeddings: dict[str, list[float]]):
-    """Rename diarized cluster labels (e.g. SPEAKER_00) to enrolled names where matched."""
+def _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embeddings: dict[str, list[float]]) -> tuple:
+    """Rename diarized cluster labels (e.g. SPEAKER_00) to enrolled names where
+    matched, and also report which (cluster, name) pairs were actually matched --
+    never an "Unknown-N" placeholder -- for speaker_embeddings.json to persist."""
     from dataclasses import replace
 
     from clew.speakers.base import VoiceprintDB
     from clew.speakers.matching import assign_speaker_names
 
     if not isinstance(cluster_embeddings, dict) or not cluster_embeddings:
-        return result
+        return result, {}
 
     db = VoiceprintDB.load()
     if not db.voiceprints:
-        return result
+        return result, {}
 
     assignments = assign_speaker_names(cluster_embeddings, db)
+    matched_assignments = {cluster: name for cluster, name in assignments.items() if not name.startswith("Unknown-")}
     relabeled_segments = [replace(seg, speaker=assignments.get(seg.speaker, seg.speaker)) for seg in result.segments]
-    return replace(result, segments=relabeled_segments)
+    return replace(result, segments=relabeled_segments), matched_assignments
+
+
+def _relabel_speakers_with_voiceprints(result, cluster_embeddings: dict[str, list[float]]):
+    """Rename diarized cluster labels (e.g. SPEAKER_00) to enrolled names where matched."""
+    relabeled, _assignments = _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embeddings)
+    return relabeled
+
+
+def _write_speaker_embeddings(
+    meeting_dir: Path, cluster_embeddings: dict[str, list[float]], assignments: dict[str, str]
+) -> None:
+    """ADD-only: never overwrites an existing speaker_embeddings.json -- run_reprocess
+    is the one explicit-rewrite path, and it unlinks the file itself before
+    re-running (see run_reprocess). Writes nothing when there are no cluster
+    embeddings to persist, or when cluster_embeddings isn't really a dict (a
+    loosely mocked transcriber's default attribute, in tests)."""
+    import json
+
+    if not isinstance(cluster_embeddings, dict) or not cluster_embeddings:
+        return
+
+    out_path = meeting_dir / SPEAKER_EMBEDDINGS_FILENAME
+    if out_path.exists():
+        return
+
+    out_path.write_text(json.dumps({"version": 1, "clusters": cluster_embeddings, "assignments": assignments}))
 
 
 def _transcribe_and_identify(transcriber, audio_path: Path):
-    """Transcribe a track and relabel any diarized clusters with enrolled speaker names."""
+    """Transcribe a track, relabel any diarized clusters with enrolled speaker
+    names, and persist the cluster embeddings (ADD-only) next to the audio."""
     result = transcriber.transcribe(audio_path)
-    return _relabel_speakers_with_voiceprints(result, transcriber.last_speaker_embeddings)
+    cluster_embeddings = transcriber.last_speaker_embeddings
+    relabeled, assignments = _relabel_speakers_with_voiceprints_and_assignments(result, cluster_embeddings)
+    _write_speaker_embeddings(audio_path.parent, cluster_embeddings, assignments)
+    return relabeled
 
 
 def _transcribe_dual_track(transcriber, system_path: Path, mic_path: Path, mic_offset: float):
@@ -1193,6 +1232,7 @@ def run_reprocess(config: Config, directory: str) -> None:
     for existing in (_find_transcript(dir_path), _find_summary(dir_path)):
         if existing is not None:
             existing.unlink()
+    (dir_path / SPEAKER_EMBEDDINGS_FILENAME).unlink(missing_ok=True)
 
     click.echo(f"Reprocessing from: {audio}\n")
     _do_transcribe_and_summarize(config, audio, dir_path)
