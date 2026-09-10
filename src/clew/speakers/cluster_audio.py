@@ -52,13 +52,20 @@ def _effective_end(segments: list, index: int, duration: float) -> float:
 
 def cluster_turns(transcript: TranscriptResult, cluster: str) -> list[tuple[float, float]]:
     """Merge consecutive segments belonging to `cluster` into turns -- a run
-    interrupted by any other speaker's segment ends the turn."""
+    ends when interrupted by any other speaker's segment, OR when the gap to
+    the next same-speaker segment exceeds _WHISPER_MAX_SEGMENT_SECONDS, so two
+    real utterances of the same speaker far apart with nothing transcribed in
+    between (review finding R2) can never merge into one inflated turn -- each
+    starts its own run, capped the same way _effective_end caps a single one."""
     segments = transcript.segments
     turns: list[tuple[float, float]] = []
     run_start: float | None = None
     run_end = 0.0
     for i, seg in enumerate(segments):
         if seg.speaker == cluster:
+            if run_start is not None and seg.start - run_end > _WHISPER_MAX_SEGMENT_SECONDS:
+                turns.append((run_start, run_end))
+                run_start = None
             if run_start is None:
                 run_start = seg.start
             run_end = _effective_end(segments, i, transcript.duration)

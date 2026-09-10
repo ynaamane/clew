@@ -1356,7 +1356,10 @@ class TestDoTranscribeAndSummarize:
         with mock.patch("clew.pipeline._create_transcriber", return_value=mock_transcriber):
             _do_transcribe_and_summarize(config, audio_path, out_dir, summarize=False)
 
-        assert not (out_dir / SPEAKER_EMBEDDINGS_FILENAME).exists()
+        # Review finding R1: asserting absence in out_dir alone is vacuous --
+        # it also passes if F1's write target were reverted to audio_path.parent
+        # (the file would then survive there instead). Check the whole temp root.
+        assert not list(tmp_path.rglob(SPEAKER_EMBEDDINGS_FILENAME))
 
     def test_colocated_audio_follows_rename_despite_separate_audio_dir(self, tmp_path):
         """Resuming a directory that holds its own recording (made before

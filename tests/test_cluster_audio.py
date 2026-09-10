@@ -100,6 +100,32 @@ class TestClusterTurns:
         )
         assert cluster_turns(transcript, "A") == [(0.0, 45.0)]
 
+    def test_a_large_gap_to_the_next_same_speaker_segment_splits_the_run(self):
+        # Review finding R2: exact reviewer probe (10-13s and 900-903s, 1000s recording).
+        transcript = TranscriptResult(
+            segments=[
+                Segment(text="hi there", start=10.0, end=13.0, speaker="SPEAKER_00"),
+                Segment(text="hi again", start=900.0, end=903.0, speaker="SPEAKER_00"),
+            ],
+            duration=1000.0,
+        )
+        assert cluster_turns(transcript, "SPEAKER_00") == [(10.0, 40.0), (900.0, 930.0)]
+
+    def test_dense_transcript_with_small_gaps_is_unaffected_by_the_gap_condition(self):
+        # Regression guard: R2's gap-split must never fire on ordinary speech.
+        transcript = TranscriptResult(
+            segments=[
+                _seg("A", 0.0),
+                _seg("A", 4.0),
+                _seg("B", 9.0),
+                _seg("A", 20.0),
+                _seg("A", 25.0),
+                _seg("F", 40.0),
+            ],
+            duration=100.0,
+        )
+        assert cluster_turns(transcript, "A") == [(0.0, 9.0), (20.0, 40.0)]
+
 
 class TestSelectClusterSpans:
     def test_drops_turn_in_first_boundary_fraction(self):
