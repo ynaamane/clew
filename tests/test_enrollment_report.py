@@ -64,9 +64,9 @@ class TestBuildEnrollmentReportClusters:
         assert cluster["turns"] == 1
 
     def test_json_shaped_transcript_speech_seconds_and_turns(self, tmp_path):
-        # cluster_turns (block A1) extends a real end up to the next segment's
-        # start when there's a gap (max(seg.end, next_start)) -- 8.0 grows to
-        # 10.0 here, same rule test_cluster_audio.py already locks in.
+        # cluster_turns (block A1) trusts a real (non-degenerate) end as-is --
+        # it is never extended toward the next segment's start, so
+        # speech_seconds equals the real segment duration, 8.0.
         (tmp_path / "system.wav").touch()
         transcript = TranscriptResult(
             segments=[
@@ -79,7 +79,7 @@ class TestBuildEnrollmentReportClusters:
         report = build_enrollment_report(transcript, tmp_path, [], None, now=_FIXED_NOW)
 
         cluster = next(c for c in report["clusters"] if c["label"] == "SPEAKER_00")
-        assert cluster["speech_seconds"] == pytest.approx(10.0)
+        assert cluster["speech_seconds"] == pytest.approx(8.0)
         assert cluster["turns"] == 1
 
     def test_owner_included_when_owner_segments_exist(self, tmp_path):

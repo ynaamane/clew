@@ -34,20 +34,21 @@ _WHISPER_MAX_SEGMENT_SECONDS = 30.0
 
 
 def _effective_end(segments: list, index: int, duration: float) -> float:
-    """A segment's end, reconstructed when it's degenerate (markdown-shape
-    transcripts have end == start on every segment). The next segment's start
-    (any speaker) is the reconstruction target, capped at
-    start + _WHISPER_MAX_SEGMENT_SECONDS (a Whisper segment never decodes past
-    that window) so a real utterance followed by an arbitrarily long silent
-    gap or recording tail can never inflate a turn far enough to escape the
-    boundary-exclusion rule. A real, non-degenerate end (JSON-shape) is never
-    shrunk below itself -- only ever extended up to the capped reconstruction
-    when the real end sits before it.
+    """A segment's end. A real, non-degenerate end (JSON-shape, end > start)
+    is trusted as-is and never extended -- only bounded by transcript.duration
+    when that duration is actually known (duration > 0), so it can never claim
+    to run past the recording. Reconstruction only ever applies to a degenerate
+    segment (markdown-shape transcripts have end == start on every segment):
+    the next segment's start (any speaker) is the reconstruction target,
+    capped at start + _WHISPER_MAX_SEGMENT_SECONDS (a Whisper segment never
+    decodes past that window) so a silent gap or recording tail can never
+    inflate a turn far enough to escape the boundary-exclusion rule.
     """
     seg = segments[index]
+    if seg.end > seg.start:
+        return min(seg.end, duration) if duration > 0 else seg.end
     next_start = segments[index + 1].start if index + 1 < len(segments) else duration
-    reconstructed = min(next_start, seg.start + _WHISPER_MAX_SEGMENT_SECONDS)
-    return max(seg.end, reconstructed)
+    return min(next_start, seg.start + _WHISPER_MAX_SEGMENT_SECONDS)
 
 
 def cluster_turns(transcript: TranscriptResult, cluster: str) -> list[tuple[float, float]]:

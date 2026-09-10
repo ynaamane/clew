@@ -53,14 +53,14 @@ class TestClusterTurns:
         )
         assert cluster_turns(transcript, "A") == [(0.0, 9.0)]
 
-    def test_effective_end_extends_past_a_smaller_real_end_to_the_next_segment_start(self):
-        # Not the last segment: a real end (1.8) smaller than the next segment's
-        # start (5.0) is filled up to that start, never left as a premature cut.
+    def test_a_real_end_is_trusted_even_when_smaller_than_the_next_segment_start(self):
+        # A real (non-degenerate) end is never extended toward the next
+        # segment's start -- only a degenerate end==start segment reconstructs.
         transcript = TranscriptResult(
             segments=[Segment(text="a", start=0.0, end=1.8, speaker="A"), _seg("Z", 5.0)],
             duration=20.0,
         )
-        assert cluster_turns(transcript, "A") == [(0.0, 5.0)]
+        assert cluster_turns(transcript, "A") == [(0.0, 1.8)]
 
     def test_real_end_past_the_next_segment_start_is_never_shrunk(self):
         transcript = TranscriptResult(
@@ -90,10 +90,9 @@ class TestClusterTurns:
         transcript = TranscriptResult(segments=[_seg("A", 0.0), _seg("B", 20.0)], duration=100.0)
         assert cluster_turns(transcript, "A") == [(0.0, 20.0)]
 
-    def test_the_cap_does_not_shrink_a_real_end_even_past_30s(self):
-        # The cap only ever bounds the RECONSTRUCTION target; a genuinely
-        # observed real end is never shrunk below itself (existing invariant,
-        # unaffected by F3).
+    def test_a_real_end_past_30s_is_trusted_not_capped(self):
+        # A real end is bounded only by transcript.duration, never by the
+        # reconstruction cap -- that cap applies only to degenerate segments.
         transcript = TranscriptResult(
             segments=[Segment(text="a", start=0.0, end=45.0, speaker="A"), _seg("B", 50.0)],
             duration=100.0,
@@ -101,7 +100,8 @@ class TestClusterTurns:
         assert cluster_turns(transcript, "A") == [(0.0, 45.0)]
 
     def test_a_large_gap_to_the_next_same_speaker_segment_splits_the_run(self):
-        # Review finding R2: exact reviewer probe (10-13s and 900-903s, 1000s recording).
+        # Review finding R2: exact reviewer probe (10-13s and 900-903s, 1000s
+        # recording). Real ends, so each turn now equals its own segment.
         transcript = TranscriptResult(
             segments=[
                 Segment(text="hi there", start=10.0, end=13.0, speaker="SPEAKER_00"),
@@ -109,7 +109,17 @@ class TestClusterTurns:
             ],
             duration=1000.0,
         )
-        assert cluster_turns(transcript, "SPEAKER_00") == [(10.0, 40.0), (900.0, 930.0)]
+        assert cluster_turns(transcript, "SPEAKER_00") == [(10.0, 13.0), (900.0, 903.0)]
+
+    def test_a_markdown_shaped_transcript_still_reconstructs_toward_a_distant_next_segment_capped_at_30s(self):
+        # Pinned explicitly: only a degenerate (end == start) segment
+        # reconstructs toward the next segment's start, capped at 30s --
+        # unaffected by trusting a real end for non-degenerate segments.
+        transcript = TranscriptResult(
+            segments=[_seg("SPEAKER_00", 1.0), _seg("OTHER", 500.0)],
+            duration=1000.0,
+        )
+        assert cluster_turns(transcript, "SPEAKER_00") == [(1.0, 31.0)]
 
     def test_dense_transcript_with_small_gaps_is_unaffected_by_the_gap_condition(self):
         # Regression guard: R2's gap-split must never fire on ordinary speech.
@@ -188,6 +198,20 @@ class TestSelectClusterSpans:
             duration=0.0,
         )
         assert select_cluster_spans(transcript, "A") == [(1.0, 9.0)]
+
+    def test_far_apart_real_end_segments_yield_no_qualifying_span(self):
+        # Review finding R2, closed: the reviewer's exact JSON probe (10-13s
+        # and 900-903s, 1000s recording) now yields two 3s real turns, each
+        # excluded (the first by the boundary rule, the second for being
+        # under min_turn_seconds after trimming).
+        transcript = TranscriptResult(
+            segments=[
+                Segment(text="hi there", start=10.0, end=13.0, speaker="SPEAKER_00"),
+                Segment(text="hi again", start=900.0, end=903.0, speaker="SPEAKER_00"),
+            ],
+            duration=1000.0,
+        )
+        assert select_cluster_spans(transcript, "SPEAKER_00") == []
 
     def test_a_sparse_boundary_utterance_is_correctly_excluded_after_the_turn_cap(self):
         # Review finding F3, reproduced exactly (spec probe e): pre-fix,
